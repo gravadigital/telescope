@@ -1,0 +1,438 @@
+.manage-event-page {
+  min-height: calc(100vh - 60px);
+  padding: 2rem;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+}
+
+.manage-event-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.manage-header {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.manage-header h1 {
+  font-size: 2.5rem;
+  margin: 1rem 0 0.5rem 0;
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.manage-header .subtitle {
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 1.5rem;
+}
+
+.back-button {
+  margin-bottom: 1rem;
+}
+
+/* Event Info Card */
+.event-info-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.event-info-card h2 {
+  font-size: 1.8rem;
+  color: #fff;
+  margin-bottom: 1rem;
+}
+
+.event-description {
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+
+.event-meta {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.meta-label {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.meta-value {
+  font-size: 1.1rem;
+  color: #fff;
+  font-weight: 500;
+}
+
+/* Edit Deadline Button - S-003 */
+.btn-edit-deadline {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  margin-left: 8px;
+  font-size: 1rem;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.btn-edit-deadline:hover {
+  opacity: 1;
+}
+
+.btn-set-deadline {
+  background: none;
+  border: 1px dashed rgba(106, 90, 205, 0.6);
+  border-radius: 6px;
+  color: var(--color-primary-hover);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: 4px;
+}
+
+.btn-set-deadline:hover {
+  background: rgba(106, 90, 205, 0.15);
+  border-color: var(--color-primary-hover);
+  color: #fff;
+}
+
+/* Deadline meta item highlight - S-003 */
+.meta-item.deadline-meta {
+  background: rgba(108, 92, 231, 0.1);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(108, 92, 231, 0.3);
+}
+
+/* Current date info for edit modal - S-003 */
+.current-date-info {
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 16px;
+}
+
+.current-date-info strong {
+  color: #fff;
+}
+
+/* Stage Control Section */
+.stage-control-section {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stage-control-section h3 {
+  font-size: 1.5rem;
+  color: #fff;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.stage-flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.stage-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  min-width: 120px;
+  transition: all 0.3s ease;
+}
+
+.stage-item.active {
+  background: rgba(255, 165, 0, 0.2);
+  border-color: var(--color-primary);
+}
+
+.stage-item.completed {
+  background: rgba(40, 167, 69, 0.2);
+  border-color: #28a745;
+}
+
+.stage-number {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.stage-item.active .stage-number {
+  background: var(--color-primary);
+}
+
+.stage-item.completed .stage-number {
+  background: #28a745;
+}
+
+.stage-name {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+  text-align: center;
+}
+
+.stage-arrow {
+  font-size: 1.5rem;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.stage-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.completed-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 2rem;
+  background: rgba(40, 167, 69, 0.2);
+  border: 2px solid #28a745;
+  border-radius: 8px;
+  color: #28a745;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.completed-icon {
+  font-size: 1.5rem;
+}
+
+/* Voting Configuration Section */
+.voting-configuration-section {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.voting-configured-section {
+  background: rgba(40, 167, 69, 0.1);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.voting-configured-section .alert {
+  background: transparent;
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.voting-configured-section h3 {
+  color: #28a745;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.voting-configured-section p {
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.6;
+  margin-bottom: 0.5rem;
+}
+
+/* Participants Section */
+.participants-section {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.participants-section h3 {
+  font-size: 1.5rem;
+  color: #fff;
+  margin-bottom: 1.5rem;
+}
+
+.participants-table {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.participants-table .table-header {
+  display: grid;
+  grid-template-columns: 1.5fr 2fr 1.2fr 1.2fr;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.participants-table .table-body {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.participants-table .table-row {
+  display: grid;
+  grid-template-columns: 1.5fr 2fr 1.2fr 1.2fr;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background 0.2s ease;
+}
+
+.participants-table .table-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.participants-table .table-row:last-child {
+  border-bottom: none;
+}
+
+.participants-table .table-cell {
+  color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+}
+
+/* Loading States */
+.loading-state,
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  text-align: center;
+  color: #fff;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+.loading-spinner-small {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 0.5rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error-state h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.empty-state p {
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .manage-event-page {
+    padding: 1rem;
+  }
+
+  .manage-header h1 {
+    font-size: 2rem;
+  }
+
+  .event-info-card,
+  .stage-control-section,
+  .participants-section {
+    padding: 1.5rem;
+  }
+
+  .event-meta {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .stage-flow {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .stage-arrow {
+    transform: rotate(90deg);
+  }
+
+  .participants-table .table-header,
+  .participants-table .table-row {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .participants-table .table-header .header-cell::before,
+  .participants-table .table-cell::before {
+    content: attr(data-label);
+    font-weight: 600;
+    margin-right: 0.5rem;
+  }
+
+  .stage-actions {
+    flex-direction: column;
+  }
+
+  .stage-actions .btn {
+    width: 100%;
+  }
+}

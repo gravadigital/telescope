@@ -1,0 +1,7 @@
+# Archivo de entorno con secretos
+.env
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+

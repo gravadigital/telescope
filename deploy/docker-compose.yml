@@ -1,0 +1,126 @@
+name: telescope
+
+networks:
+  telescope-database:
+    name: "telescope-${ENVIRONMENT}-database"
+  ingress-network:
+    external: true
+    name: "${INGRESS_NETWORK}"
+
+volumes:
+  telescope-database:
+    name: "telescope-${ENVIRONMENT}-database"
+  telescope-minio:
+    name: "telescope-${ENVIRONMENT}-minio"
+
+services:
+  telescope-database:
+    image: postgres:15-alpine
+    container_name: telescope-${ENVIRONMENT}-database
+    restart: always
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - telescope-database:/var/lib/postgresql/data
+    networks:
+      - telescope-database
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  telescope-api:
+    image: registry.git.grava.io/telescope/api:dev
+    container_name: telescope-${ENVIRONMENT}-api
+    restart: always
+    environment:
+      - VIRTUAL_HOST=api.${DOMAIN}
+      - VIRTUAL_PORT=8080
+      - LETSENCRYPT_HOST=api.${DOMAIN}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_NAME=${POSTGRES_DB}
+      - DB_SSLMODE=${DB_SSLMODE}
+      - PORT=8080
+      - GIN_MODE=${GIN_MODE}
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE}
+      - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS}
+      - CORS_ALLOW_METHODS=${CORS_ALLOW_METHODS}
+      - CORS_ALLOW_HEADERS=${CORS_ALLOW_HEADERS}
+      - FRONTEND_URL=https://${DOMAIN}
+      - STORAGE_PROVIDER=minio
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - MINIO_BUCKET=${MINIO_BUCKET:-telescopio}
+      - MINIO_USE_SSL=${MINIO_USE_SSL:-false}
+      - MINIO_REGION=${MINIO_REGION:-us-east-1}
+    networks:
+      - ingress-network
+      - telescope-database
+    depends_on:
+      telescope-database:
+        condition: service_healthy
+      telescope-minio:
+        condition: service_healthy
+
+  telescope-web:
+    image: registry.git.grava.io/telescope/web:dev
+    container_name: telescope-${ENVIRONMENT}-web
+    restart: always
+    environment:
+      - VIRTUAL_HOST=${DOMAIN}
+      - VIRTUAL_PORT=80
+      - LETSENCRYPT_HOST=${DOMAIN}
+    networks:
+      - ingress-network
+    depends_on:
+      - telescope-api
+
+  telescope-pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: telescope-${ENVIRONMENT}-pgadmin
+    restart: always
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    environment:
+      - VIRTUAL_HOST=pgadmin.${DOMAIN}
+      - VIRTUAL_PORT=80
+      - LETSENCRYPT_HOST=pgadmin.${DOMAIN}
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD}
+      - PGADMIN_CONFIG_SERVER_MODE=False
+    networks:
+      - ingress-network
+      - telescope-database
+    profiles:
+      - tools
+
+  telescope-minio:
+    image: quay.io/minio/minio:latest
+    container_name: telescope-${ENVIRONMENT}-minio
+    restart: always
+    command: server /data --console-address ":9001"
+    ports:
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin123}
+      - VIRTUAL_HOST=minio.${DOMAIN}
+      - VIRTUAL_PORT=9001
+      - LETSENCRYPT_HOST=minio.${DOMAIN}
+    volumes:
+      - telescope-minio:/data
+    networks:
+      - telescope-database
+      - ingress-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3

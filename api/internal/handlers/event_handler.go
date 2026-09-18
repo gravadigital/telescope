@@ -1,0 +1,1645 @@
+package handlers
+
+import (
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/charmbracelet/log"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/gravadigital/telescopio-api/internal/config"
+	"github.com/gravadigital/telescopio-api/internal/domain/event"
+	"github.com/gravadigital/telescopio-api/internal/domain/participant"
+	"github.com/gravadigital/telescopio-api/internal/email"
+	"github.com/gravadigital/telescopio-api/internal/logger"
+	"github.com/gravadigital/telescopio-api/internal/storage/postgres"
+)
+
+type EventHandler struct {
+	eventRepo      postgres.EventRepository
+	userRepo       postgres.UserRepository
+	attachmentRepo postgres.AttachmentRepository
+	emailService   *email.EmailService
+	config         *config.Config
+	log            *log.Logger
+}
+
+func NewEventHandler(eventRepo postgres.EventRepository, userRepo postgres.UserRepository, attachmentRepo postgres.AttachmentRepository, emailService *email.EmailService, cfg *config.Config) *EventHandler {
+	return &EventHandler{
+		eventRepo:      eventRepo,
+		userRepo:       userRepo,
+		attachmentRepo: attachmentRepo,
+		emailService:   emailService,
+		config:         cfg,
+		log:            logger.Handler("event"),
+	}
+}
+
+type CreateEventRequest struct {
+	Name            string `json:"name" binding:"required,min=3,max=200"`
+	Description     string `json:"description" binding:"required,min=10,max=2000"`
+	StartDate       string `json:"start_date" binding:"required"`
+	EndDate         string `json:"end_date" binding:"required"`
+	Organizer       string `json:"organizer"`
+	AuthorID        string `json:"author_id"`        // Optional: if provided, use this as author_id
+	MaxParticipants *int   `json:"max_participants"` // Optional: if provided, use this limit (default: 20)
+}
+
+// CreateEvent handles POST /api/events
+// Requires JWT authentication (middleware enforced)
+func (h *EventHandler) CreateEvent(c *gin.Context) {
+	h.log.Debug("received create event request")
+
+	// Get authenticated user ID from JWT middleware context
+	userIDStr, exists := c.Get("user_id")
+	if !exists {
+		h.log.Warn("unauthenticated create event attempt")
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "Authentication required",
+			"code":  "UNAUTHORIZED",
+		})
+		return
+	}
+
+	var req CreateEventRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.log.Error("invalid request payload for create event", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request payload",
+			"code":    "INVALID_PAYLOAD",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Parse and validate dates
+	startDate, err := time.Parse("2006-01-02", req.StartDate)
+	if err != nil {
+		h.log.Warn("invalid start_date format", "start_date", req.StartDate, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid start_date format",
+			"code":    "INVALID_START_DATE",
+			"details": "Expected format: YYYY-MM-DD",
+		})
+		return
+	}
+
+	endDate, err := time.Parse("2006-01-02", req.EndDate)
+	if err != nil {
+		h.log.Warn("invalid end_date format", "end_date", req.EndDate, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid end_date format",
+			"code":    "INVALID_END_DATE",
+			"details": "Expected format: YYYY-MM-DD",
+		})
+		return
+	}
+
+	// Business validation for dates
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	if startDate.Before(today) {
+		h.log.Warn("start_date is in the past", "start_date", req.StartDate)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Start date cannot be in the past",
+			"code":  "PAST_START_DATE",
+		})
+		return
+	}
+
+	if endDate.Before(startDate) {
+		h.log.Warn("end_date before start_date", "start_date", req.StartDate, "end_date", req.EndDate)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "End date must be after start date",
+			"code":  "INVALID_DATE_RANGE",
+		})
+		return
+	}
+
+	// Validate event duration (minimum 1 day, maximum 1 year)
+	duration := endDate.Sub(startDate)
+	minDuration := 24 * time.Hour
+	maxDuration := 365 * 24 * time.Hour
+
+	if duration < minDuration {
+		h.log.Warn("event duration too short", "duration", duration)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Event duration must be at least 1 day",
+			"code":  "DURATION_TOO_SHORT",
+		})
+		return
+	}
+
+	if duration > maxDuration {
+		h.log.Warn("event duration too long", "duration", duration)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Event duration cannot exceed 1 year",
+			"code":  "DURATION_TOO_LONG",
+		})
+		return
+	}
+
+	// Use authenticated user as the event author
+	authorID, err := uuid.Parse(userIDStr.(string))
+	if err != nil {
+		h.log.Error("invalid user_id from JWT token", "user_id", userIDStr, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Invalid authentication token",
+			"code":  "INVALID_TOKEN",
+		})
+		return
+	}
+
+	// Verify user exists in database
+	user, err := h.userRepo.GetByID(authorID.String())
+	if err != nil {
+		h.log.Error("authenticated user not found in database", "user_id", authorID, "error", err)
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "User account not found",
+			"code":  "USER_NOT_FOUND",
+		})
+		return
+	}
+
+	h.log.Debug("creating event for authenticated user", "author_id", authorID, "author_name", user.Name)
+
+	// Check for duplicate event names (optional business rule)
+	existingEvents, err := h.eventRepo.GetAll()
+	if err == nil {
+		for _, existingEvent := range existingEvents {
+			if existingEvent.Name == req.Name {
+				h.log.Warn("duplicate event name", "event_name", req.Name)
+				c.JSON(http.StatusConflict, gin.H{
+					"error": "An event with this name already exists",
+					"code":  "DUPLICATE_EVENT_NAME",
+				})
+				return
+			}
+		}
+	}
+
+	newEvent := event.NewEvent(req.Name, req.Description, authorID, startDate, endDate, req.Organizer)
+
+	// Set custom max_participants if provided, otherwise use default (20)
+	if req.MaxParticipants != nil {
+		if *req.MaxParticipants < 1 {
+			h.log.Warn("invalid max_participants value", "value", *req.MaxParticipants)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "max_participants must be at least 1",
+				"code":    "INVALID_MAX_PARTICIPANTS",
+				"details": "Please provide a positive number",
+			})
+			return
+		}
+		if *req.MaxParticipants > 100 {
+			h.log.Warn("max_participants exceeds system limit", "value", *req.MaxParticipants)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "max_participants cannot exceed 100",
+				"code":    "MAX_PARTICIPANTS_LIMIT_EXCEEDED",
+				"details": "System limit is 100 participants per event",
+			})
+		return
+	}
+	newEvent.MaxParticipants = req.MaxParticipants
+	h.log.Debug("using custom max_participants", "value", *req.MaxParticipants)
+}	// Validate the event domain entity
+	if err := newEvent.Validate(); err != nil {
+		h.log.Error("event validation failed", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Event validation failed",
+			"code":    "VALIDATION_FAILED",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	if err := h.eventRepo.Create(newEvent); err != nil {
+		h.log.Error("failed to create event", "error", err, "event_name", req.Name)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to create event",
+			"code":  "DB_CREATE_ERROR",
+		})
+		return
+	}
+
+	// Add creator as participant with 'creator' role
+	if err := h.eventRepo.AddParticipantWithRole(newEvent.ID.String(), authorID.String(), event.RoleCreator); err != nil {
+		h.log.Error("failed to add creator as participant", "error", err, "event_id", newEvent.ID)
+		// Don't fail the request - event was created successfully
+		// Creator might need to be added manually later
+	}
+
+	h.log.Info("event created successfully", "event_id", newEvent.ID, "event_name", newEvent.Name, "author_id", authorID)
+
+	c.JSON(http.StatusCreated, gin.H{
+		"event": gin.H{
+			"id":               newEvent.ID.String(),
+			"name":             newEvent.Name,
+			"description":      newEvent.Description,
+			"start_date":       newEvent.StartDate.Format("2006-01-02"),
+			"end_date":         newEvent.EndDate.Format("2006-01-02"),
+			"organizer":        newEvent.Organizer,
+			"shareable_link":   newEvent.ShareableLink,
+			"max_participants": newEvent.MaxParticipants,
+			"stage":            newEvent.Stage.String(),
+			"author_id":        newEvent.AuthorID.String(),
+			"created_at":       newEvent.CreatedAt,
+		},
+		"message": "Event created successfully",
+		"code":    "EVENT_CREATED",
+	})
+}
+
+type UpdateStageRequest struct {
+	Stage            string `json:"stage" binding:"required"`
+	EstimatedEndDate string `json:"estimated_end_date"` // Optional: YYYY-MM-DD format, required for participation/voting
+}
+
+type UpdateEstimatedEndDateRequest struct {
+	Stage            string `json:"stage" binding:"required"`
+	EstimatedEndDate string `json:"estimated_end_date" binding:"required"`
+}
+
+// UpdateEventStage handles PATCH /api/events/{event_id}/stage
+func (h *EventHandler) UpdateEventStage(c *gin.Context) {
+	eventID := c.Param("event_id")
+
+	h.log.Debug("updating event stage", "event_id", eventID)
+
+	// Validate required parameters
+	if eventID == "" {
+		h.log.Warn("missing event_id parameter")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "event_id is required",
+			"code":  "MISSING_EVENT_ID",
+		})
+		return
+	}
+
+	// Validate UUID format
+	if _, err := uuid.Parse(eventID); err != nil {
+		h.log.Warn("invalid event_id format", "event_id", eventID, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid event_id format",
+			"code":  "INVALID_EVENT_ID",
+		})
+		return
+	}
+
+	var req UpdateStageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.log.Warn("invalid request payload for stage update", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request payload",
+			"code":    "INVALID_PAYLOAD",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Authorization is handled by RequireEventOwner middleware
+	// User is guaranteed to be the event owner or admin at this point
+
+	// Get the event
+	existingEvent, err := h.eventRepo.GetByID(eventID)
+	if err != nil {
+		h.log.Error("event not found", "event_id", eventID, "error", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Event not found",
+			"code":  "EVENT_NOT_FOUND",
+		})
+		return
+	}
+
+	// Parse and validate the new stage
+	newStage, valid := event.StageFromString(req.Stage)
+	if !valid {
+		h.log.Warn("invalid stage requested", "requested_stage", req.Stage)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":        "Invalid stage",
+			"code":         "INVALID_STAGE",
+			"valid_stages": []string{"creation", "participation", "voting", "results"},
+		})
+		return
+	}
+
+	// Check if transition is valid
+	if !existingEvent.CanTransitionTo(newStage) {
+		h.log.Warn("invalid stage transition",
+			"event_id", eventID,
+			"current_stage", existingEvent.Stage.String(),
+			"requested_stage", req.Stage)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":           "Invalid stage transition",
+			"code":            "INVALID_TRANSITION",
+			"current_stage":   existingEvent.Stage.String(),
+			"requested_stage": req.Stage,
+		})
+		return
+	}
+
+	// Validate estimated_end_date for participation and voting stages
+	var estimatedDate *time.Time
+	if newStage == event.StageParticipation || newStage == event.StageVoting {
+		if req.EstimatedEndDate == "" {
+			h.log.Warn("missing estimated_end_date for stage transition", "stage", req.Stage)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "estimated_end_date is required when advancing to participation or voting stage",
+				"code":  "MISSING_ESTIMATED_DATE",
+			})
+			return
+		}
+
+		parsedDate, err := time.Parse("2006-01-02", req.EstimatedEndDate)
+		if err != nil {
+			h.log.Warn("invalid estimated_end_date format", "date", req.EstimatedEndDate, "error", err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "Invalid estimated_end_date format",
+				"code":    "INVALID_DATE_FORMAT",
+				"details": "Expected format: YYYY-MM-DD",
+			})
+			return
+		}
+
+		// Validate date is not in the past
+		today := time.Now().Truncate(24 * time.Hour)
+		if parsedDate.Before(today) {
+			h.log.Warn("estimated_end_date is in the past", "date", req.EstimatedEndDate)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "Estimated end date must be today or in the future",
+				"code":    "INVALID_ESTIMATED_DATE",
+				"details": "Provided date: " + req.EstimatedEndDate + ", Current date: " + today.Format("2006-01-02"),
+			})
+			return
+		}
+
+		estimatedDate = &parsedDate
+	}
+
+	// Additional business rules validation before stage transitions
+	switch newStage {
+	case event.StageVoting:
+		h.log.Debug("moving to voting stage", "event_id", eventID)
+
+		// Validate that there are enough attachments for voting
+		attachments, err := h.attachmentRepo.GetByEventID(eventID)
+		if err != nil {
+			h.log.Error("failed to get attachments", "event_id", eventID, "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to validate attachments",
+				"code":  "ATTACHMENTS_ERROR",
+			})
+			return
+		}
+
+		if len(attachments) == 0 {
+			h.log.Warn("attempting to move to voting stage without attachments", "event_id", eventID)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Cannot move to voting stage without attachments. Participants must upload their proposals first.",
+				"code":  "NO_ATTACHMENTS",
+			})
+			return
+		}
+
+		// Validate minimum attachments for meaningful voting (at least 2)
+		if len(attachments) < 2 {
+			h.log.Warn("insufficient attachments for voting", "event_id", eventID, "attachment_count", len(attachments))
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":            "At least 2 attachments are required for meaningful voting",
+				"code":             "INSUFFICIENT_ATTACHMENTS",
+				"current_count":    len(attachments),
+				"required_minimum": 2,
+			})
+			return
+		}
+
+		h.log.Info("voting stage validation passed", "event_id", eventID, "attachments", len(attachments))
+
+	case event.StageResult:
+		h.log.Debug("moving to results stage", "event_id", eventID)
+	}
+
+	// Update stage with estimated date
+	if err := h.eventRepo.UpdateStageWithEstimatedDate(eventID, newStage, estimatedDate); err != nil {
+		h.log.Error("failed to update event stage", "event_id", eventID, "new_stage", req.Stage, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to update event stage",
+			"code":  "DB_UPDATE_ERROR",
+		})
+		return
+	}
+
+	// Get updated event
+	updatedEvent, err := h.eventRepo.GetByID(eventID)
+	if err != nil {
+		h.log.Error("failed to retrieve updated event", "event_id", eventID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to retrieve updated event",
+			"code":  "RETRIEVAL_ERROR",
+		})
+		return
+	}
+
+	h.log.Info("event stage updated successfully",
+		"event_id", eventID,
+		"old_stage", existingEvent.Stage.String(),
+		"new_stage", updatedEvent.Stage.String())
+
+	// Notify participants asynchronously — errors are logged but don't fail the request
+	go func() {
+		participants, err := h.userRepo.GetEventParticipants(updatedEvent.ID.String())
+		if err != nil {
+			h.log.Warn("failed to get participants for stage change email", "event_id", eventID, "error", err)
+			return
+		}
+		emails := make([]string, 0, len(participants))
+		for _, p := range participants {
+			emails = append(emails, p.Email)
+		}
+		if err := h.emailService.SendStageChangeNotification(updatedEvent.Name, updatedEvent.Stage.String(), emails); err != nil {
+			h.log.Warn("failed to send stage change emails", "event_id", eventID, "error", err)
+		}
+	}()
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": gin.H{
+			"id":                               updatedEvent.ID.String(),
+			"name":                             updatedEvent.Name,
+			"description":                      updatedEvent.Description,
+			"start_date":                       updatedEvent.StartDate.Format("2006-01-02"),
+			"end_date":                         updatedEvent.EndDate.Format("2006-01-02"),
+			"stage":                            updatedEvent.Stage.String(),
+			"participation_estimated_end_date": formatDatePtr(updatedEvent.ParticipationEstimatedEndDate),
+			"voting_estimated_end_date":        formatDatePtr(updatedEvent.VotingEstimatedEndDate),
+			"author_id":                        updatedEvent.AuthorID.String(),
+			"updated_at":                       updatedEvent.UpdatedAt,
+		},
+		"message": "Event stage updated successfully",
+		"code":    "STAGE_UPDATED",
+		"transition": gin.H{
+			"from": existingEvent.Stage.String(),
+			"to":   updatedEvent.Stage.String(),
+		},
+	})
+}
+
+// UpdateEstimatedEndDate handles PATCH /api/v1/events/{event_id}/estimated-end-date
+// Allows the event organizer to edit the estimated end date for an active stage
+func (h *EventHandler) UpdateEstimatedEndDate(c *gin.Context) {
+	eventID := c.Param("event_id")
+
+	h.log.Debug("updating estimated end date", "event_id", eventID)
+
+	// Validate UUID format
+	if _, err := uuid.Parse(eventID); err != nil {
+		h.log.Warn("invalid event_id format", "event_id", eventID, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid event_id format",
+			"code":  "INVALID_EVENT_ID",
+		})
+		return
+	}
+
+	var req UpdateEstimatedEndDateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.log.Warn("invalid request payload", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request payload",
+			"code":    "INVALID_PAYLOAD",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Get the event
+	existingEvent, err := h.eventRepo.GetByID(eventID)
+	if err != nil {
+		h.log.Error("event not found", "event_id", eventID, "error", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Event not found",
+			"code":  "EVENT_NOT_FOUND",
+		})
+		return
+	}
+
+	// Parse and validate target stage
+	targetStage, valid := event.StageFromString(req.Stage)
+	if !valid || (targetStage != event.StageParticipation && targetStage != event.StageVoting) {
+		h.log.Warn("invalid stage for estimated end date", "stage", req.Stage)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":        "Invalid stage for estimated end date",
+			"code":         "INVALID_STAGE",
+			"valid_stages": []string{"participation", "voting"},
+		})
+		return
+	}
+
+	// Validate event is in the specified stage
+	if existingEvent.Stage != targetStage {
+		h.log.Warn("event not in specified stage",
+			"event_id", eventID,
+			"current_stage", existingEvent.Stage.String(),
+			"requested_stage", req.Stage)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Event is not in the specified stage",
+			"code":  "INVALID_STAGE_FOR_EDIT",
+			"details": gin.H{
+				"current_stage":   existingEvent.Stage.String(),
+				"requested_stage": req.Stage,
+			},
+		})
+		return
+	}
+
+	// Parse new date
+	newDate, err := time.Parse("2006-01-02", req.EstimatedEndDate)
+	if err != nil {
+		h.log.Warn("invalid date format", "date", req.EstimatedEndDate, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid estimated_end_date format",
+			"code":    "INVALID_DATE_FORMAT",
+			"details": "Expected format: YYYY-MM-DD",
+		})
+		return
+	}
+
+	// Validate new date is not in the past
+	today := time.Now().Truncate(24 * time.Hour)
+	if newDate.Before(today) {
+		h.log.Warn("new date is in the past", "date", req.EstimatedEndDate)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Estimated end date must be today or in the future",
+			"code":  "INVALID_ESTIMATED_DATE",
+		})
+		return
+	}
+
+	// Get current estimated date for the stage
+	var currentDate *time.Time
+	if targetStage == event.StageParticipation {
+		currentDate = existingEvent.ParticipationEstimatedEndDate
+	} else {
+		currentDate = existingEvent.VotingEstimatedEndDate
+	}
+
+	// Removed restriction: organizer can freely change estimated end date (advance or postpone)
+	if false && currentDate != nil && !currentDate.Before(today) && newDate.Before(*currentDate) {
+		h.log.Warn("attempt to advance deadline",
+			"event_id", eventID,
+			"current_date", currentDate.Format("2006-01-02"),
+			"requested_date", req.EstimatedEndDate)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "You can only postpone the deadline, not bring it forward",
+			"code":  "CANNOT_ADVANCE_DEADLINE",
+			"details": gin.H{
+				"current_date":   currentDate.Format("2006-01-02"),
+				"requested_date": req.EstimatedEndDate,
+			},
+		})
+		return
+	}
+
+	// Update estimated end date
+	if err := h.eventRepo.UpdateEstimatedEndDate(eventID, targetStage, newDate); err != nil {
+		h.log.Error("failed to update estimated end date", "event_id", eventID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to update estimated end date",
+			"code":  "UPDATE_ERROR",
+		})
+		return
+	}
+
+	h.log.Info("estimated end date updated",
+		"event_id", eventID,
+		"stage", req.Stage,
+		"new_date", req.EstimatedEndDate)
+
+	// Notify participants asynchronously
+	go func() {
+		participants, err := h.userRepo.GetEventParticipants(eventID)
+		if err != nil {
+			h.log.Warn("failed to get participants for estimated date email", "event_id", eventID, "error", err)
+			return
+		}
+		emails := make([]string, 0, len(participants))
+		for _, p := range participants {
+			emails = append(emails, p.Email)
+		}
+		if err := h.emailService.SendEstimatedDateChangeNotification(existingEvent.Name, req.Stage, req.EstimatedEndDate, emails); err != nil {
+			h.log.Warn("failed to send estimated date change emails", "event_id", eventID, "error", err)
+		}
+	}()
+
+	// Build response
+	previousDateStr := ""
+	if currentDate != nil {
+		previousDateStr = currentDate.Format("2006-01-02")
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Estimated end date updated successfully",
+		"data": gin.H{
+			"event_id":           eventID,
+			"stage":              req.Stage,
+			"estimated_end_date": req.EstimatedEndDate,
+			"previous_date":      previousDateStr,
+		},
+		"code": "ESTIMATED_DATE_UPDATED",
+	})
+}
+
+type RegisterParticipantRequest struct {
+	ParticipantName  string `json:"participant_name" binding:"required,min=2,max=100"`
+	ParticipantEmail string `json:"participant_email" binding:"required,email"`
+}
+
+// RegisterParticipant handles POST /api/events/{event_id}/register
+func (h *EventHandler) RegisterParticipant(c *gin.Context) {
+	eventID := c.Param("event_id")
+
+	h.log.Debug("registering participant", "event_id", eventID)
+
+	// Validate required parameters
+	if eventID == "" {
+		h.log.Warn("missing event_id parameter")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "event_id is required",
+			"code":  "MISSING_EVENT_ID",
+		})
+		return
+	}
+
+	// Validate UUID format
+	eventUUID, err := uuid.Parse(eventID)
+	if err != nil {
+		h.log.Warn("invalid event_id format", "event_id", eventID, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid event_id format",
+			"code":  "INVALID_EVENT_ID",
+		})
+		return
+	}
+
+	var req RegisterParticipantRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.log.Warn("invalid request payload for participant registration", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request payload",
+			"code":    "INVALID_PAYLOAD",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Check if event exists and is in participation stage
+	eventObj, err := h.eventRepo.GetByID(eventID)
+	if err != nil {
+		h.log.Error("event not found", "event_id", eventID, "error", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Event not found",
+			"code":  "EVENT_NOT_FOUND",
+		})
+		return
+	}
+
+	// Only allow registration during participation stage
+	if eventObj.Stage != event.StageParticipation {
+		h.log.Warn("registration attempt outside participation stage",
+			"event_id", eventID,
+			"current_stage", eventObj.Stage.String())
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":         "Participant registration is only allowed during participation stage",
+			"code":          "INVALID_REGISTRATION_STAGE",
+			"current_stage": eventObj.Stage.String(),
+		})
+		return
+	}
+
+	// Block registration if event is paused
+	if eventObj.IsPaused {
+		h.log.Warn("registration attempt on paused event", "event_id", eventID)
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "This event is currently paused. Registration is not available.",
+			"code":  "EVENT_PAUSED",
+		})
+		return
+	}
+
+	existingUser, err := h.userRepo.GetByEmail(req.ParticipantEmail)
+	if err != nil {
+		// User doesn't exist, create a new one
+		h.log.Debug("creating new user", "email", req.ParticipantEmail, "name", req.ParticipantName)
+
+		newUser := &participant.User{
+			ID:    uuid.New(),
+			Name:  req.ParticipantName,
+			Email: req.ParticipantEmail,
+			Role:  participant.RoleParticipant,
+		}
+
+		if err := h.userRepo.Create(newUser); err != nil {
+			h.log.Error("failed to create participant", "email", req.ParticipantEmail, "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to create participant",
+				"code":  "USER_CREATE_ERROR",
+			})
+			return
+		}
+		existingUser = newUser
+		h.log.Info("new user created", "user_id", newUser.ID, "email", newUser.Email)
+	} else {
+		h.log.Debug("using existing user", "user_id", existingUser.ID, "email", existingUser.Email)
+	}
+
+	// Prevent event creator from registering as participant
+	if existingUser.ID == eventObj.AuthorID {
+		h.log.Warn("event creator attempted to register as participant",
+			"event_id", eventID,
+			"user_id", existingUser.ID.String())
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Event creator cannot register as a participant",
+			"code":  "CREATOR_CANNOT_REGISTER",
+		})
+		return
+	}
+
+	// Check if participant is already registered for this event
+	participantEvents, err := h.eventRepo.GetByParticipant(existingUser.ID.String())
+	if err == nil && len(participantEvents) > 0 {
+		for _, evt := range participantEvents {
+			if evt.ID == eventUUID {
+				h.log.Warn("duplicate registration attempt",
+					"event_id", eventID,
+					"user_id", existingUser.ID.String())
+				c.JSON(http.StatusConflict, gin.H{
+					"error": "Participant is already registered for this event",
+					"code":  "ALREADY_REGISTERED",
+				})
+				return
+			}
+		}
+	}
+
+	// Check maximum participants limit
+	currentParticipants, err := h.userRepo.GetEventParticipants(eventID)
+	if err != nil {
+		h.log.Error("failed to get current participants count",
+			"event_id", eventID,
+			"error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to verify participant limit",
+			"code":  "PARTICIPANT_CHECK_ERROR",
+		})
+		return
+	}
+
+	// Use max_participants from event configuration (default: 20)
+	maxParticipants := 20 // Default value
+	if eventObj.MaxParticipants != nil && *eventObj.MaxParticipants > 0 {
+		maxParticipants = *eventObj.MaxParticipants
+	}
+
+	if len(currentParticipants) >= maxParticipants {
+		h.log.Warn("maximum participants reached",
+			"event_id", eventID,
+			"current_count", len(currentParticipants),
+			"max_participants", maxParticipants)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":            "Maximum number of participants reached for this event",
+			"code":             "MAX_PARTICIPANTS_REACHED",
+			"current_count":    len(currentParticipants),
+			"max_participants": maxParticipants,
+		})
+		return
+	}
+
+	// Add participant to event with 'participant' role
+	if err := h.eventRepo.AddParticipantWithRole(eventID, existingUser.ID.String(), event.RoleParticipant); err != nil {
+		h.log.Error("failed to register participant",
+			"event_id", eventID,
+			"user_id", existingUser.ID.String(),
+			"error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to register participant",
+			"code":  "REGISTRATION_ERROR",
+		})
+		return
+	}
+
+	h.log.Info("participant registered successfully",
+		"event_id", eventID,
+		"user_id", existingUser.ID.String(),
+		"email", existingUser.Email)
+
+	c.JSON(http.StatusCreated, gin.H{
+		"data": gin.H{
+			"participant_id":    existingUser.ID.String(),
+			"participant_name":  existingUser.Name,
+			"participant_email": existingUser.Email,
+			"event_id":          eventID,
+			"event_name":        eventObj.Name,
+			"registered_at":     time.Now(),
+		},
+		"message": "Participant registered successfully",
+		"code":    "PARTICIPANT_REGISTERED",
+	})
+}
+
+// GetEventParticipants handles GET /api/events/{event_id}/participants
+func (h *EventHandler) GetEventParticipants(c *gin.Context) {
+	eventID := c.Param("event_id")
+
+	h.log.Debug("retrieving event participants", "event_id", eventID)
+
+	// Validate required parameters
+	if eventID == "" {
+		h.log.Warn("missing event_id parameter")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "event_id is required",
+			"code":  "MISSING_EVENT_ID",
+		})
+		return
+	}
+
+	// Validate UUID format
+	if _, err := uuid.Parse(eventID); err != nil {
+		h.log.Warn("invalid event_id format", "event_id", eventID, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid event_id format",
+			"code":  "INVALID_EVENT_ID",
+		})
+		return
+	}
+
+	// Check if event exists
+	eventObj, err := h.eventRepo.GetByID(eventID)
+	if err != nil {
+		h.log.Error("event not found", "event_id", eventID, "error", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Event not found",
+			"code":  "EVENT_NOT_FOUND",
+		})
+		return
+	}
+
+	// Authentication enforced by JWT middleware
+	// Any authenticated user can view event participants
+
+	participants, err := h.userRepo.GetEventParticipants(eventID)
+	if err != nil {
+		h.log.Error("failed to retrieve participants", "event_id", eventID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to retrieve participants",
+			"code":  "RETRIEVAL_ERROR",
+		})
+		return
+	}
+
+	// Transform participants data
+	participantData := make([]gin.H, len(participants))
+	for i, p := range participants {
+		participantData[i] = gin.H{
+			"id":         p.ID.String(),
+			"name":       p.Name,
+			"email":      p.Email,
+			"role":       p.EventRole, // Use event-specific role (creator/participant)
+			"created_at": p.CreatedAt,
+		}
+	}
+
+	h.log.Debug("participants retrieved successfully", "event_id", eventID, "count", len(participants))
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": gin.H{
+			"event": gin.H{
+				"id":    eventObj.ID.String(),
+				"name":  eventObj.Name,
+				"stage": eventObj.Stage.String(),
+			},
+			"participants": participantData,
+		},
+		"count": len(participants),
+	})
+}
+
+// GetAllEvents handles GET /api/events
+func (h *EventHandler) GetAllEvents(c *gin.Context) {
+	h.log.Debug("retrieving all events")
+
+	// Add pagination support
+	page := 1
+	limit := 10
+
+	if pageStr := c.Query("page"); pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+			limit = l
+		}
+	}
+
+	// Add filtering support
+	stage := c.Query("stage")
+
+	events, err := h.eventRepo.GetAll()
+	if err != nil {
+		h.log.Error("failed to retrieve events", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to retrieve events",
+			"code":  "RETRIEVAL_ERROR",
+		})
+		return
+	}
+
+	// Filter by stage if specified
+	var filteredEvents []*event.Event
+	if stage != "" {
+		if stageEnum, valid := event.StageFromString(stage); valid {
+			for _, evt := range events {
+				if evt.Stage == stageEnum {
+					filteredEvents = append(filteredEvents, evt)
+				}
+			}
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":        "Invalid stage filter",
+				"code":         "INVALID_STAGE_FILTER",
+				"valid_stages": []string{"creation", "participation", "voting", "results"},
+			})
+			return
+		}
+	} else {
+		filteredEvents = events
+	}
+
+	// Apply pagination
+	total := len(filteredEvents)
+	start := (page - 1) * limit
+	end := start + limit
+
+	if start >= total {
+		filteredEvents = []*event.Event{}
+	} else {
+		if end > total {
+			end = total
+		}
+		filteredEvents = filteredEvents[start:end]
+	}
+
+	// Transform events data
+	eventData := make([]gin.H, len(filteredEvents))
+	for i, evt := range filteredEvents {
+		// Get participant IDs for this event
+		participantIDs := []string{}
+		participants, err := h.userRepo.GetEventParticipants(evt.ID.String())
+		if err == nil {
+			for _, p := range participants {
+				participantIDs = append(participantIDs, p.ID.String())
+			}
+		}
+
+		eventData[i] = gin.H{
+			"id":                               evt.ID.String(),
+			"name":                             evt.Name,
+			"description":                      evt.Description,
+			"start_date":                       evt.StartDate.Format("2006-01-02"),
+			"end_date":                         evt.EndDate.Format("2006-01-02"),
+			"stage":                            evt.Stage.String(),
+			"author_id":                        evt.AuthorID.String(),
+			"max_participants":                 evt.MaxParticipants,
+			"participation_estimated_end_date": formatDatePtr(evt.ParticipationEstimatedEndDate),
+			"voting_estimated_end_date":        formatDatePtr(evt.VotingEstimatedEndDate),
+			"participant_ids":                  participantIDs,
+			"is_cancelled":                     evt.IsCancelled,
+			"is_paused":                        evt.IsPaused,
+			"created_at":                       evt.CreatedAt,
+			"updated_at":                       evt.UpdatedAt,
+		}
+	}
+
+	h.log.Debug("events retrieved successfully", "total", total, "page", page, "limit", limit)
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": eventData,
+		"pagination": gin.H{
+			"page":        page,
+			"limit":       limit,
+			"total":       total,
+			"total_pages": (total + limit - 1) / limit,
+		},
+		"filters": gin.H{
+			"stage": stage,
+		},
+	})
+}
+
+// GetEvent handles GET /api/events/{event_id}
+func (h *EventHandler) GetEvent(c *gin.Context) {
+	eventID := c.Param("event_id")
+
+	h.log.Debug("retrieving event", "event_id", eventID)
+
+	// Validate required parameters
+	if eventID == "" {
+		h.log.Warn("missing event_id parameter")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "event_id is required",
+			"code":  "MISSING_EVENT_ID",
+		})
+		return
+	}
+
+	// Validate UUID format
+	if _, err := uuid.Parse(eventID); err != nil {
+		h.log.Warn("invalid event_id format", "event_id", eventID, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid event_id format",
+			"code":  "INVALID_EVENT_ID",
+		})
+		return
+	}
+
+	// Get the event
+	eventObj, err := h.eventRepo.GetByID(eventID)
+	if err != nil {
+		h.log.Error("event not found", "event_id", eventID, "error", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Event not found",
+			"code":  "EVENT_NOT_FOUND",
+		})
+		return
+	}
+
+	// Get additional statistics if requested
+	includeStats := c.Query("include_stats") == "true"
+
+	// Always get participants to populate participant_ids
+	participants, err := h.userRepo.GetEventParticipants(eventID)
+	participantIDs := []string{}
+	participantCount := 0
+	if err == nil {
+		participantCount = len(participants)
+		for _, p := range participants {
+			participantIDs = append(participantIDs, p.ID.String())
+		}
+	} else {
+		h.log.Warn("failed to get event participants", "event_id", eventID, "error", err)
+	}
+
+	// Get attachments count
+	attachments, err := h.attachmentRepo.GetByEventID(eventID)
+	attachmentCount := 0
+	if err == nil {
+		attachmentCount = len(attachments)
+	} else {
+		h.log.Warn("failed to get event attachments", "event_id", eventID, "error", err)
+	}
+
+	// Resolve organizer: use stored value or fall back to creator's username
+	organizer := eventObj.Organizer
+	if organizer == "" {
+		if author, err := h.userRepo.GetByID(eventObj.AuthorID.String()); err == nil {
+			organizer = author.Name
+		}
+	}
+
+	response := gin.H{
+		"data": gin.H{
+			"id":                               eventObj.ID.String(),
+			"name":                             eventObj.Name,
+			"description":                      eventObj.Description,
+			"start_date":                       eventObj.StartDate.Format("2006-01-02"),
+			"end_date":                         eventObj.EndDate.Format("2006-01-02"),
+			"stage":                            eventObj.Stage.String(),
+			"author_id":                        eventObj.AuthorID.String(),
+			"organizer":                        organizer,
+			"max_participants":                 eventObj.MaxParticipants,
+			"participation_estimated_end_date": formatDatePtr(eventObj.ParticipationEstimatedEndDate),
+			"voting_estimated_end_date":        formatDatePtr(eventObj.VotingEstimatedEndDate),
+			"participant_ids":                  participantIDs,
+			"attachment_count":                 attachmentCount,
+			"is_cancelled":                     eventObj.IsCancelled,
+			"is_paused":                        eventObj.IsPaused,
+			"created_at":                       eventObj.CreatedAt,
+			"updated_at":                       eventObj.UpdatedAt,
+		},
+	}
+
+	if includeStats {
+		response["statistics"] = gin.H{
+			"participants_count": participantCount,
+			"duration_days":      int(eventObj.EndDate.Sub(eventObj.StartDate).Hours() / 24),
+		}
+	}
+
+	h.log.Debug("event retrieved successfully", "event_id", eventID)
+	c.JSON(http.StatusOK, response)
+}
+
+// UpdateEvent handles PUT /api/events/{event_id}
+func (h *EventHandler) UpdateEvent(c *gin.Context) {
+	eventID := c.Param("event_id")
+
+	h.log.Debug("updating event", "event_id", eventID)
+
+	// Validate required parameters
+	if eventID == "" {
+		h.log.Warn("missing event_id parameter")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "event_id is required",
+			"code":  "MISSING_EVENT_ID",
+		})
+		return
+	}
+
+	// Validate UUID format
+	if _, err := uuid.Parse(eventID); err != nil {
+		h.log.Warn("invalid event_id format", "event_id", eventID, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid event_id format",
+			"code":  "INVALID_EVENT_ID",
+		})
+		return
+	}
+
+	// Get existing event
+	existingEvent, err := h.eventRepo.GetByID(eventID)
+	if err != nil {
+		h.log.Error("event not found", "event_id", eventID, "error", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Event not found",
+			"code":  "EVENT_NOT_FOUND",
+		})
+		return
+	}
+
+	// Only allow updates in creation stage
+	if existingEvent.Stage != event.StageCreation {
+		h.log.Warn("update attempt outside creation stage", "event_id", eventID, "current_stage", existingEvent.Stage)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":         "Event can only be updated during creation stage",
+			"code":          "INVALID_UPDATE_STAGE",
+			"current_stage": existingEvent.Stage.String(),
+		})
+		return
+	}
+
+	var req CreateEventRequest // Reuse the same struct
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.log.Warn("invalid request payload for event update", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request payload",
+			"code":    "INVALID_PAYLOAD",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Parse and validate dates
+	startDate, err := time.Parse("2006-01-02", req.StartDate)
+	if err != nil {
+		h.log.Warn("invalid start_date format", "start_date", req.StartDate, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid start_date format",
+			"code":    "INVALID_START_DATE",
+			"details": "Expected format: YYYY-MM-DD",
+		})
+		return
+	}
+
+	endDate, err := time.Parse("2006-01-02", req.EndDate)
+	if err != nil {
+		h.log.Warn("invalid end_date format", "end_date", req.EndDate, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid end_date format",
+			"code":    "INVALID_END_DATE",
+			"details": "Expected format: YYYY-MM-DD",
+		})
+		return
+	}
+
+	// Validate business rules
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	if startDate.Before(today) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Start date cannot be in the past",
+			"code":  "PAST_START_DATE",
+		})
+		return
+	}
+
+	if endDate.Before(startDate) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "End date must be after start date",
+			"code":  "INVALID_DATE_RANGE",
+		})
+		return
+	}
+
+	h.log.Warn("event update feature not implemented", "event_id", eventID)
+	c.JSON(http.StatusNotImplemented, gin.H{
+		"error":   "Event update feature is not yet implemented",
+		"code":    "NOT_IMPLEMENTED",
+		"details": "EventRepository.Update method needs to be added",
+	})
+}
+
+// DeleteEvent handles DELETE /api/events/{event_id}
+func (h *EventHandler) DeleteEvent(c *gin.Context) {
+	eventID := c.Param("event_id")
+
+	h.log.Debug("deleting event", "event_id", eventID)
+
+	// Validate required parameters
+	if eventID == "" {
+		h.log.Warn("missing event_id parameter")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "event_id is required",
+			"code":  "MISSING_EVENT_ID",
+		})
+		return
+	}
+
+	// Validate UUID format
+	if _, err := uuid.Parse(eventID); err != nil {
+		h.log.Warn("invalid event_id format", "event_id", eventID, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid event_id format",
+			"code":  "INVALID_EVENT_ID",
+		})
+		return
+	}
+
+	// Get existing event
+	existingEvent, err := h.eventRepo.GetByID(eventID)
+	if err != nil {
+		h.log.Error("event not found", "event_id", eventID, "error", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Event not found",
+			"code":  "EVENT_NOT_FOUND",
+		})
+		return
+	}
+
+	// Only allow deletion in creation stage
+	if existingEvent.Stage != event.StageCreation {
+		h.log.Warn("deletion attempt outside creation stage", "event_id", eventID, "current_stage", existingEvent.Stage)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":         "Event can only be deleted during creation stage",
+			"code":          "INVALID_DELETE_STAGE",
+			"current_stage": existingEvent.Stage.String(),
+		})
+		return
+	}
+
+	h.log.Warn("event delete feature not implemented", "event_id", eventID)
+	c.JSON(http.StatusNotImplemented, gin.H{
+		"error":   "Event delete feature is not yet implemented",
+		"code":    "NOT_IMPLEMENTED",
+		"details": "EventRepository.Delete method needs to be added",
+	})
+}
+
+// RemoveParticipant handles DELETE /api/events/{event_id}/participants/{participant_id}
+func (h *EventHandler) RemoveParticipant(c *gin.Context) {
+	eventID := c.Param("event_id")
+	participantID := c.Param("participant_id")
+
+	h.log.Debug("removing participant", "event_id", eventID, "participant_id", participantID)
+
+	// Validate required parameters
+	if eventID == "" || participantID == "" {
+		h.log.Warn("missing required parameters", "event_id", eventID, "participant_id", participantID)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "event_id and participant_id are required",
+			"code":  "MISSING_PARAMETERS",
+		})
+		return
+	}
+
+	// Validate UUID formats
+	if _, err := uuid.Parse(eventID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid event_id format",
+			"code":  "INVALID_EVENT_ID",
+		})
+		return
+	}
+
+	if _, err := uuid.Parse(participantID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid participant_id format",
+			"code":  "INVALID_PARTICIPANT_ID",
+		})
+		return
+	}
+
+	// Get existing event
+	existingEvent, err := h.eventRepo.GetByID(eventID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Event not found",
+			"code":  "EVENT_NOT_FOUND",
+		})
+		return
+	}
+
+	// Only allow removal during participation stage
+	if existingEvent.Stage != event.StageParticipation {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":         "Participants can only be removed during participation stage",
+			"code":          "INVALID_REMOVAL_STAGE",
+			"current_stage": existingEvent.Stage.String(),
+		})
+		return
+	}
+
+	participantEvents, err := h.eventRepo.GetByParticipant(participantID)
+	isRegistered := false
+	if err == nil {
+		for _, evt := range participantEvents {
+			if evt.ID.String() == eventID {
+				isRegistered = true
+				break
+			}
+		}
+	}
+
+	if !isRegistered {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Participant is not registered for this event",
+			"code":  "NOT_REGISTERED",
+		})
+		return
+	}
+
+	// Remove participant from event
+	if err := h.eventRepo.RemoveParticipant(eventID, participantID); err != nil {
+		h.log.Error("failed to remove participant", "event_id", eventID, "participant_id", participantID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to remove participant",
+			"code":  "REMOVAL_ERROR",
+		})
+		return
+	}
+
+	h.log.Info("participant removed successfully", "event_id", eventID, "participant_id", participantID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Participant removed successfully",
+		"code":    "PARTICIPANT_REMOVED",
+	})
+}
+
+// GetShareableEventInfo handles GET /api/events/{event_id}/share
+// Returns metadata for social media sharing (Open Graph, Twitter Card)
+func (h *EventHandler) GetShareableEventInfo(c *gin.Context) {
+	eventID := c.Param("event_id")
+
+	h.log.Debug("retrieving shareable event info", "event_id", eventID)
+
+	// Validate UUID format
+	if _, err := uuid.Parse(eventID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid event_id format",
+			"code":  "INVALID_EVENT_ID",
+		})
+		return
+	}
+
+	// Get the event
+	eventObj, err := h.eventRepo.GetByID(eventID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Event not found",
+			"code":  "EVENT_NOT_FOUND",
+		})
+		return
+	}
+
+	// Build shareable URL (frontend URL + shareable_link)
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	baseURL := h.config.Server.FrontendURL
+	if baseURL == "" {
+		baseURL = scheme + "://" + c.Request.Host
+	}
+	shareURL := baseURL + eventObj.ShareableLink
+
+	// Build description excerpt (first 200 chars)
+	description := eventObj.Description
+	if len(description) > 200 {
+		description = description[:197] + "..."
+	}
+
+	// Get statistics
+	participants, _ := h.userRepo.GetEventParticipants(eventID)
+	attachments, _ := h.attachmentRepo.GetByEventID(eventID)
+
+	ogImageURL := baseURL + "/og-image.png"
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": gin.H{
+			"title":          eventObj.Name,
+			"description":    description,
+			"share_url":      shareURL,
+			"shareable_link": eventObj.ShareableLink,
+			"image_url":      ogImageURL,
+			"stage":          eventObj.Stage.String(),
+			"start_date":     eventObj.StartDate.Format("2006-01-02"),
+			"end_date":       eventObj.EndDate.Format("2006-01-02"),
+			"organizer":      eventObj.Organizer,
+		},
+		"statistics": gin.H{
+			"participants_count": len(participants),
+			"attachments_count":  len(attachments),
+		},
+		"social_meta": gin.H{
+			"og_title":            eventObj.Name,
+			"og_description":      description,
+			"og_type":             "website",
+			"og_url":              shareURL,
+			"og_image":            ogImageURL,
+			"twitter_card":        "summary_large_image",
+			"twitter_title":       eventObj.Name,
+			"twitter_description": description,
+			"twitter_image":       ogImageURL,
+		},
+	})
+}
+
+// CancelEvent handles PATCH /api/v1/events/{event_id}/cancel
+// Marks an event as cancelled and notifies all participants via email.
+func (h *EventHandler) CancelEvent(c *gin.Context) {
+	eventID := c.Param("event_id")
+
+	h.log.Debug("cancelling event", "event_id", eventID)
+
+	if _, err := uuid.Parse(eventID); err != nil {
+		h.log.Warn("invalid event_id format", "event_id", eventID, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid event_id format",
+			"code":  "INVALID_EVENT_ID",
+		})
+		return
+	}
+
+	existingEvent, err := h.eventRepo.GetByID(eventID)
+	if err != nil {
+		h.log.Error("event not found", "event_id", eventID, "error", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Event not found",
+			"code":  "EVENT_NOT_FOUND",
+		})
+		return
+	}
+
+	if existingEvent.IsCancelled {
+		h.log.Warn("event already cancelled", "event_id", eventID)
+		c.JSON(http.StatusConflict, gin.H{
+			"error": "Event is already cancelled",
+			"code":  "ALREADY_CANCELLED",
+		})
+		return
+	}
+
+	if err := h.eventRepo.CancelEvent(eventID); err != nil {
+		h.log.Error("failed to cancel event", "event_id", eventID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to cancel event",
+			"code":  "CANCEL_ERROR",
+		})
+		return
+	}
+
+	h.log.Info("event cancelled successfully", "event_id", eventID)
+
+	// Notify participants asynchronously
+	go func() {
+		participants, err := h.userRepo.GetEventParticipants(eventID)
+		if err != nil {
+			h.log.Warn("failed to get participants for cancellation email", "event_id", eventID, "error", err)
+			return
+		}
+		emails := make([]string, 0, len(participants))
+		for _, p := range participants {
+			emails = append(emails, p.Email)
+		}
+		if err := h.emailService.SendCancellationNotification(existingEvent.Name, emails); err != nil {
+			h.log.Warn("failed to send cancellation emails", "event_id", eventID, "error", err)
+		}
+	}()
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": gin.H{
+			"id":           existingEvent.ID.String(),
+			"name":         existingEvent.Name,
+			"stage":        existingEvent.Stage.String(),
+			"is_cancelled": true,
+		},
+		"message": "Event cancelled successfully",
+		"code":    "EVENT_CANCELLED",
+	})
+}
+
+// PauseEvent handles PATCH /api/v1/events/{event_id}/pause
+// Toggles the paused state of an event. Notifies participants when pausing.
+func (h *EventHandler) PauseEvent(c *gin.Context) {
+	eventID := c.Param("event_id")
+
+	h.log.Debug("toggling event pause", "event_id", eventID)
+
+	if _, err := uuid.Parse(eventID); err != nil {
+		h.log.Warn("invalid event_id format", "event_id", eventID, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid event_id format",
+			"code":  "INVALID_EVENT_ID",
+		})
+		return
+	}
+
+	existingEvent, err := h.eventRepo.GetByID(eventID)
+	if err != nil {
+		h.log.Error("event not found", "event_id", eventID, "error", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Event not found",
+			"code":  "EVENT_NOT_FOUND",
+		})
+		return
+	}
+
+	if existingEvent.IsCancelled {
+		h.log.Warn("cannot pause cancelled event", "event_id", eventID)
+		c.JSON(http.StatusConflict, gin.H{
+			"error": "Cannot pause a cancelled event",
+			"code":  "EVENT_CANCELLED",
+		})
+		return
+	}
+
+	newPausedState := !existingEvent.IsPaused
+	if err := h.eventRepo.PauseEvent(eventID, newPausedState); err != nil {
+		h.log.Error("failed to toggle event pause", "event_id", eventID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to update event",
+			"code":  "UPDATE_ERROR",
+		})
+		return
+	}
+
+	h.log.Info("event pause toggled", "event_id", eventID, "is_paused", newPausedState)
+
+	// Notify participants when pausing (not when unpausing)
+	if newPausedState {
+		go func() {
+			participants, err := h.userRepo.GetEventParticipants(eventID)
+			if err != nil {
+				h.log.Warn("failed to get participants for pause email", "event_id", eventID, "error", err)
+				return
+			}
+			emails := make([]string, 0, len(participants))
+			for _, p := range participants {
+				emails = append(emails, p.Email)
+			}
+			if err := h.emailService.SendPauseNotification(existingEvent.Name, emails); err != nil {
+				h.log.Warn("failed to send pause emails", "event_id", eventID, "error", err)
+			}
+		}()
+	}
+
+	message := "Event paused successfully"
+	code := "EVENT_PAUSED"
+	if !newPausedState {
+		message = "Event resumed successfully"
+		code = "EVENT_RESUMED"
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": gin.H{
+			"id":        existingEvent.ID.String(),
+			"name":      existingEvent.Name,
+			"stage":     existingEvent.Stage.String(),
+			"is_paused": newPausedState,
+		},
+		"message": message,
+		"code":    code,
+	})
+}
+
+// formatDatePtr formats a time pointer to YYYY-MM-DD string or returns nil
+func formatDatePtr(t *time.Time) interface{} {
+	if t == nil {
+		return nil
+	}
+	return t.Format("2006-01-02")
+}

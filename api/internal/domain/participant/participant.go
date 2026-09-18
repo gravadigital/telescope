@@ -1,0 +1,253 @@
+package participant
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
+)
+
+// Role represents user roles in the system
+type Role string
+
+const (
+	RoleAdmin       Role = "admin"
+	RoleParticipant Role = "participant"
+	RoleOrganizer   Role = "organizer"
+)
+
+// String returns the string representation of the role
+func (r Role) String() string {
+	return string(r)
+}
+
+// IsValid checks if the role is valid
+func (r Role) IsValid() bool {
+	return r == RoleAdmin || r == RoleParticipant || r == RoleOrganizer
+}
+
+// User represents a system user (admin or participant)
+type User struct {
+	ID           uuid.UUID `json:"id" gorm:"type:uuid;primaryKey;default:uuid_generate_v4()"`
+	Name         string    `json:"name" gorm:"not null"`
+	LastName     string    `json:"lastname" gorm:"column:lastname"`
+	Email        string    `json:"email" gorm:"uniqueIndex;not null"`
+	PasswordHash *string   `json:"-" gorm:"column:password_hash"`
+	GoogleID                *string    `json:"google_id,omitempty" gorm:"column:google_id;uniqueIndex"`
+	Role                    Role       `json:"role" gorm:"type:varchar(20);not null;default:'participant'"`
+	PasswordResetToken      *string    `json:"-" gorm:"column:password_reset_token;uniqueIndex"`
+	PasswordResetExpiresAt  *time.Time `json:"-" gorm:"column:password_reset_expires_at"`
+	CreatedAt    time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt    time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+}
+
+// TableName overrides the table name used by GORM
+func (User) TableName() string {
+	return "users"
+}
+
+// BeforeCreate sets a UUID before creating the record
+func (u *User) BeforeCreate(tx *gorm.DB) error {
+	if u.ID == uuid.Nil {
+		u.ID = uuid.New()
+	}
+	return nil
+}
+
+// NewUser creates a new user with default values
+func NewUser(name, lastName, email string, role Role) *User {
+	return &User{
+		ID:        uuid.New(),
+		Name:      name,
+		LastName:  lastName,
+		Email:     email,
+		Role:      role,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+}
+
+// NewParticipant creates a new participant user
+func NewParticipant(name, lastName, email string) *User {
+	return NewUser(name, lastName, email, RoleParticipant)
+}
+
+// NewAdmin creates a new admin user
+func NewAdmin(name, lastName, email string) *User {
+	return NewUser(name, lastName, email, RoleAdmin)
+}
+
+// NewOrganizer creates a new organizer user
+func NewOrganizer(name, lastName, email string) *User {
+	return NewUser(name, lastName, email, RoleOrganizer)
+}
+
+// GetFullName returns the full name of the user
+func (u *User) GetFullName() string {
+	if u.LastName == "" {
+		return u.Name
+	}
+	return fmt.Sprintf("%s %s", u.Name, u.LastName)
+}
+
+// SetPassword hashes and sets the user's password
+func (u *User) SetPassword(password string) error {
+	if len(password) < 8 {
+		return fmt.Errorf("password must be at least 8 characters")
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	hashStr := string(hash)
+	u.PasswordHash = &hashStr
+	return nil
+}
+
+// CheckPassword verifies if the provided password matches the hash
+func (u *User) CheckPassword(password string) bool {
+	if u.PasswordHash == nil || *u.PasswordHash == "" {
+		return false
+	}
+	err := bcrypt.CompareHashAndPassword([]byte(*u.PasswordHash), []byte(password))
+	return err == nil
+}
+
+// GeneratePasswordResetToken genera un token seguro y establece su expiración (1 hora).
+func (u *User) GeneratePasswordResetToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("failed to generate reset token: %w", err)
+	}
+	token := hex.EncodeToString(b)
+	expires := time.Now().Add(1 * time.Hour)
+	u.PasswordResetToken = &token
+	u.PasswordResetExpiresAt = &expires
+	return token, nil
+}
+
+// ClearPasswordResetToken elimina el token de reset tras su uso.
+func (u *User) ClearPasswordResetToken() {
+	u.PasswordResetToken = nil
+	u.PasswordResetExpiresAt = nil
+}
+
+// IsPasswordResetTokenValid verifica que el token no haya expirado.
+func (u *User) IsPasswordResetTokenValid() bool {
+	return u.PasswordResetToken != nil &&
+		u.PasswordResetExpiresAt != nil &&
+		time.Now().Before(*u.PasswordResetExpiresAt)
+}
+
+// UpdateRole safely updates the user role with validation
+func (u *User) UpdateRole(newRole Role) error {
+	if !newRole.IsValid() {
+		return fmt.Errorf("invalid role: %s", newRole)
+	}
+	u.Role = newRole
+	u.UpdatedAt = time.Now()
+	return nil
+}
+
+// IsAdmin checks if the user has admin role
+func (u *User) IsAdmin() bool {
+	return u.Role == RoleAdmin
+}
+
+// IsParticipant checks if the user has participant role
+func (u *User) IsParticipant() bool {
+	return u.Role == RoleParticipant
+}
+
+// IsOrganizer checks if the user has organizer role
+func (u *User) IsOrganizer() bool {
+	return u.Role == RoleOrganizer
+}
+
+// Validate checks if the user data is valid
+func (u *User) Validate() error {
+	if u.Name == "" {
+		return fmt.Errorf("name is required")
+	}
+	if u.Email == "" {
+		return fmt.Errorf("email is required")
+	}
+	// TODO: Add email format validation using regex
+	// Example: regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	if !u.Role.IsValid() {
+		return fmt.Errorf("role must be 'admin', 'participant', or 'organizer', got: %s", u.Role)
+	}
+	return nil
+}
+
+// Implement common.UserInterface to avoid circular imports
+func (u *User) GetID() uuid.UUID {
+	return u.ID
+}
+
+func (u *User) GetName() string {
+	return u.Name
+}
+
+// TODO: Permission management methods by role
+// These methods should be implemented to handle role-based permissions
+
+// CanCreateEvent checks if user can create events
+func (u *User) CanCreateEvent() bool {
+	return u.IsAdmin() || u.IsOrganizer()
+}
+
+// CanManageParticipants checks if user can manage event participants
+func (u *User) CanManageParticipants() bool {
+	return u.IsAdmin() || u.IsOrganizer()
+}
+
+// CanVote checks if user can participate in voting
+func (u *User) CanVote() bool {
+	return u.IsParticipant() || u.IsAdmin() || u.IsOrganizer()
+}
+
+// CanViewResults checks if user can view voting results
+// TODO: Implement result viewing permission logic
+func (u *User) CanViewResults() bool {
+	// TODO: Define which roles can view results
+	return true // Placeholder: everyone can view results
+}
+
+// CanModifyVotingConfiguration checks if user can modify voting settings
+func (u *User) CanModifyVotingConfiguration() bool {
+	return u.IsAdmin() || u.IsOrganizer()
+}
+
+// HasPermission checks if user has a specific permission
+// TODO: Implement a comprehensive permission system
+func (u *User) HasPermission(permission string) bool {
+	// TODO: Implement permission checking logic
+	// This could integrate with a more sophisticated RBAC system
+	switch permission {
+	case "create_event":
+		return u.CanCreateEvent()
+	case "manage_participants":
+		return u.CanManageParticipants()
+	case "vote":
+		return u.CanVote()
+	case "view_results":
+		return u.CanViewResults()
+	case "modify_voting_config":
+		return u.CanModifyVotingConfiguration()
+	default:
+		return false // TODO: Define default permission behavior
+	}
+}
+
+// UserWithEventRole represents a user with their role in a specific event
+type UserWithEventRole struct {
+	User
+	EventRole string `json:"event_role"` // Role from event_participants table (creator/participant)
+}

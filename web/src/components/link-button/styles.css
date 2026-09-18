@@ -1,0 +1,27 @@
+
+.link-button-component {
+  text-align: center;
+  padding-top: 20px;
+  border-top: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+.link-button-component p {
+  color: #94a3b8;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.link-button-component-button {
+  background: none;
+  border: none;
+  color: #b19cd9;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.link-button-component-button:hover {
+  color: #c9b6e6;
+}

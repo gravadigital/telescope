@@ -1,0 +1,259 @@
+/* ── EventTimeline ────────────────────────────────────────────────────────── */
+
+.event-timeline-wrapper {
+  width: 100%;
+}
+
+.event-timeline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  width: 100%;
+  padding: var(--spacing-lg) 0 var(--spacing-md);
+}
+
+/* Step -------------------------------------------------------------------- */
+
+.etl-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+/* Marker (circle) --------------------------------------------------------- */
+
+.etl-marker {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid var(--glass-border);
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.etl-step--active .etl-marker {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
+  border-color: var(--color-primary-hover);
+  color: #fff;
+  box-shadow:
+    0 0 0 4px rgba(106, 90, 205, 0.2),
+    0 0 20px rgba(106, 90, 205, 0.4);
+  animation: etl-pulse 2s ease-in-out infinite;
+}
+
+.etl-step--completed .etl-marker {
+  background: linear-gradient(135deg, var(--color-success) 0%, var(--color-success-hover) 100%);
+  border-color: var(--color-success);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.35);
+}
+
+@keyframes etl-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(106, 90, 205, 0.2), 0 0 20px rgba(106, 90, 205, 0.4); }
+  50%       { box-shadow: 0 0 0 7px rgba(106, 90, 205, 0.1), 0 0 30px rgba(106, 90, 205, 0.6); }
+}
+
+.etl-check {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.etl-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* Label, description & deadline ------------------------------------------- */
+
+.etl-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+}
+
+.etl-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  transition: color 0.3s ease;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.etl-step--active .etl-label    { color: #fff; }
+.etl-step--completed .etl-label { color: #4ade80; }
+
+.etl-desc {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.55);
+  max-width: 120px;
+  line-height: 1.35;
+}
+
+.etl-step--active .etl-desc { color: rgba(255, 255, 255, 0.85); }
+.etl-step--completed .etl-desc { color: rgba(255, 255, 255, 0.5); }
+
+.etl-deadline {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 130px;
+  line-height: 1.35;
+  margin-top: 3px;
+  font-weight: 500;
+}
+
+.etl-deadline--soon   { color: #fcd34d; font-weight: 600; }
+.etl-deadline--urgent { color: #fca5a5; font-weight: 600; }
+
+/* "Current" badge --------------------------------------------------------- */
+
+.etl-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(106, 90, 205, 0.4);
+}
+
+/* Connector --------------------------------------------------------------- */
+
+.etl-connector {
+  flex: 1;
+  height: 2px;
+  margin-top: 23px;
+  align-self: flex-start;
+  background: var(--glass-border);
+  border-radius: var(--radius-full);
+  transition: background 0.4s ease;
+  min-width: 12px;
+}
+
+.etl-connector--done {
+  background: linear-gradient(90deg, var(--color-success) 0%, rgba(34, 197, 94, 0.4) 100%);
+}
+
+/* ── Active stage info card ─────────────────────────────────────────────── */
+
+.etl-stage-card {
+  background: linear-gradient(135deg,
+    rgba(106, 90, 205, 0.08) 0%,
+    rgba(75, 74, 138, 0.05) 100%);
+  border: 1px solid rgba(106, 90, 205, 0.25);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  margin-top: var(--spacing-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.etl-stage-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+}
+
+.etl-stage-card-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.etl-stage-card-name {
+  margin: 0 0 4px 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #a78bfa;
+}
+
+.etl-stage-card-detail {
+  margin: 0;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.65;
+}
+
+.etl-stage-card-next {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.etl-stage-card-next-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.etl-stage-card-next-icon { font-size: 0.9rem; }
+
+.etl-stage-card-next-name {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.etl-stage-card-next-hint {
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+}
+
+/* Compact variant --------------------------------------------------------- */
+
+.etw--compact .etl-marker       { width: 36px; height: 36px; font-size: 0.9rem; }
+.etw--compact .etl-connector    { margin-top: 17px; }
+.etw--compact .etl-label        { font-size: 0.72rem; }
+.etw--compact .etl-badge        { font-size: 0.6rem; padding: 2px 6px; }
+
+/* Responsive ------------------------------------------------------------- */
+
+@media (max-width: 600px) {
+  .etl-desc,
+  .etl-deadline {
+    display: none;
+  }
+
+  .etl-label { font-size: 0.7rem; }
+
+  .etl-marker {
+    width: 38px;
+    height: 38px;
+    font-size: 0.95rem;
+  }
+
+  .etl-connector {
+    margin-top: 18px;
+    min-width: 8px;
+  }
+
+  .etl-stage-card-next-hint { display: none; }
+}

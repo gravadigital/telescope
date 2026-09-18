@@ -1,0 +1,254 @@
+package migrations
+
+import (
+	"fmt"
+
+	"github.com/gravadigital/telescopio-api/internal/logger"
+	"gorm.io/gorm"
+)
+
+// Migration represents a database migration
+type Migration struct {
+	ID   string
+	Name string
+	Up   func(*gorm.DB) error
+	Down func(*gorm.DB) error
+}
+
+// GetMigrations returns all available migrations in order
+func GetMigrations() []Migration {
+	return []Migration{
+		{
+			ID:   "001",
+			Name: "create_extensions_and_types",
+			Up:   migration001Up,
+			Down: migration001Down,
+		},
+		{
+			ID:   "002",
+			Name: "create_core_tables",
+			Up:   migration002Up,
+			Down: migration002Down,
+		},
+		{
+			ID:   "003",
+			Name: "create_indexes",
+			Up:   migration003Up,
+			Down: migration003Down,
+		},
+		{
+			ID:   "004",
+			Name: "create_constraints_and_triggers",
+			Up:   migration004Up,
+			Down: migration004Down,
+		},
+		{
+			ID:   "005",
+			Name: "create_views_and_functions",
+			Up:   migration005Up,
+			Down: migration005Down,
+		},
+		{
+			ID:   "006",
+			Name: "insert_sample_data",
+			Up:   migration006Up,
+			Down: migration006Down,
+		},
+		{
+			ID:   "007",
+			Name: "add_organizer_to_events",
+			Up:   migration007Up,
+			Down: migration007Down,
+		},
+		{
+			ID:   "008",
+			Name: "fix_assignment_constraints",
+			Up:   migration008Up,
+			Down: migration008Down,
+		},
+		{
+			ID:   "009",
+			Name: "fix_attachment_ids_type",
+			Up:   migration009Up,
+			Down: migration009Down,
+		},
+		{
+			ID:   "010",
+			Name: "event_participant_roles_and_shareable_links",
+			Up:   migration010Up,
+			Down: migration010Down,
+		},
+		{
+			ID:   "011",
+			Name: "shareable_link_constraints",
+			Up:   migration011Up,
+			Down: migration011Down,
+		},
+		{
+			ID:   "012",
+			Name: "unify_participation_stages",
+			Up:   migration012Up,
+			Down: migration012Down,
+		},
+		{
+			ID:   "013",
+			Name: "add_max_participants_to_events",
+			Up:   migration013Up,
+			Down: migration013Down,
+		},
+		{
+			ID:   "014",
+			Name: "add_estimated_end_dates_to_events",
+			Up:   migration014Up,
+			Down: migration014Down,
+		},
+		{
+			ID:   "015",
+			Name: "add_password_hash_to_users",
+			Up:   migration015Up,
+			Down: migration015Down,
+		},
+		{
+			ID:   "016",
+			Name: "add_vote_drafts",
+			Up:   migration016Up,
+			Down: migration016Down,
+		},
+		{
+			ID:   "017",
+			Name: "add_google_oauth_support",
+			Up:   migration017Up,
+			Down: migration017Down,
+		},
+		{
+			ID:   "018",
+			Name: "add_is_cancelled_to_events",
+			Up:   migration018Up,
+			Down: migration018Down,
+		},
+		{
+			ID:   "019",
+			Name: "add_password_reset_to_users",
+			Up:   migration019Up,
+			Down: migration019Down,
+		},
+		{
+			ID:   "020",
+			Name: "add_is_paused_to_events",
+			Up:   migration020Up,
+			Down: migration020Down,
+		},
+	}
+}
+
+// RunMigrations executes all pending migrations
+func RunMigrations(db *gorm.DB) error {
+	log := logger.Migration()
+
+	if err := createMigrationsTable(db); err != nil {
+		return fmt.Errorf("failed to create migrations table: %w", err)
+	}
+
+	migrations := GetMigrations()
+
+	for _, migration := range migrations {
+		if hasBeenRun(db, migration.ID) {
+			log.Debug("Migration already applied, skipping", "id", migration.ID, "name", migration.Name)
+			continue
+		}
+
+		log.Info("Running migration", "id", migration.ID, "name", migration.Name)
+
+		err := db.Transaction(func(tx *gorm.DB) error {
+			if err := migration.Up(tx); err != nil {
+				return fmt.Errorf("failed to run migration %s: %w", migration.ID, err)
+			}
+
+			return recordMigration(tx, migration.ID, migration.Name)
+		})
+		if err != nil {
+			return err
+		}
+
+		log.Info("Successfully applied migration", "id", migration.ID)
+	}
+
+	log.Info("All migrations completed successfully")
+	return nil
+}
+
+// createMigrationsTable creates the migrations tracking table
+func createMigrationsTable(db *gorm.DB) error {
+	return db.Exec(`
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            id VARCHAR(10) PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
+    `).Error
+}
+
+// hasBeenRun checks if a migration has already been applied
+func hasBeenRun(db *gorm.DB, migrationID string) bool {
+	var count int64
+	db.Raw("SELECT COUNT(*) FROM schema_migrations WHERE id = ?", migrationID).Scan(&count)
+	return count > 0
+}
+
+// recordMigration records that a migration has been applied
+func recordMigration(db *gorm.DB, migrationID, name string) error {
+	return db.Exec("INSERT INTO schema_migrations (id, name) VALUES (?, ?)", migrationID, name).Error
+}
+
+// RollbackMigration rolls back the last applied migration
+func RollbackMigration(db *gorm.DB) error {
+	log := logger.Migration()
+
+	var lastMigration struct {
+		ID   string
+		Name string
+	}
+
+	err := db.Raw(`
+        SELECT id, name FROM schema_migrations 
+        ORDER BY applied_at DESC 
+        LIMIT 1
+    `).Scan(&lastMigration).Error
+	if err != nil {
+		return fmt.Errorf("failed to get last migration: %w", err)
+	}
+
+	if lastMigration.ID == "" {
+		return fmt.Errorf("no migrations to rollback")
+	}
+
+	migrations := GetMigrations()
+	var targetMigration *Migration
+
+	for _, migration := range migrations {
+		if migration.ID == lastMigration.ID {
+			targetMigration = &migration
+			break
+		}
+	}
+
+	if targetMigration == nil {
+		return fmt.Errorf("migration %s not found", lastMigration.ID)
+	}
+
+	log.Info("Rolling back migration", "id", targetMigration.ID, "name", targetMigration.Name)
+
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err = targetMigration.Down(tx); err != nil {
+			return fmt.Errorf("failed to rollback migration %s: %w", targetMigration.ID, err)
+		}
+
+		return tx.Exec("DELETE FROM schema_migrations WHERE id = ?", targetMigration.ID).Error
+	})
+	if err != nil {
+		return err
+	}
+
+	log.Info("Successfully rolled back migration", "id", targetMigration.ID)
+	return nil
+}

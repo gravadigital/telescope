@@ -1,0 +1,214 @@
+.stage-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.stage-modal {
+  background: var(--surface-color, #1a1a2e);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 450px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stage-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stage-modal-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--text-primary, #fff);
+}
+
+.stage-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-secondary, #888);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.stage-modal-close:hover {
+  color: var(--text-primary, #fff);
+}
+
+.stage-modal-body {
+  padding: 24px;
+}
+
+.stage-modal-description {
+  color: var(--text-secondary, #aaa);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.stage-transition-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.stage-badge {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.stage-badge.current {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary, #aaa);
+}
+
+.stage-badge.next {
+  background: var(--primary-color, #6c5ce7);
+  color: white;
+}
+
+.stage-arrow {
+  color: var(--text-secondary, #888);
+  font-size: 1.25rem;
+}
+
+.stage-modal-date-field {
+  margin-top: 20px;
+}
+
+.stage-modal-date-field label {
+  display: block;
+  color: var(--text-primary, #fff);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.stage-modal-date-field .required {
+  color: #e74c3c;
+  margin-left: 4px;
+}
+
+.stage-modal-date-field .field-hint {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #888);
+  margin-bottom: 12px;
+}
+
+.stage-modal-date-field input[type="date"] {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary, #fff);
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+
+.stage-modal-date-field input[type="date"]:focus {
+  outline: none;
+  border-color: var(--primary-color, #6c5ce7);
+}
+
+.stage-modal-date-field input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
+.stage-modal-error {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(231, 76, 60, 0.1);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  border-radius: 8px;
+  color: #e74c3c;
+  font-size: 0.9rem;
+}
+
+.stage-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stage-modal-footer .btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.stage-modal-footer .btn-secondary {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text-secondary, #aaa);
+}
+
+.stage-modal-footer .btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.stage-modal-footer .btn-primary {
+  background: var(--primary-color, #6c5ce7);
+  border: none;
+  color: white;
+}
+
+.stage-modal-footer .btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover, #5b4cdb);
+}
+
+.stage-modal-footer .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Current date info for edit modal */
+.current-date-info {
+  color: var(--text-secondary, #aaa);
+  margin-bottom: 16px;
+}
+
+.current-date-info strong {
+  color: var(--text-primary, #fff);
+}
+

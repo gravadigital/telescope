@@ -1,0 +1,30 @@
+# Aplicación web de Telescopio (React + nginx).
+#
+#   cp .env.example .env      # y ajustar REACT_APP_API_URL
+#   docker compose up -d --build
+#
+# Web: http://localhost:${WEB_PORT:-3000}
+#
+# La API se levanta aparte, desde el repo telescopio-api.
+# Esta web se comunica con ella por HTTP desde el navegador, así que
+# REACT_APP_API_URL tiene que ser una URL alcanzable desde el navegador
+# (http://localhost:8080), nunca un nombre de contenedor.
+
+name: telescopio-web
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        # OJO: Create React App congela estas variables durante el BUILD.
+        # Si las cambiás en .env hay que reconstruir:
+        #   docker compose up -d --build
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8080}
+        REACT_APP_GOOGLE_CLIENT_ID: ${REACT_APP_GOOGLE_CLIENT_ID:-}
+    image: telescopio/web:local
+    container_name: telescopio-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-3000}:80"

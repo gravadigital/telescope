@@ -1,0 +1,43 @@
+# ---------------------------------------------------------------------------
+# Secretos. Nada de esto se versiona: los .env reales se crean a partir de los
+# .env.example / .env.dist que sí están en el repo.
+# ---------------------------------------------------------------------------
+.env
+.env.local
+.env.*.local
+
+# ---------------------------------------------------------------------------
+# Dependencias y artefactos de build
+# ---------------------------------------------------------------------------
+node_modules/
+web/build/
+web/coverage/
+
+# Binarios compilados de Go. El binario de la api se llama igual que la carpeta,
+# por eso se listan las rutas explícitas y no un patrón.
+api/bin/
+api/migrate
+api/main
+*.exe
+*.test
+*.out
+
+# ---------------------------------------------------------------------------
+# Datos en runtime. uploads/ son archivos subidos por usuarios: nunca al repo.
+# ---------------------------------------------------------------------------
+api/uploads/
+api/tmp/
+*.log
+*.db
+*.sqlite
+*.sqlite3
+
+# ---------------------------------------------------------------------------
+# Editor y sistema operativo
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
