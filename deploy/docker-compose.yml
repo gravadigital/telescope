@@ -1,3 +1,7 @@
+# Producción: baja las imágenes publicadas del registry. La versión de cada una sale de
+# API_VERSION / WEB_VERSION en .env — ver la política de versionado en CHANGELOG.md.
+#
+# Para desarrollo usá docker-compose.local.yml, que construye desde el repo.
 name: telescope
 
 networks:
@@ -33,7 +37,7 @@ services:
       retries: 3
 
   telescope-api:
-    image: registry.git.grava.io/telescope/api:dev
+    image: gravadigital/telescope-api:${API_VERSION}
     container_name: telescope-${ENVIRONMENT}-api
     restart: always
     environment:
@@ -49,17 +53,28 @@ services:
       - PORT=8080
       - GIN_MODE=${GIN_MODE}
       - MAX_FILE_SIZE=${MAX_FILE_SIZE}
+      - JWT_SECRET=${JWT_SECRET}
       - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS}
       - CORS_ALLOW_METHODS=${CORS_ALLOW_METHODS}
       - CORS_ALLOW_HEADERS=${CORS_ALLOW_HEADERS}
       - FRONTEND_URL=https://${DOMAIN}
-      - STORAGE_PROVIDER=minio
+      - STORAGE_PROVIDER=${STORAGE_PROVIDER}
       - MINIO_ENDPOINT=${MINIO_ENDPOINT}
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
-      - MINIO_BUCKET=${MINIO_BUCKET:-telescopio}
-      - MINIO_USE_SSL=${MINIO_USE_SSL:-false}
-      - MINIO_REGION=${MINIO_REGION:-us-east-1}
+      - MINIO_BUCKET=${MINIO_BUCKET}
+      - MINIO_USE_SSL=${MINIO_USE_SSL}
+      - MINIO_REGION=${MINIO_REGION}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - EMAIL_ENABLED=${EMAIL_ENABLED}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_SECURE=${SMTP_SECURE}
+      - EMAIL_FROM=${EMAIL_FROM}
+      - EMAIL_FROM_NAME=${EMAIL_FROM_NAME}
     networks:
       - ingress-network
       - telescope-database
@@ -69,8 +84,11 @@ services:
       telescope-minio:
         condition: service_healthy
 
+  # La web NO recibe REACT_APP_* acá: Create React App las congela en el momento del
+  # build, no al arrancar. La URL de la api y el client id de Google entran como
+  # --build-arg cuando el CI construye la imagen (ver .github/workflows/).
   telescope-web:
-    image: registry.git.grava.io/telescope/web:dev
+    image: gravadigital/telescope-web:${WEB_VERSION}
     container_name: telescope-${ENVIRONMENT}-web
     restart: always
     environment:
@@ -82,12 +100,49 @@ services:
     depends_on:
       - telescope-api
 
+  telescope-minio:
+    image: quay.io/minio/minio:latest
+    container_name: telescope-${ENVIRONMENT}-minio
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY}
+      - VIRTUAL_HOST=minio.${DOMAIN}
+      - VIRTUAL_PORT=9001
+      - LETSENCRYPT_HOST=minio.${DOMAIN}
+    volumes:
+      - telescope-minio:/data
+    networks:
+      - telescope-database
+      - ingress-network
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Crea el bucket y termina. La api NO lo crea —firma contra un bucket que da por
+  # existente—, así que sin esto la primera subida falla con NoSuchBucket.
+  telescope-minio-init:
+    image: quay.io/minio/mc:latest
+    container_name: telescope-${ENVIRONMENT}-minio-init
+    restart: "no"
+    depends_on:
+      telescope-minio:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+      mc alias set local http://telescope-${ENVIRONMENT}-minio:9000 '${MINIO_ACCESS_KEY}' '${MINIO_SECRET_KEY}' &&
+      mc mb --ignore-existing local/'${MINIO_BUCKET}'
+      "
+    networks:
+      - telescope-database
+
   telescope-pgadmin:
     image: dpage/pgadmin4:latest
     container_name: telescope-${ENVIRONMENT}-pgadmin
     restart: always
-    ports:
-      - "${PGADMIN_PORT:-5050}:80"
     environment:
       - VIRTUAL_HOST=pgadmin.${DOMAIN}
       - VIRTUAL_PORT=80
@@ -100,27 +155,3 @@ services:
       - telescope-database
     profiles:
       - tools
-
-  telescope-minio:
-    image: quay.io/minio/minio:latest
-    container_name: telescope-${ENVIRONMENT}-minio
-    restart: always
-    command: server /data --console-address ":9001"
-    ports:
-      - "9001:9001"
-    environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin123}
-      - VIRTUAL_HOST=minio.${DOMAIN}
-      - VIRTUAL_PORT=9001
-      - LETSENCRYPT_HOST=minio.${DOMAIN}
-    volumes:
-      - telescope-minio:/data
-    networks:
-      - telescope-database
-      - ingress-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3

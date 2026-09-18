@@ -10,20 +10,22 @@ telescope/
 └── docs/      Documentación de producto y arquitectura (Grava Workflow)
 ```
 
-## Estado
-
-Repositorio recién creado a partir de los tres repos anteriores
-(`telescopio-api`, `Telescopio-web`, `Telescopio-deploy`). El código entró tal
-cual estaba en `dev`; **todavía no está la documentación de producto, el CI ni
-el deploy reescrito**. Eso es lo que sigue.
-
 ## Levantar el proyecto
 
-Pendiente. La idea es que sea un solo comando desde `deploy/`, como en jiku.
-Por ahora valen las instrucciones de cada servicio:
+```sh
+cd deploy
+cp .env.dist .env     # completar JWT_SECRET: openssl rand -base64 32
+./local.sh up
+```
 
-- [api/README.md](api/README.md)
-- [web/README.md](web/README.md)
+Eso levanta la base, MinIO con su bucket, la api y la web:
+
+| | |
+|---|---|
+| web | http://localhost:3000 |
+| api | http://localhost:8080 |
+
+El detalle, y cómo se despliega en un servidor, en [deploy/README.md](deploy/README.md).
 
 ## Documentación
 
