@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+    # Un cambio sólo de documentación no necesita la suite. El propio workflow
+    # queda fuera de la lista a propósito: editar el CI tiene que correr el CI.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+  # dev-images.yml y release.yml reutilizan esta misma suite con `uses:`, así los
+  # tres workflows corren exactamente los mismos pasos y no hay tres copias que
+  # mantener en sintonía.
+  workflow_call:
+
+# Una corrida por rama: si llegan pushes seguidos, el anterior se cancela. El grupo
+# incluye el workflow que llama, porque este archivo también corre reusado desde
+# dev-images.yml y release.yml: sin eso, un push a dev cancelaría la suite de la
+# publicación que ya está en curso.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.workflow == 'CI' }}
+
+# Go y Node son toolchains distintas, con caches y setup propios, así que no hay
+# un único `npm test` que los cubra como en un monorepo de un solo lenguaje: son
+# dos jobs que corren en paralelo. Un rojo en web no oculta el estado de api.
+jobs:
+  api:
+    name: api (Go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
+
+      - name: Versions agree across the monorepo
+        run: ./scripts/set-version.sh --check
+        working-directory: .
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      # Los unitarios no tocan base ni red: corren en menos de un segundo. Los de
+      # integración viven detrás del build tag `integration` y NO corren acá,
+      # porque necesitan un PostgreSQL. Ver docs/architectures/api/conventions/testing.md.
+      - name: Test
+        run: go test -race ./...
+
+  web:
+    name: web (React)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          # El build de CRA falla ante cualquier warning si CI=true, y Actions lo
+          # setea solo. Acá se compila para verificar que compila, no para trabar
+          # el merge por un import sin usar.
+          CI: false
+
+      # `npm test` NO corre todavía: el Jest que trae react-scripts 5 no resuelve
+      # los `exports` de react-router-dom 7 (condición `module-sync`), así que la
+      # única suite que hay falla al importar App.tsx. Es incompatibilidad de
+      # herramientas, no código roto — el build de arriba pasa.
+      #
+      # Se arregla al migrar de CRA a Vite + Vitest. Cuando eso pase, este paso
+      # vuelve como `npm test` y deja de estar comentado.
+      # - name: Test
+      #   run: npm test

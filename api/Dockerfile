@@ -7,6 +7,11 @@ RUN apk update && apk add --no-cache git ca-certificates tzdata && update-ca-cer
 # Create appuser for security
 RUN adduser -D -g '' appuser
 
+# La versión la fija scripts/set-version.sh y la pasa el CI. Se compila dentro del
+# binario con -ldflags: en Go no hay un package.json donde declararla, y un version.go
+# sería código que existe sólo para llevar un número.
+ARG VERSION=dev
+
 # Set working directory
 WORKDIR /build
 
@@ -20,7 +25,9 @@ RUN go mod download
 COPY . .
 
 # Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o main cmd/api/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
+    -ldflags "-extldflags '-static' -X main.version=${VERSION}" \
+    -o main cmd/api/main.go
 
 # Final stage
 FROM scratch

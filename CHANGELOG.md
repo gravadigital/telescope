@@ -1,0 +1,83 @@
+# Changelog
+
+Los cambios notables del proyecto se documentan en este archivo.
+
+El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
+versionado es [Semantic Versioning](https://semver.org/lang/es/).
+
+## Política de versionado
+
+Todo el monorepo comparte **una sola versión**: `api` y `web` se publican juntas y
+llevan siempre el mismo número. Las variables por servicio de `deploy/`
+(`API_VERSION`, `WEB_VERSION`) existen para poder redesplegar uno sin tocar el otro,
+no para versionarlos por separado.
+
+Qué significa cada salto:
+
+| Salto | Cuándo |
+|---|---|
+| **major** | Cambio incompatible en la API HTTP. |
+| **minor** | Funcionalidad nueva, compatible hacia atrás. |
+| **patch** | Correcciones y cambios internos sin efecto en el contrato. |
+
+El esquema de la base no se versiona aparte: las migraciones corren al arrancar la
+api y se esperan aditivas.
+
+### Sacar un release
+
+La versión vive en `VERSION`, en `web/package.json` y en los `*_VERSION` de
+`deploy/.env.dist`. Un script escribe todos:
+
+```sh
+scripts/set-version.sh 1.2.3      # sube todo
+scripts/set-version.sh --check    # verifica que coincidan (lo corre el CI)
+```
+
+Después pasá las entradas de `[Unreleased]` bajo el encabezado nuevo, commiteá en
+`dev`, mergeá a `main` y tagueá:
+
+```sh
+git tag v1.2.3 && git push origin v1.2.3
+```
+
+Pushear el tag es lo que publica. `release.yml` vuelve a verificar que el tag coincida
+con el árbol, corre la suite y sube dos imágenes a Docker Hub —
+`gravadigital/telescope-{api,web}`, cada una con los tags `1.2.3`, `1.2` y `latest`.
+
+Un tag que no coincide con `VERSION` falla antes de construir nada, así que una imagen
+mal etiquetada nunca llega al registry.
+
+### El tag `dev`
+
+Aparte de los releases, cada push a `dev` republica las dos imágenes con el tag `dev`,
+pisando las anteriores. Es un puntero móvil a la punta de la rama, útil para un entorno
+de staging; no es un release y no promete estabilidad.
+
+Cada build publica además un tag inmutable `dev-<sha>`, para que una imagen dev puntual
+siga siendo alcanzable después de que el tag `dev` se movió.
+
+Para correr contra él, poné las versiones por servicio en `dev` en `deploy/.env`:
+
+```
+API_VERSION=dev
+WEB_VERSION=dev
+```
+
+---
+
+## [Unreleased]
+
+### Agregado
+
+- **Monorepo**: `api`, `web` y `deploy` pasan a vivir en un solo repositorio.
+- **Documentación de producto** en `docs/`: PRD, arquitecturas por servicio con sus
+  convenciones, 8 ADRs, flujos cross-service, relevamiento de UX y design system.
+- **CI en GitHub Actions**: `ci.yml` (suite en cada PR), `dev-images.yml` (imágenes
+  `dev` en cada push a la rama) y `release.yml` (imágenes inmutables por tag).
+- **Versionado único** del monorepo, con `scripts/set-version.sh` como única puerta.
+
+### Conocido
+
+- La suite de `web` no corre todavía: el Jest que trae `react-scripts` 5 no resuelve
+  los `exports` de `react-router-dom` 7. El build sí pasa. Se destraba al migrar a
+  Vite + Vitest.

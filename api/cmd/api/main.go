@@ -16,6 +16,10 @@ import (
 	"github.com/gravadigital/telescopio-api/internal/storage/postgres"
 )
 
+// La fija el linker al compilar (-ldflags "-X main.version=..."), así que en un build
+// hecho a mano queda en "dev". El CI le pasa la versión del release o dev-<sha>.
+var version = "dev"
+
 func main() {
 	cfg := config.Load()
 
@@ -25,6 +29,8 @@ func main() {
 	}
 	logger.Initialize(logLevel)
 	log := logger.Get()
+
+	log.Info("starting telescope api", "version", version)
 
 	gin.SetMode(cfg.Server.GinMode)
 

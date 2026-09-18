@@ -1,0 +1,131 @@
+name: Release
+
+# La publicación la manejan los tags, no las ramas: pushear `v1.2.3` construye las dos
+# imágenes y las sube a Docker Hub. Acá no corre nada en un commit normal.
+on:
+  push:
+    tags: ['v*.*.*']
+
+# Un release no se cancela por la mitad: una de dos imágenes en el registry es peor que
+# ninguna. A diferencia de ci.yml, esto no cancela lo que está en curso.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY_NAMESPACE: gravadigital
+
+jobs:
+  # El tag es lo único que nombra a las imágenes, así que tiene que coincidir con el
+  # árbol antes de construir nada. Un tag v1.3.0 sobre un árbol que dice 1.2.0
+  # publicaría imágenes mal etiquetadas sin forma de notarlo desde el registry.
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derivar la versión del tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: El tag tiene que coincidir con la versión del árbol
+        run: |
+          tag_version="${{ steps.version.outputs.version }}"
+          tree_version="$(cat VERSION)"
+          if [[ "$tag_version" != "$tree_version" ]]; then
+            echo "::error::el tag ${GITHUB_REF_NAME} no coincide con VERSION ($tree_version)."
+            echo "::error::Corré scripts/set-version.sh $tag_version, commiteá y volvé a taguear."
+            exit 1
+          fi
+          echo "El tag y el árbol coinciden en $tag_version."
+
+      - name: Todos los archivos tienen que declarar la misma versión
+        run: ./scripts/set-version.sh --check
+
+  # El release se valida a sí mismo en vez de confiar en que CI corrió sobre este
+  # commit: un tag puede apuntar a cualquier cosa. Si esto falla, ninguna imagen llega
+  # al registry.
+  test:
+    needs: verify
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: [verify, test]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    strategy:
+      # Una imagen fallida no tiene que cancelar la otra: un release a medias es más
+      # fácil de terminar que de reconstruir.
+      fail-fast: false
+      matrix:
+        service: [api, web]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Los tres tags por imagen: la versión exacta, la serie menor para quien quiera
+      # seguir los parches, y latest.
+      - name: Calcular tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY_NAMESPACE }}/telescope-${{ matrix.service }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.title=telescope-${{ matrix.service }}
+            org.opencontainers.image.vendor=Grava Digital
+
+      - name: Build args de la web
+        id: webargs
+        if: matrix.service == 'web'
+        run: |
+          {
+            echo 'args<<EOF'
+            echo 'REACT_APP_API_URL=https://api.telescope.grava.io'
+            echo "REACT_APP_GOOGLE_CLIENT_ID=${{ secrets.REACT_APP_GOOGLE_CLIENT_ID }}"
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.service }}
+          file: ${{ matrix.service }}/${{ matrix.service == 'web' && 'docker/Dockerfile' || 'Dockerfile' }}
+          push: true
+          build-args: |
+            VERSION=${{ needs.verify.outputs.version }}
+            ${{ steps.webargs.outputs.args }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  # Falla la corrida si falta alguna imagen, así un check rojo significa "no anuncies
+  # este release" aunque fail-fast esté apagado arriba.
+  summary:
+    needs: publish
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report
+        run: |
+          if [[ "${{ needs.publish.result }}" != "success" ]]; then
+            echo "::error::Alguna imagen no se publicó. Revisá los jobs de la matriz antes de anunciar ${GITHUB_REF_NAME}."
+            exit 1
+          fi
+          echo "Publicado ${GITHUB_REF_NAME}: telescope-api, telescope-web."

@@ -1,0 +1,118 @@
+name: Dev images
+
+# Cada push a dev republica las dos imágenes bajo el tag `dev`, pisando las anteriores.
+# Ese tag es un puntero móvil a la punta de dev, no un release.
+#
+# Para correr un servidor contra él, apuntá las versiones por servicio al tag:
+# `API_VERSION=dev` (y lo mismo para web) en deploy/.env, que el compose consume.
+#
+# Los releases son otro workflow: release.yml, disparado por tags de versión, es el
+# que publica los tags inmutables 1.2.3 / 1.2 / latest.
+on:
+  push:
+    branches: [dev]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+  # Permite reconstruir una imagen dev sin un commit vacío, útil cuando la publicación
+  # falló por algo ajeno al árbol.
+  workflow_dispatch:
+
+# Los pushes a dev llegan de a ráfagas y todos compiten por el mismo tag mutable, pero
+# una corrida en vuelo no se cancela: así el registry nunca queda con la mitad de un
+# build y la mitad de otro.
+concurrency:
+  group: dev-images
+  cancel-in-progress: false
+
+env:
+  REGISTRY_NAMESPACE: gravadigital
+
+jobs:
+  # Una imagen sólo se publica si la suite pasa. ci.yml corre sobre este mismo commit,
+  # pero no se puede depender de él desde acá: dos workflows disparados por un push
+  # corren independientes, así que esto repite el gate en vez de darlo por hecho.
+  #
+  # La repetición es deliberada. Sacarla ahorraría unos minutos por push, a cambio de
+  # poder publicar una imagen `dev` desde un commit cuyos tests fallaron — y una imagen
+  # publicada es lo que otro después baja.
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    strategy:
+      # Una imagen fallida no tiene que cancelar la otra.
+      fail-fast: false
+      matrix:
+        service: [api, web]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # La web congela REACT_APP_* en el build, no al arrancar: la URL de la api tiene
+      # que entrar acá. La api no necesita ningún build-arg más que la versión.
+      - name: Build args de la web
+        id: webargs
+        if: matrix.service == 'web'
+        run: |
+          {
+            echo 'args<<EOF'
+            echo 'REACT_APP_API_URL=https://api.telescope.dev.grava.io'
+            echo "REACT_APP_GOOGLE_CLIENT_ID=${{ secrets.REACT_APP_GOOGLE_CLIENT_ID }}"
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
+      # Dos tags: `dev`, que se mueve, y `dev-<sha>`, que no. El inmutable es lo que
+      # hace diagnosticable una imagen dev mala — sin él, "la imagen dev de ayer" es
+      # irrecuperable una vez que el tag se movió.
+      #
+      # El contexto de build es la carpeta del servicio, no la raíz: acá no hay código
+      # compartido entre api y web, así que cada uno se construye con lo suyo.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.service }}
+          file: ${{ matrix.service }}/${{ matrix.service == 'web' && 'docker/Dockerfile' || 'Dockerfile' }}
+          push: true
+          build-args: |
+            VERSION=dev-${{ github.sha }}
+            ${{ steps.webargs.outputs.args }}
+          tags: |
+            ${{ env.REGISTRY_NAMESPACE }}/telescope-${{ matrix.service }}:dev
+            ${{ env.REGISTRY_NAMESPACE }}/telescope-${{ matrix.service }}:dev-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.title=telescope-${{ matrix.service }}
+            org.opencontainers.image.vendor=Grava Digital
+            org.opencontainers.image.revision=${{ github.sha }}
+          # Comparte el scope de caché con release.yml a propósito: las capas son las
+          # mismas, así que un build de dev calienta el de release y al revés.
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  # Con fail-fast en false, una publicación parcial reportaría verde.
+  summary:
+    needs: publish
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report
+        run: |
+          if [[ "${{ needs.publish.result }}" != "success" ]]; then
+            echo "::error::Alguna imagen dev no se publicó. El tag dev puede ser una mezcla de este build y el anterior."
+            exit 1
+          fi
+          echo "Publicadas dev y dev-${GITHUB_SHA} para telescope-api y telescope-web."
