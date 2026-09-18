@@ -1,0 +1,2407 @@
+{
+  "_generated": "derivado de screens/*.md por /product-ux-wireframes — no editar a mano",
+  "surface": "web",
+  "platform": "web",
+  "viewports": [
+    "desktop",
+    "mobile"
+  ],
+  "accent_color": "#6a5acd",
+  "grid_baseline": 8,
+  "screens": [
+    {
+      "name": "home",
+      "displayName": "Home (landing)",
+      "audiences": [
+        "participante"
+      ],
+      "blocks": [
+        {
+          "name": "navbar",
+          "type": "header",
+          "content": "TELESCOPIO",
+          "icon": "menu",
+          "annotation": "chrome global: logo + About + See Demo + Events + bloque de sesión. Presente en las 6 rutas"
+        },
+        {
+          "name": "why-titulo",
+          "type": "heading",
+          "level": "h1",
+          "content": "WHY?"
+        },
+        {
+          "name": "why-parrafo",
+          "type": "paragraph",
+          "level": "body",
+          "content": "This is the WHY section where we explain the purpose and motivation behind Telescopio.",
+          "annotation": "min-height: 100vh · texto placeholder autorreferencial"
+        },
+        {
+          "name": "how-titulo",
+          "type": "heading",
+          "level": "h1",
+          "content": "HOW?"
+        },
+        {
+          "name": "how-parrafo",
+          "type": "paragraph",
+          "level": "body",
+          "content": "This is the HOW section where we explain the process and methodology of Telescopio.",
+          "annotation": "min-height: 100vh · texto placeholder autorreferencial"
+        },
+        {
+          "name": "demo-titulo",
+          "type": "heading",
+          "level": "h1",
+          "content": "DEMO"
+        },
+        {
+          "name": "demo-parrafo",
+          "type": "paragraph",
+          "level": "body",
+          "content": "This is the DEMO section where we showcase the capabilities of Telescopio.",
+          "annotation": "min-height: 100vh · texto placeholder autorreferencial"
+        },
+        {
+          "name": "link-events",
+          "type": "link",
+          "icon": "arrow-right",
+          "content": "Events",
+          "annotation": "único link de salida real de la pantalla (vive en la navbar)"
+        }
+      ],
+      "layouts": {
+        "desktop": [
+          {
+            "row": "why",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "why-titulo",
+                  "why-parrafo"
+                ]
+              }
+            ]
+          },
+          {
+            "row": "how",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "how-titulo",
+                  "how-parrafo"
+                ]
+              }
+            ]
+          },
+          {
+            "row": "demo",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "demo-titulo",
+                  "demo-parrafo"
+                ]
+              }
+            ]
+          },
+          {
+            "row": "salida",
+            "cols": [
+              {
+                "w": 3,
+                "stack": [
+                  "link-events"
+                ]
+              },
+              {
+                "w": 9,
+                "stack": []
+              }
+            ]
+          }
+        ],
+        "mobile": [
+          {
+            "row": "why-m",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "why-titulo",
+                  "why-parrafo"
+                ]
+              }
+            ]
+          },
+          {
+            "row": "how-m",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "how-titulo",
+                  "how-parrafo"
+                ]
+              }
+            ]
+          },
+          {
+            "row": "demo-m",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "demo-titulo",
+                  "demo-parrafo"
+                ]
+              }
+            ]
+          },
+          "link-events"
+        ]
+      },
+      "states": [
+        {
+          "name": "default",
+          "applies": true
+        }
+      ]
+    },
+    {
+      "name": "events-list",
+      "displayName": "Listado de eventos",
+      "audiences": [
+        "participante",
+        "organizador"
+      ],
+      "blocks": [
+        {
+          "name": "navbar",
+          "type": "header",
+          "content": "TELESCOPIO",
+          "icon": "menu",
+          "annotation": "chrome global"
+        },
+        {
+          "name": "loader-pantalla",
+          "type": "loader",
+          "content": "Loading events...",
+          "visible_only_in_states": [
+            "loading"
+          ],
+          "annotation": "retorno temprano: reemplaza toda la pantalla"
+        },
+        {
+          "name": "loader-sub",
+          "type": "paragraph",
+          "level": "caption",
+          "content": "Connecting to server...",
+          "visible_only_in_states": [
+            "loading"
+          ]
+        },
+        {
+          "name": "titulo",
+          "type": "heading",
+          "level": "h1",
+          "content": "Browse Events",
+          "hidden_in_states": [
+            "loading"
+          ]
+        },
+        {
+          "name": "btn-crear",
+          "type": "button",
+          "variant": "primary",
+          "icon": "plus",
+          "content": "Create Event",
+          "hidden_in_states": [
+            "loading"
+          ],
+          "annotation": "sin sesión: se renderiza activo y al click abre el modal de login (title=\"Log in to create events\")"
+        },
+        {
+          "name": "btn-refresh",
+          "type": "button",
+          "variant": "secondary",
+          "icon": "refresh",
+          "content": "Refresh",
+          "hidden_in_states": [
+            "loading"
+          ],
+          "annotation": "disabled={loading}, pero loading fuerza el retorno temprano: estado inalcanzable"
+        },
+        {
+          "name": "tabs-filtro",
+          "type": "tabs",
+          "labels": [
+            "All Events (12)",
+            "My Events (3)",
+            "My Subscriptions (5)"
+          ],
+          "active": 0,
+          "hidden_in_states": [
+            "loading"
+          ],
+          "annotation": "condicional: solo con sesión · filtrado client-side"
+        },
+        {
+          "name": "alerta-error",
+          "type": "alert",
+          "kind": "error",
+          "content": "Error loading events. Please try again.",
+          "visible_only_in_states": [
+            "error de sistema"
+          ]
+        },
+        {
+          "name": "btn-retry",
+          "type": "button",
+          "variant": "secondary",
+          "icon": "refresh",
+          "content": "Retry",
+          "visible_only_in_states": [
+            "error de sistema"
+          ]
+        },
+        {
+          "name": "vacio",
+          "type": "empty-state",
+          "content": "No events available at this time. Come back soon for new observation opportunities!",
+          "visible_only_in_states": [
+            "empty"
+          ],
+          "annotation": "tres variantes de texto según tab activo (all / my / subscriptions)"
+        },
+        {
+          "name": "tabla-eventos",
+          "type": "table",
+          "columns": [
+            {
+              "label": "Event",
+              "width": 40
+            },
+            {
+              "label": "Created",
+              "width": 15
+            },
+            {
+              "label": "Stage",
+              "width": 15
+            },
+            {
+              "label": "Participants",
+              "width": 15
+            },
+            {
+              "label": "Actions",
+              "width": 15
+            }
+          ],
+          "rows": [
+            [
+              "Spring Photo Contest 2026",
+              "Mar 3, 2026",
+              "badge:Participation",
+              "14 / 20",
+              "badge:Upload File"
+            ],
+            [
+              "Convocatoria de Propuestas Q2",
+              "Feb 18, 2026",
+              "badge:Voting",
+              "20 / 20",
+              "badge:Vote"
+            ],
+            [
+              "Ciclo de Observación Austral",
+              "Feb 2, 2026",
+              "badge:Completed",
+              "18 / 20",
+              "badge:See Results"
+            ],
+            [
+              "Concurso Interno de Ideas",
+              "Ene 27, 2026",
+              "badge:Creation",
+              "3 / 20",
+              "badge:Manage"
+            ]
+          ],
+          "hidden_in_states": [
+            "loading",
+            "empty"
+          ],
+          "annotation": "grid de <div>, no <table>. En mobile el header se oculta y cada fila pasa a tarjeta con cell-labels",
+          "visible_only_in_viewports": [
+            "desktop"
+          ]
+        },
+        {
+          "name": "cards-eventos",
+          "type": "card-list",
+          "items": [
+            {
+              "id": "Spring Photo Contest 2026",
+              "fecha": "Created: Mar 3, 2026",
+              "titulo": "Spring Photo Contest 2026",
+              "badges": [
+                "Participation"
+              ],
+              "proyecto": "Participants: 14 / 20",
+              "responsable": "Upload File",
+              "title": "Spring Photo Contest 2026"
+            },
+            {
+              "id": "Convocatoria de Propuestas Q2",
+              "fecha": "Created: Feb 18, 2026",
+              "titulo": "Convocatoria de Propuestas Q2",
+              "badges": [
+                "Voting"
+              ],
+              "proyecto": "Participants: 20 / 20",
+              "responsable": "Vote",
+              "title": "Convocatoria de Propuestas Q2"
+            },
+            {
+              "id": "Ciclo de Observación Austral",
+              "fecha": "Created: Feb 2, 2026",
+              "titulo": "Ciclo de Observación Austral",
+              "badges": [
+                "Completed"
+              ],
+              "proyecto": "Participants: 18 / 20",
+              "responsable": "See Results",
+              "title": "Ciclo de Observación Austral"
+            }
+          ],
+          "visible_only_in_viewports": [
+            "mobile"
+          ],
+          "hidden_in_states": [
+            "loading",
+            "empty"
+          ],
+          "annotation": "≤768px: cada fila deja de ser grid y se vuelve tarjeta con fondo, borde y radio propios"
+        }
+      ],
+      "layouts": {
+        "desktop": [
+          "loader-pantalla",
+          "loader-sub",
+          {
+            "row": "cabecera",
+            "cols": [
+              {
+                "w": 7,
+                "stack": [
+                  "titulo"
+                ]
+              },
+              {
+                "w": 5,
+                "stack": [
+                  {
+                    "row": "acciones",
+                    "cols": [
+                      {
+                        "w": 6,
+                        "stack": [
+                          "btn-crear"
+                        ]
+                      },
+                      {
+                        "w": 6,
+                        "stack": [
+                          "btn-refresh"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "tabs-filtro",
+          {
+            "row": "error",
+            "cols": [
+              {
+                "w": 9,
+                "stack": [
+                  "alerta-error"
+                ]
+              },
+              {
+                "w": 3,
+                "stack": [
+                  "btn-retry"
+                ]
+              }
+            ]
+          },
+          "vacio",
+          "tabla-eventos"
+        ],
+        "mobile": [
+          "loader-pantalla",
+          "loader-sub",
+          "titulo",
+          "btn-crear",
+          "btn-refresh",
+          "tabs-filtro",
+          "alerta-error",
+          "btn-retry",
+          "vacio",
+          "cards-eventos"
+        ]
+      },
+      "states": [
+        {
+          "name": "default",
+          "applies": true
+        },
+        {
+          "name": "empty",
+          "applies": true
+        },
+        {
+          "name": "loading",
+          "applies": true
+        },
+        {
+          "name": "error de sistema",
+          "applies": true
+        }
+      ]
+    },
+    {
+      "name": "create-event",
+      "displayName": "Crear evento",
+      "audiences": [
+        "organizador"
+      ],
+      "blocks": [
+        {
+          "name": "navbar",
+          "type": "header",
+          "content": "TELESCOPIO",
+          "icon": "menu",
+          "annotation": "chrome global"
+        },
+        {
+          "name": "btn-volver",
+          "type": "link",
+          "icon": "arrow-left",
+          "content": "← Back to Events",
+          "annotation": "desktop: position:absolute sobre el header · mobile: static, apilado encima del título"
+        },
+        {
+          "name": "titulo",
+          "type": "heading",
+          "level": "h1",
+          "content": "Create Event"
+        },
+        {
+          "name": "subtitulo",
+          "type": "paragraph",
+          "level": "caption",
+          "content": "Fill in the details to set up a new event"
+        },
+        {
+          "name": "alerta-error",
+          "type": "alert",
+          "kind": "error",
+          "content": "An event with this name already exists. Please choose a different name.",
+          "visible_only_in_states": [
+            "error de sistema",
+            "error de validación"
+          ],
+          "state_overrides": {
+            "error de sistema": {
+              "content": "Error creating event. Please try again."
+            },
+            "error de validación": {
+              "content": "Invalid form data. Please check all required fields."
+            }
+          }
+        },
+        {
+          "name": "campo-nombre",
+          "type": "text-input",
+          "state": "default",
+          "content": "e.g. Spring Photo Contest 2026",
+          "annotation": "Event name * — required, maxLength 200. Válido con 3–200 caracteres (trim en el mínimo)",
+          "state_overrides": {
+            "error de validación": {
+              "state": "error",
+              "error_msg": "Invalid form data. Please check all required fields."
+            }
+          }
+        },
+        {
+          "name": "ayuda-nombre",
+          "type": "paragraph",
+          "level": "caption",
+          "content": "A short, descriptive title that participants will see in the events list. Between 3 and 200 characters."
+        },
+        {
+          "name": "campo-descripcion",
+          "type": "textarea",
+          "h": 110,
+          "content": "Explain what the event is about, what participants are expected to submit, and how the judging works.",
+          "annotation": "Description * — required, maxLength 2000"
+        },
+        {
+          "name": "ayuda-descripcion",
+          "type": "paragraph",
+          "level": "caption",
+          "content": "Describe the event purpose, submission guidelines, and evaluation criteria. 0/2000 characters (minimum 10)."
+        },
+        {
+          "name": "campo-organizador",
+          "type": "text-input",
+          "state": "default",
+          "content": "e.g. Photography Club, Science Dept.",
+          "annotation": "Organizer name — sin asterisco, opcional"
+        },
+        {
+          "name": "ayuda-organizador",
+          "type": "paragraph",
+          "level": "caption",
+          "content": "The person, team, or institution responsible for this event. Shown publicly on the event page. Optional."
+        },
+        {
+          "name": "campo-max",
+          "type": "text-input",
+          "state": "default",
+          "value": "20",
+          "content": "Maximum participants",
+          "annotation": "type=number, min=1 max=100 — pero el min/max NO está en isFormValid. Vaciarlo lo convierte a 1"
+        },
+        {
+          "name": "ayuda-max",
+          "type": "paragraph",
+          "level": "caption",
+          "content": "How many people can register. Once this limit is reached, new registrations are blocked. Between 1 and 100. Default: 20."
+        },
+        {
+          "name": "caja-deadlines",
+          "type": "alert",
+          "kind": "info",
+          "content": "Deadline dates for each stage (Participation, Voting) are set when you advance the event to that stage from the management panel."
+        },
+        {
+          "name": "btn-cancelar",
+          "type": "button",
+          "variant": "secondary",
+          "content": "Cancel",
+          "state_overrides": {
+            "loading": {
+              "variant": "disabled"
+            }
+          }
+        },
+        {
+          "name": "btn-crear",
+          "type": "button",
+          "variant": "primary",
+          "icon": "check",
+          "content": "Create Event",
+          "annotation": "disabled cuando creating o !isFormValid — sin explicar por qué",
+          "state_overrides": {
+            "loading": {
+              "variant": "disabled",
+              "content": "Creating…"
+            },
+            "error de validación": {
+              "variant": "disabled"
+            }
+          }
+        }
+      ],
+      "layouts": {
+        "desktop": [
+          {
+            "row": "header",
+            "cols": [
+              {
+                "w": 3,
+                "stack": [
+                  "btn-volver"
+                ]
+              },
+              {
+                "w": 9,
+                "stack": [
+                  "titulo",
+                  "subtitulo"
+                ]
+              }
+            ]
+          },
+          "alerta-error",
+          {
+            "row": "identification",
+            "card": true,
+            "title": "Identification",
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  {
+                    "row": "f-nombre",
+                    "cols": [
+                      {
+                        "w": 12,
+                        "stack": [
+                          "campo-nombre",
+                          "ayuda-nombre"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "row": "f-desc",
+                    "cols": [
+                      {
+                        "w": 12,
+                        "stack": [
+                          "campo-descripcion",
+                          "ayuda-descripcion"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "row": "f-org",
+                    "cols": [
+                      {
+                        "w": 12,
+                        "stack": [
+                          "campo-organizador",
+                          "ayuda-organizador"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "row": "configuration",
+            "card": true,
+            "title": "Configuration",
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  {
+                    "row": "f-max",
+                    "cols": [
+                      {
+                        "w": 6,
+                        "stack": [
+                          "campo-max",
+                          "ayuda-max"
+                        ]
+                      },
+                      {
+                        "w": 6,
+                        "stack": [
+                          "caja-deadlines"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "row": "acciones",
+            "cols": [
+              {
+                "w": 6,
+                "stack": [
+                  "btn-cancelar"
+                ]
+              },
+              {
+                "w": 6,
+                "stack": [
+                  "btn-crear"
+                ]
+              }
+            ]
+          }
+        ],
+        "mobile": [
+          "btn-volver",
+          "titulo",
+          "subtitulo",
+          "alerta-error",
+          {
+            "row": "identification-m",
+            "card": true,
+            "title": "Identification",
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "campo-nombre",
+                  "ayuda-nombre",
+                  "campo-descripcion",
+                  "ayuda-descripcion",
+                  "campo-organizador",
+                  "ayuda-organizador"
+                ]
+              }
+            ]
+          },
+          {
+            "row": "configuration-m",
+            "card": true,
+            "title": "Configuration",
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "campo-max",
+                  "ayuda-max",
+                  "caja-deadlines"
+                ]
+              }
+            ]
+          },
+          "btn-cancelar",
+          "btn-crear"
+        ]
+      },
+      "states": [
+        {
+          "name": "default",
+          "applies": true
+        },
+        {
+          "name": "loading",
+          "applies": true
+        },
+        {
+          "name": "error de validación",
+          "applies": true
+        },
+        {
+          "name": "error de sistema",
+          "applies": true
+        },
+        {
+          "name": "permiso denegado",
+          "applies": true
+        }
+      ]
+    },
+    {
+      "name": "event-detail",
+      "displayName": "Detalle del evento (participante)",
+      "audiences": [
+        "participante"
+      ],
+      "blocks": [
+        {
+          "name": "navbar",
+          "type": "header",
+          "content": "TELESCOPIO",
+          "icon": "menu",
+          "annotation": "chrome global"
+        },
+        {
+          "name": "loader-pantalla",
+          "type": "loader",
+          "content": "Loading event details...",
+          "visible_only_in_states": [
+            "loading"
+          ],
+          "annotation": "retorno temprano bloqueante"
+        },
+        {
+          "name": "error-carga",
+          "type": "alert",
+          "kind": "error",
+          "content": "⚠️ Unable to Load Event — Event with ID \"42\" was not found.",
+          "visible_only_in_states": [
+            "error de sistema",
+            "not found"
+          ],
+          "state_overrides": {
+            "error de sistema": {
+              "content": "⚠️ Unable to Load Event — Unable to connect to the server. Using cached data if available."
+            }
+          }
+        },
+        {
+          "name": "btn-volver-lista",
+          "type": "button",
+          "variant": "secondary",
+          "icon": "arrow-left",
+          "content": "← Back to Events List",
+          "visible_only_in_states": [
+            "error de sistema",
+            "not found"
+          ]
+        },
+        {
+          "name": "btn-reintentar",
+          "type": "button",
+          "variant": "primary",
+          "icon": "refresh",
+          "content": "🔄 Try Again",
+          "visible_only_in_states": [
+            "error de sistema",
+            "not found"
+          ]
+        },
+        {
+          "name": "nav-volver",
+          "type": "link",
+          "icon": "arrow-left",
+          "content": "← Back to Events",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found"
+          ]
+        },
+        {
+          "name": "titulo-evento",
+          "type": "heading",
+          "level": "h1",
+          "content": "Spring Photo Contest 2026",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found"
+          ]
+        },
+        {
+          "name": "btn-compartir",
+          "type": "button",
+          "variant": "tertiary",
+          "icon": "share",
+          "content": "Share",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found"
+          ]
+        },
+        {
+          "name": "descripcion-evento",
+          "type": "paragraph",
+          "level": "body",
+          "content": "Convocatoria abierta a propuestas fotográficas. Cada participante entrega una sola propuesta y evalúa las asignadas.",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found"
+          ]
+        },
+        {
+          "name": "meta-organizador",
+          "type": "label",
+          "content": "Organizer: Photography Club",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found"
+          ],
+          "annotation": "fallback literal: Not specified"
+        },
+        {
+          "name": "meta-participantes",
+          "type": "label",
+          "content": "14 / 20 participants",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found"
+          ]
+        },
+        {
+          "name": "toggle-participantes",
+          "type": "link",
+          "icon": "eye",
+          "content": "View",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found"
+          ],
+          "annotation": "alterna a 'Hide' y abre el modal de participantes"
+        },
+        {
+          "name": "timeline",
+          "type": "list",
+          "items": [
+            {
+              "title": "Creation",
+              "subtitle": "Completada",
+              "icon": "check"
+            },
+            {
+              "title": "Participation",
+              "subtitle": "En curso · deadline 30 Mar 2026",
+              "icon": "clock"
+            },
+            {
+              "title": "Voting",
+              "subtitle": "Pendiente",
+              "icon": "clock"
+            },
+            {
+              "title": "Results",
+              "subtitle": "Pendiente",
+              "icon": "clock"
+            }
+          ],
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found"
+          ],
+          "annotation": "EventTimeline · ≤600px oculta descripciones y deadlines (defecto registrado en gaps)"
+        },
+        {
+          "name": "aviso-pausa",
+          "type": "alert",
+          "kind": "warning",
+          "content": "This event is currently paused",
+          "visible_only_in_states": [
+            "terminal"
+          ]
+        },
+        {
+          "name": "banner-exito",
+          "type": "alert",
+          "kind": "success",
+          "content": "File uploaded successfully!",
+          "visible_only_in_states": [
+            "success"
+          ],
+          "annotation": "nunca se limpia por tiempo ni al navegar"
+        },
+        {
+          "name": "banner-error-accion",
+          "type": "alert",
+          "kind": "error",
+          "content": "File type not allowed. Use: JPEG, PNG, GIF, WebP, PDF, TXT, DOC, DOCX",
+          "visible_only_in_states": [
+            "error de validación"
+          ]
+        },
+        {
+          "name": "accion-titulo",
+          "type": "heading",
+          "level": "h3",
+          "content": "📝 Event Participation",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found"
+          ]
+        },
+        {
+          "name": "accion-texto",
+          "type": "paragraph",
+          "level": "body",
+          "content": "Upload your submission for this event.",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found"
+          ],
+          "state_overrides": {
+            "empty": {
+              "content": "This event is being set up. Come back when it opens for participation."
+            },
+            "terminal": {
+              "content": "⏸ Registration and file submissions are not available while the event is paused."
+            }
+          }
+        },
+        {
+          "name": "badge-registrado",
+          "type": "badge",
+          "content": "✅ Registered",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "empty"
+          ]
+        },
+        {
+          "name": "requisitos-archivo",
+          "type": "paragraph",
+          "level": "caption",
+          "content": "Accepted: JPEG, PNG, GIF, WebP, PDF, TXT, DOC, DOCX · Max 10 MB",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "empty"
+          ]
+        },
+        {
+          "name": "btn-subir",
+          "type": "button",
+          "variant": "primary",
+          "icon": "upload",
+          "content": "Upload File",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "empty"
+          ],
+          "state_overrides": {
+            "success": {
+              "variant": "disabled",
+              "content": "Submission received"
+            },
+            "terminal": {
+              "variant": "disabled"
+            }
+          }
+        },
+        {
+          "name": "btn-quitar",
+          "type": "button",
+          "variant": "tertiary",
+          "icon": "x",
+          "content": "×",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "empty"
+          ],
+          "annotation": "title=\"Remove selected file\" · sin aria-label"
+        },
+        {
+          "name": "aviso-votacion",
+          "type": "alert",
+          "kind": "success",
+          "content": "✅ Voting is underway — Reviewers have been assigned their submissions and can now submit their rankings.",
+          "visible_only_in_states": [
+            "readonly"
+          ]
+        }
+      ],
+      "layouts": {
+        "desktop": [
+          "loader-pantalla",
+          "error-carga",
+          {
+            "row": "acciones-error",
+            "cols": [
+              {
+                "w": 6,
+                "stack": [
+                  "btn-volver-lista"
+                ]
+              },
+              {
+                "w": 6,
+                "stack": [
+                  "btn-reintentar"
+                ]
+              }
+            ]
+          },
+          "nav-volver",
+          {
+            "row": "presentacion",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  {
+                    "row": "titulo-fila",
+                    "cols": [
+                      {
+                        "w": 9,
+                        "stack": [
+                          "titulo-evento"
+                        ]
+                      },
+                      {
+                        "w": 3,
+                        "stack": [
+                          "btn-compartir"
+                        ]
+                      }
+                    ]
+                  },
+                  "descripcion-evento",
+                  {
+                    "row": "meta",
+                    "cols": [
+                      {
+                        "w": 5,
+                        "stack": [
+                          "meta-organizador"
+                        ]
+                      },
+                      {
+                        "w": 4,
+                        "stack": [
+                          "meta-participantes"
+                        ]
+                      },
+                      {
+                        "w": 3,
+                        "stack": [
+                          "toggle-participantes"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "row": "estado",
+            "card": true,
+            "title": "Estado del evento",
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "timeline",
+                  "aviso-pausa"
+                ]
+              }
+            ]
+          },
+          "banner-exito",
+          "banner-error-accion",
+          {
+            "row": "accion",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "accion-titulo",
+                  "badge-registrado",
+                  "accion-texto",
+                  "requisitos-archivo",
+                  {
+                    "row": "accion-botones",
+                    "cols": [
+                      {
+                        "w": 8,
+                        "stack": [
+                          "btn-subir"
+                        ]
+                      },
+                      {
+                        "w": 4,
+                        "stack": [
+                          "btn-quitar"
+                        ]
+                      }
+                    ]
+                  },
+                  "aviso-votacion"
+                ]
+              }
+            ]
+          }
+        ],
+        "mobile": [
+          "loader-pantalla",
+          "error-carga",
+          "btn-volver-lista",
+          "btn-reintentar",
+          "nav-volver",
+          {
+            "row": "presentacion-m",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "titulo-evento",
+                  "btn-compartir",
+                  "descripcion-evento",
+                  "meta-organizador",
+                  "meta-participantes",
+                  "toggle-participantes"
+                ]
+              }
+            ]
+          },
+          {
+            "row": "estado-m",
+            "card": true,
+            "title": "Estado del evento",
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "timeline",
+                  "aviso-pausa"
+                ]
+              }
+            ]
+          },
+          "banner-exito",
+          "banner-error-accion",
+          {
+            "row": "accion-m",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "accion-titulo",
+                  "badge-registrado",
+                  "accion-texto",
+                  "requisitos-archivo",
+                  "btn-subir",
+                  "btn-quitar",
+                  "aviso-votacion"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "states": [
+        {
+          "name": "default",
+          "applies": true
+        },
+        {
+          "name": "empty",
+          "applies": true
+        },
+        {
+          "name": "loading",
+          "applies": true
+        },
+        {
+          "name": "error de validación",
+          "applies": true
+        },
+        {
+          "name": "error de sistema",
+          "applies": true
+        },
+        {
+          "name": "success",
+          "applies": true
+        },
+        {
+          "name": "not found",
+          "applies": true
+        },
+        {
+          "name": "readonly",
+          "applies": true
+        },
+        {
+          "name": "terminal",
+          "applies": true
+        }
+      ]
+    },
+    {
+      "name": "manage-event",
+      "displayName": "Gestión del evento (organizador)",
+      "audiences": [
+        "organizador"
+      ],
+      "blocks": [
+        {
+          "name": "navbar",
+          "type": "header",
+          "content": "TELESCOPIO",
+          "icon": "menu",
+          "annotation": "chrome global"
+        },
+        {
+          "name": "loader-pantalla",
+          "type": "loader",
+          "content": "Loading event...",
+          "visible_only_in_states": [
+            "loading"
+          ],
+          "annotation": "pantalla bloqueante"
+        },
+        {
+          "name": "error-pantalla",
+          "type": "alert",
+          "kind": "error",
+          "content": "Error loading event data. Please try again.",
+          "visible_only_in_states": [
+            "error de sistema",
+            "not found"
+          ],
+          "state_overrides": {
+            "not found": {
+              "content": "Event not found."
+            }
+          }
+        },
+        {
+          "name": "error-permiso",
+          "type": "alert",
+          "kind": "error",
+          "content": "You do not have permission to manage this event.",
+          "visible_only_in_states": [
+            "permiso denegado"
+          ],
+          "annotation": "el único estado de permiso explícito de toda la app"
+        },
+        {
+          "name": "btn-a-eventos",
+          "type": "button",
+          "variant": "secondary",
+          "icon": "arrow-left",
+          "content": "Back to Events",
+          "visible_only_in_states": [
+            "error de sistema",
+            "not found",
+            "permiso denegado"
+          ]
+        },
+        {
+          "name": "btn-volver",
+          "type": "link",
+          "icon": "arrow-left",
+          "content": "← Back to Event Details",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "permiso denegado"
+          ],
+          "annotation": "⚠️ loop de navegación: el wrapper redirige al creador de vuelta acá"
+        },
+        {
+          "name": "titulo",
+          "type": "heading",
+          "level": "h1",
+          "content": "Manage Event",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "permiso denegado"
+          ]
+        },
+        {
+          "name": "subtitulo",
+          "type": "paragraph",
+          "level": "caption",
+          "content": "Control event stages and view participants",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "permiso denegado"
+          ]
+        },
+        {
+          "name": "alerta-error-inline",
+          "type": "alert",
+          "kind": "error",
+          "content": "Error updating event. Please try again.",
+          "visible_only_in_states": [
+            "error de validación"
+          ],
+          "state_overrides": {
+            "error de validación": {
+              "content": "Cannot advance: Only 12 of 20 participants have voted."
+            }
+          }
+        },
+        {
+          "name": "ficha-titulo",
+          "type": "heading",
+          "level": "h3",
+          "content": "Spring Photo Contest 2026",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "permiso denegado"
+          ]
+        },
+        {
+          "name": "ficha-descripcion",
+          "type": "paragraph",
+          "level": "body",
+          "content": "Convocatoria abierta a propuestas fotográficas. Cada participante entrega una sola propuesta y evalúa las asignadas.",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "permiso denegado"
+          ]
+        },
+        {
+          "name": "meta-creado",
+          "type": "label",
+          "content": "Created: March 3, 2026",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "permiso denegado"
+          ]
+        },
+        {
+          "name": "meta-etapa",
+          "type": "badge",
+          "content": "Current Stage: Participation",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "permiso denegado"
+          ],
+          "state_overrides": {
+            "terminal": {
+              "content": "Current Stage: Results"
+            }
+          }
+        },
+        {
+          "name": "meta-participantes",
+          "type": "label",
+          "content": "Participants: 14 / 20",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "permiso denegado"
+          ]
+        },
+        {
+          "name": "meta-archivos",
+          "type": "label",
+          "content": "Files Submitted: 9 / 14",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "permiso denegado"
+          ]
+        },
+        {
+          "name": "meta-deadline",
+          "type": "label",
+          "content": "Participation Deadline: March 30, 2026 (in 12 days)",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "permiso denegado"
+          ]
+        },
+        {
+          "name": "btn-editar-deadline",
+          "type": "button",
+          "variant": "tertiary",
+          "icon": "edit",
+          "content": "✏️",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "permiso denegado"
+          ],
+          "annotation": "title=\"Edit deadline\" · sin deadline fijado muestra '+ Set deadline'"
+        },
+        {
+          "name": "control-titulo",
+          "type": "heading",
+          "level": "h3",
+          "content": "Event Stage Control",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "permiso denegado"
+          ]
+        },
+        {
+          "name": "timeline",
+          "type": "list",
+          "items": [
+            {
+              "title": "Creation",
+              "subtitle": "Completada",
+              "icon": "check"
+            },
+            {
+              "title": "Participation",
+              "subtitle": "En curso · deadline 30 Mar 2026",
+              "icon": "clock"
+            },
+            {
+              "title": "Voting",
+              "subtitle": "Pendiente",
+              "icon": "clock"
+            },
+            {
+              "title": "Results",
+              "subtitle": "Pendiente",
+              "icon": "clock"
+            }
+          ],
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "permiso denegado"
+          ],
+          "annotation": "EventTimeline · ≤600px oculta deadlines"
+        },
+        {
+          "name": "btn-avanzar",
+          "type": "button",
+          "variant": "primary",
+          "icon": "arrow-right",
+          "content": "Advance to Voting",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "permiso denegado"
+          ],
+          "state_overrides": {
+            "error de validación": {
+              "variant": "disabled"
+            },
+            "terminal": {
+              "variant": "disabled",
+              "content": "Event has reached final results"
+            }
+          }
+        },
+        {
+          "name": "btn-pausar",
+          "type": "button",
+          "variant": "secondary",
+          "icon": "pause",
+          "content": "⏸ Pause Event",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "permiso denegado"
+          ],
+          "annotation": "confirma con window.confirm nativo — único diálogo no-React de la app"
+        },
+        {
+          "name": "aviso-votacion",
+          "type": "alert",
+          "kind": "success",
+          "content": "✅ Voting is underway — Once everyone has voted, advance to \"Results\" to publish the final ranking.",
+          "visible_only_in_states": [
+            "readonly"
+          ]
+        },
+        {
+          "name": "participantes-titulo",
+          "type": "heading",
+          "level": "h3",
+          "content": "Registered Participants (14)",
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "permiso denegado",
+            "terminal"
+          ]
+        },
+        {
+          "name": "participantes-vacio",
+          "type": "empty-state",
+          "content": "No participants have registered yet. Share the event link to invite participants!",
+          "visible_only_in_states": [
+            "empty"
+          ],
+          "annotation": "⚠️ si la API de participantes falla se muestra esto mismo: un fallo se presenta como un dato"
+        },
+        {
+          "name": "tabla-participantes",
+          "type": "table",
+          "columns": [
+            {
+              "label": "Name",
+              "width": 28
+            },
+            {
+              "label": "Email",
+              "width": 34
+            },
+            {
+              "label": "File Status",
+              "width": 19
+            },
+            {
+              "label": "Voting Status",
+              "width": 19
+            }
+          ],
+          "rows": [
+            [
+              "Ana Ruiz",
+              "ana.ruiz@ejemplo.org",
+              "badge:✓ Submitted",
+              "badge:⏳ Not Voted"
+            ],
+            [
+              "Bruno Paz",
+              "bruno.paz@ejemplo.org",
+              "badge:✓ Submitted",
+              "badge:✓ Voted"
+            ],
+            [
+              "Carla Vega",
+              "carla.vega@ejemplo.org",
+              "badge:⏳ Pending",
+              "badge:N/A"
+            ],
+            [
+              "Diego Sosa",
+              "diego.sosa@ejemplo.org",
+              "badge:✓ Submitted",
+              "badge:⏳ Not Voted"
+            ]
+          ],
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "permiso denegado",
+            "empty",
+            "terminal"
+          ],
+          "annotation": "⚠️ en mobile se apila sin etiquetas: el CSS usa attr(data-label) pero el JSX nunca setea data-label",
+          "visible_only_in_viewports": [
+            "desktop"
+          ]
+        },
+        {
+          "name": "cards-participantes",
+          "type": "card-list",
+          "items": [
+            {
+              "id": "P-01",
+              "fecha": "ana.ruiz@ejemplo.org",
+              "titulo": "Ana Ruiz",
+              "badges": [
+                "✓ Submitted",
+                "⏳ Not Voted"
+              ],
+              "proyecto": "",
+              "responsable": "",
+              "title": "Ana Ruiz"
+            },
+            {
+              "id": "P-02",
+              "fecha": "bruno.paz@ejemplo.org",
+              "titulo": "Bruno Paz",
+              "badges": [
+                "✓ Submitted",
+                "✓ Voted"
+              ],
+              "proyecto": "",
+              "responsable": "",
+              "title": "Bruno Paz"
+            },
+            {
+              "id": "P-03",
+              "fecha": "carla.vega@ejemplo.org",
+              "titulo": "Carla Vega",
+              "badges": [
+                "⏳ Pending",
+                "N/A"
+              ],
+              "proyecto": "",
+              "responsable": "",
+              "title": "Carla Vega"
+            }
+          ],
+          "visible_only_in_viewports": [
+            "mobile"
+          ],
+          "hidden_in_states": [
+            "loading",
+            "error de sistema",
+            "not found",
+            "permiso denegado",
+            "empty",
+            "terminal"
+          ],
+          "annotation": "≤768px la tabla pasa a 1 columna"
+        },
+        {
+          "name": "resultados-titulo",
+          "type": "heading",
+          "level": "h3",
+          "content": "Resultados",
+          "visible_only_in_states": [
+            "terminal"
+          ]
+        },
+        {
+          "name": "resultados-tabla",
+          "type": "table",
+          "columns": [
+            {
+              "label": "#",
+              "width": 10
+            },
+            {
+              "label": "Propuesta",
+              "width": 45
+            },
+            {
+              "label": "Puntaje MBC",
+              "width": 22
+            },
+            {
+              "label": "Ajustado (G')",
+              "width": 23
+            }
+          ],
+          "rows": [
+            [
+              "1",
+              "Nebulosa en tres tiempos",
+              "0.91",
+              "1"
+            ],
+            [
+              "2",
+              "Tránsito de marzo",
+              "0.87",
+              "3"
+            ],
+            [
+              "3",
+              "Cúmulo abierto NGC 3532",
+              "0.84",
+              "2"
+            ]
+          ],
+          "visible_only_in_states": [
+            "terminal"
+          ],
+          "annotation": "VotingResultsPanel · ⚠️ muestra G y G' sin declarar cuál es el resultado oficial"
+        }
+      ],
+      "layouts": {
+        "desktop": [
+          "loader-pantalla",
+          "error-pantalla",
+          "error-permiso",
+          "btn-a-eventos",
+          {
+            "row": "header",
+            "cols": [
+              {
+                "w": 4,
+                "stack": [
+                  "btn-volver"
+                ]
+              },
+              {
+                "w": 8,
+                "stack": [
+                  "titulo",
+                  "subtitulo"
+                ]
+              }
+            ]
+          },
+          "alerta-error-inline",
+          {
+            "row": "ficha",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "ficha-titulo",
+                  "ficha-descripcion",
+                  {
+                    "row": "meta-1",
+                    "cols": [
+                      {
+                        "w": 4,
+                        "stack": [
+                          "meta-creado"
+                        ]
+                      },
+                      {
+                        "w": 4,
+                        "stack": [
+                          "meta-etapa"
+                        ]
+                      },
+                      {
+                        "w": 4,
+                        "stack": [
+                          "meta-participantes"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "row": "meta-2",
+                    "cols": [
+                      {
+                        "w": 4,
+                        "stack": [
+                          "meta-archivos"
+                        ]
+                      },
+                      {
+                        "w": 6,
+                        "stack": [
+                          "meta-deadline"
+                        ]
+                      },
+                      {
+                        "w": 2,
+                        "stack": [
+                          "btn-editar-deadline"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "row": "control",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "control-titulo",
+                  "timeline",
+                  {
+                    "row": "control-acciones",
+                    "cols": [
+                      {
+                        "w": 6,
+                        "stack": [
+                          "btn-avanzar"
+                        ]
+                      },
+                      {
+                        "w": 6,
+                        "stack": [
+                          "btn-pausar"
+                        ]
+                      }
+                    ]
+                  },
+                  "aviso-votacion"
+                ]
+              }
+            ]
+          },
+          {
+            "row": "participantes",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "participantes-titulo",
+                  "participantes-vacio",
+                  "tabla-participantes"
+                ]
+              }
+            ]
+          },
+          {
+            "row": "resultados",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "resultados-titulo",
+                  "resultados-tabla"
+                ]
+              }
+            ]
+          }
+        ],
+        "mobile": [
+          "loader-pantalla",
+          "error-pantalla",
+          "error-permiso",
+          "btn-a-eventos",
+          "btn-volver",
+          "titulo",
+          "subtitulo",
+          "alerta-error-inline",
+          {
+            "row": "ficha-m",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "ficha-titulo",
+                  "ficha-descripcion",
+                  "meta-creado",
+                  "meta-etapa",
+                  "meta-participantes",
+                  "meta-archivos",
+                  "meta-deadline",
+                  "btn-editar-deadline"
+                ]
+              }
+            ]
+          },
+          {
+            "row": "control-m",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "control-titulo",
+                  "timeline",
+                  "btn-avanzar",
+                  "btn-pausar",
+                  "aviso-votacion"
+                ]
+              }
+            ]
+          },
+          {
+            "row": "participantes-m",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "participantes-titulo",
+                  "participantes-vacio",
+                  "cards-participantes"
+                ]
+              }
+            ]
+          },
+          {
+            "row": "resultados-m",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "resultados-titulo",
+                  "resultados-tabla"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "states": [
+        {
+          "name": "default",
+          "applies": true
+        },
+        {
+          "name": "empty",
+          "applies": true
+        },
+        {
+          "name": "loading",
+          "applies": true
+        },
+        {
+          "name": "error de validación",
+          "applies": true
+        },
+        {
+          "name": "error de sistema",
+          "applies": true
+        },
+        {
+          "name": "not found",
+          "applies": true
+        },
+        {
+          "name": "permiso denegado",
+          "applies": true
+        },
+        {
+          "name": "readonly",
+          "applies": true
+        },
+        {
+          "name": "terminal",
+          "applies": true
+        }
+      ]
+    },
+    {
+      "name": "reset-password",
+      "displayName": "Definir nueva contraseña",
+      "audiences": [
+        "participante"
+      ],
+      "blocks": [
+        {
+          "name": "navbar",
+          "type": "header",
+          "content": "TELESCOPIO",
+          "icon": "menu",
+          "annotation": "chrome global"
+        },
+        {
+          "name": "titulo",
+          "type": "heading",
+          "level": "h2",
+          "content": "🔭 Reset Password",
+          "state_overrides": {
+            "success": {
+              "content": "🔭 Password Updated"
+            }
+          }
+        },
+        {
+          "name": "error-token",
+          "type": "alert",
+          "kind": "error",
+          "content": "Invalid or missing reset token.",
+          "visible_only_in_states": [
+            "not found"
+          ],
+          "annotation": "⚠️ esta tarjeta no ofrece ninguna salida: ni botón ni link"
+        },
+        {
+          "name": "mensaje-exito",
+          "type": "paragraph",
+          "level": "body",
+          "content": "Your password has been updated successfully.",
+          "visible_only_in_states": [
+            "success"
+          ]
+        },
+        {
+          "name": "btn-home",
+          "type": "button",
+          "variant": "primary",
+          "icon": "home",
+          "content": "Go to home",
+          "visible_only_in_states": [
+            "success"
+          ]
+        },
+        {
+          "name": "label-password",
+          "type": "label",
+          "content": "New password",
+          "hidden_in_states": [
+            "success",
+            "not found"
+          ]
+        },
+        {
+          "name": "campo-password",
+          "type": "text-input",
+          "state": "default",
+          "content": "At least 8 characters",
+          "hidden_in_states": [
+            "success",
+            "not found"
+          ],
+          "state_overrides": {
+            "error de validación": {
+              "state": "error",
+              "error_msg": "Password must be at least 8 characters."
+            }
+          }
+        },
+        {
+          "name": "label-confirm",
+          "type": "label",
+          "content": "Confirm password",
+          "hidden_in_states": [
+            "success",
+            "not found"
+          ]
+        },
+        {
+          "name": "campo-confirm",
+          "type": "text-input",
+          "state": "default",
+          "content": "Repeat your new password",
+          "hidden_in_states": [
+            "success",
+            "not found"
+          ],
+          "state_overrides": {
+            "error de validación": {
+              "state": "error",
+              "error_msg": "Passwords do not match."
+            }
+          }
+        },
+        {
+          "name": "error-inline",
+          "type": "alert",
+          "kind": "error",
+          "content": "Passwords do not match.",
+          "visible_only_in_states": [
+            "error de validación",
+            "error de sistema"
+          ],
+          "state_overrides": {
+            "error de sistema": {
+              "content": "Something went wrong. The link may have expired."
+            }
+          }
+        },
+        {
+          "name": "btn-enviar",
+          "type": "button",
+          "variant": "primary",
+          "icon": "lock",
+          "content": "Set new password",
+          "hidden_in_states": [
+            "success",
+            "not found"
+          ],
+          "state_overrides": {
+            "loading": {
+              "variant": "disabled",
+              "content": "Updating..."
+            }
+          }
+        }
+      ],
+      "layouts": {
+        "desktop": [
+          {
+            "row": "centrado",
+            "cols": [
+              {
+                "w": 3,
+                "stack": []
+              },
+              {
+                "w": 6,
+                "stack": [
+                  {
+                    "row": "tarjeta",
+                    "card": true,
+                    "cols": [
+                      {
+                        "w": 12,
+                        "stack": [
+                          "titulo",
+                          "error-token",
+                          "mensaje-exito",
+                          "btn-home",
+                          "label-password",
+                          "campo-password",
+                          "label-confirm",
+                          "campo-confirm",
+                          "error-inline",
+                          "btn-enviar"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "w": 3,
+                "stack": []
+              }
+            ]
+          }
+        ],
+        "mobile": [
+          {
+            "row": "tarjeta-m",
+            "card": true,
+            "cols": [
+              {
+                "w": 12,
+                "stack": [
+                  "titulo",
+                  "error-token",
+                  "mensaje-exito",
+                  "btn-home",
+                  "label-password",
+                  "campo-password",
+                  "label-confirm",
+                  "campo-confirm",
+                  "error-inline",
+                  "btn-enviar"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "states": [
+        {
+          "name": "default",
+          "applies": true
+        },
+        {
+          "name": "loading",
+          "applies": true
+        },
+        {
+          "name": "error de validación",
+          "applies": true
+        },
+        {
+          "name": "error de sistema",
+          "applies": true
+        },
+        {
+          "name": "success",
+          "applies": true
+        },
+        {
+          "name": "not found",
+          "applies": true
+        }
+      ]
+    }
+  ],
+  "transitions": [
+    {
+      "src": "home",
+      "srcBlock": "link-events",
+      "dst": "events-list",
+      "trigger": "click 'Events'",
+      "automatic": false
+    },
+    {
+      "src": "events-list",
+      "srcBlock": "btn-crear",
+      "dst": "create-event",
+      "trigger": "click 'Create Event'",
+      "automatic": false
+    },
+    {
+      "src": "events-list",
+      "srcBlock": "tabla-eventos",
+      "dst": "event-detail",
+      "trigger": "botón contextual de fila",
+      "automatic": false
+    },
+    {
+      "src": "events-list",
+      "srcBlock": "cards-eventos",
+      "dst": "event-detail",
+      "trigger": "botón contextual de tarjeta",
+      "automatic": false
+    },
+    {
+      "src": "create-event",
+      "srcBlock": "btn-cancelar",
+      "dst": "events-list",
+      "trigger": "click 'Cancel'",
+      "automatic": false
+    },
+    {
+      "src": "create-event",
+      "srcBlock": "btn-volver",
+      "dst": "events-list",
+      "trigger": "← Back to Events",
+      "automatic": false
+    },
+    {
+      "src": "create-event",
+      "srcBlock": "btn-crear",
+      "dst": "manage-event",
+      "trigger": "creado → redirect a manage",
+      "automatic": true
+    },
+    {
+      "src": "event-detail",
+      "srcBlock": "nav-volver",
+      "dst": "events-list",
+      "trigger": "← Back to Events",
+      "automatic": false
+    },
+    {
+      "src": "event-detail",
+      "srcState": "error de sistema",
+      "srcBlock": "btn-volver-lista",
+      "dst": "events-list",
+      "trigger": "← Back to Events List",
+      "automatic": false
+    },
+    {
+      "src": "event-detail",
+      "srcBlock": "titulo-evento",
+      "dst": "manage-event",
+      "trigger": "si es creador → redirect",
+      "automatic": true
+    },
+    {
+      "src": "manage-event",
+      "srcBlock": "btn-volver",
+      "dst": "event-detail",
+      "trigger": "← Back to Event Details",
+      "automatic": false
+    },
+    {
+      "src": "manage-event",
+      "srcState": "permiso denegado",
+      "srcBlock": "btn-a-eventos",
+      "dst": "events-list",
+      "trigger": "click 'Back to Events'",
+      "automatic": false
+    },
+    {
+      "src": "reset-password",
+      "srcState": "success",
+      "srcBlock": "btn-home",
+      "dst": "home",
+      "trigger": "click 'Go to home'",
+      "automatic": false
+    }
+  ]
+}

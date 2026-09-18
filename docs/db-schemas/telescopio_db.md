@@ -5,7 +5,7 @@
 | **Motor** | PostgreSQL |
 | **Extensiones** | `uuid-ossp` |
 | **Acceso** | GORM 1.30.2 (`gorm.io/driver/postgres`) |
-| **Servicio propietario** | [`telescopio-api`](../architectures/telescopio-api/index.md) |
+| **Servicio propietario** | [`api`](../architectures/api/index.md) |
 | **Migraciones** | 20, versionadas en Go (`internal/storage/migrations/`) |
 
 Todo el estado del producto vive acá. Las claves primarias son UUID generadas por

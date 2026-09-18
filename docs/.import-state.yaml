@@ -1,15 +1,17 @@
 import:
-  status: ready_to_consolidate   # los 2 servicios del monorepo están analizados
+  status: completed
+  completed_at: 2026-09-18
   last_updated: 2026-09-18
   mode: monorepo
-  next_step: /product-consolidate-services
+  next_step: /product-new-request | /service-setup-repo
+  validated_at: 2026-09-18
 
   # Sincronización desde los repos originales (~/Documentos/Proyectos/Telescopio),
   # ambos en rama dev. Tras ella, api/ y web/ son idénticos a sus originales.
   synced_from_origin:
     date: 2026-09-18
     api:
-      source: Telescopio/telescopio-api (dev @ 76edd36)
+      source: Telescopio/api (dev @ 76edd36)
       changes:
         - "Suite de tests unitarios: ~4.300 líneas, 10 archivos, mocks a mano. Pasan sin base de datos"
         - "Fix en GenerateAssignments: la fase 1 respeta el tope m por participante (antes podía excederlo y violar el trigger)"
@@ -25,8 +27,45 @@ import:
         - "Eliminados components/event-detail/ (duplicado, ~800 líneas de CSS), VoteService y las constantes EVENT_VOTE / EVENT_RESULTS"
         - "Rediseño del bloque de subida en EventDetailPage: nuevo microcopy y lista de tipos en una línea"
 
+  # Arquitectura validada por el usuario el 2026-09-18 (Step 4 de consolidate-services)
+  connections:
+    - from: web
+      to: api
+      type: http_rest
+      details: "Única integración de datos. JWT Bearer en Authorization. REACT_APP_API_URL, default http://localhost:8080"
+    - from: api
+      to: postgresql (telescopio_db)
+      type: shared_database
+      details: "Read/write, pool de 100 conexiones. Reglas de negocio en triggers plpgsql"
+    - from: api
+      to: minio
+      type: object_storage
+      details: "Propuestas. Intercambiable con filesystem local vía STORAGE_PROVIDER"
+    - from: web
+      to: localStorage
+      type: browser_storage
+      details: "Sesión: telescopio_user, telescopio_token"
+
+  # No hay comunicación backend-a-backend: monolito backend + SPA, sin bus de eventos.
+
+  external_dependencies:
+    - service: web
+      uses: google_oauth
+      purpose: "Obtener el id_token en el cliente (@react-oauth/google)"
+    - service: api
+      uses: google_oauth
+      purpose: "Verificar el id_token durante login/registro con Google"
+    - service: api
+      uses: smtp
+      purpose: "Emails de cambio de etapa, cancelación de evento y reset de password"
+
+  open_ambiguities:
+    - "STORAGE_PROVIDER: el código soporta local y minio; no se determinó cuál está desplegado"
+    - "GET /api/v1/attachments/{id}/download lo expone el backend (sin auth) pero el frontend no lo consume"
+    - "El rol global admin saltea permisos en el backend pero no tiene pantalla en el frontend"
+
   services:
-    - name: telescopio-api
+    - name: api
       type: backend
       responsibility: >-
         Backend del sistema de asignación de tiempo de telescopio: eventos de
@@ -45,9 +84,9 @@ import:
         modules: [event, participant, attachment, vote, email]
 
       documentation:
-        analysis: docs/analysis/services/telescopio-api.md
-        architecture: docs/architectures/telescopio-api/
-        api_spec: docs/apis/telescopio-api.yaml
+        analysis: docs/analysis/services/api.md
+        architecture: docs/architectures/api/
+        api_spec: docs/apis/api.yaml
         db_schema: docs/db-schemas/telescopio_db.md
 
       interfaces:
@@ -108,7 +147,7 @@ import:
             internal/middleware/auth (JWT y permisos) e internal/storage/postgres
             siguen sin cobertura.
 
-    - name: telescopio-web
+    - name: web
       type: frontend
       responsibility: >-
         Única interfaz de usuario del producto. Cubre el recorrido del participante
@@ -129,9 +168,9 @@ import:
         modules: [auth, events, event-management, voting]
 
       documentation:
-        analysis: docs/analysis/services/telescopio-web.md
-        architecture: docs/architectures/telescopio-web/
-        ux_survey: docs/analysis/ux/telescopio-web/
+        analysis: docs/analysis/services/web.md
+        architecture: docs/architectures/web/
+        ux_survey: docs/analysis/ux/web/
 
       ux_survey:
         platform: web
@@ -149,7 +188,7 @@ import:
             details: "SPA con 6 rutas, servida como estáticos"
         consumes:
           - type: api
-            target: telescopio-api
+            target: api
             details: "REST con JWT Bearer. Toda la funcionalidad del producto"
           - type: external_api
             target: google_oauth
@@ -217,3 +256,67 @@ import:
         - severity: low
           title: "Tokens de diseño duplicados y un tercio de colores hardcodeado"
           detail: "global.css repite las 57 variables de index.css. 350 hex vs 753 var()."
+
+  # ---- Consolidación completada (/product-consolidate-services, 2026-09-18) ----
+
+  prd_generated:
+    goals_and_context: docs/prd/goals-and-context.md
+    requirements: docs/prd/requirements.md          # 8 entidades, 38 capabilities, 14 defectos
+    feature_groups: docs/prd/feature-groups.md      # 7 feature groups
+    architecture: docs/prd/architecture.md
+
+  adrs_generated:
+    - docs/adrs/ADR-001-votacion-distribuida-mbc.md
+    - docs/adrs/ADR-002-reglas-de-negocio-en-triggers.md
+    - docs/adrs/ADR-003-monolito-backend-con-spa.md
+    - docs/adrs/ADR-004-gin-y-gorm.md
+    - docs/adrs/ADR-005-entidades-de-dominio-como-contrato-json.md
+    - docs/adrs/ADR-006-create-react-app.md
+    - docs/adrs/ADR-007-css-plano-sin-framework.md
+    - docs/adrs/ADR-008-expiracion-de-sesion-por-customevent.md
+
+  flows_generated:
+    - docs/flows/registro-y-carga-de-propuesta.md
+    - docs/flows/configuracion-y-generacion-de-asignaciones.md
+    - docs/flows/evaluacion-y-envio-de-ranking.md
+    - docs/flows/calculo-y-publicacion-de-resultados.md
+    - docs/flows/avance-de-etapa-del-evento.md
+
+  ux_generated:
+    audiences: [organizador, participante]   # confirmadas con el usuario; separadas por JTBD
+    surfaces: [web]
+    screens: 6                               # status: as-is-sin-validar
+    gaps_detected: 54                        # 14 alta, 24 media, 16 baja
+    cross_surface_flows: none                # una sola superficie: ningún flujo la cruza
+    files:
+      overview: docs/ux/product-overview.md
+      gaps: docs/ux/gaps-as-is.md
+
+  design_system_seeded:
+    surface: web
+    version: 1.0.0
+    foundations_seeded: [grid, color, typography, spacing]
+    foundations_placeholder: [motion, elevation, iconography, voice-tone]
+    components_surveyed: [modal, button, glass-card, status-badge]
+    brand_color: "#6a5acd"
+    real_breakpoint: 768
+
+  folders_created:
+    - docs/stories
+    - docs/requests
+
+  # Decisiones de producto tomadas durante la consolidación
+  product_decisions:
+    - "El producto es de propósito general: el dominio astronómico es el origen, no un límite"
+    - "El rol global users.role (admin/organizer/participant) es deuda a eliminar; el modelo vigente es el rol por evento"
+    - "Los parámetros del algoritmo los recomienda el sistema y los edita el organizador"
+    - "El responsive es requisito, no preferencia"
+    - "STORAGE_PROVIDER en despliegue es minio (verificado en deploy/)"
+
+  open_questions:
+    - "¿Cuál es el ranking oficial: G (global) o G' (ajustado por incentivos)? — bloquea FG-5 y FG-6"
+    - "¿Retirar users.role requiere migración de datos?"
+    - "¿El límite de archivo son 10MB (cliente) o 100MB (base)? El backend no valida nada"
+    - "¿Qué hacer si una propuesta no alcanza min_evaluations_per_file? Hoy pasa en silencio"
+    - "¿Objetivo de accesibilidad (WCAG)? — bloquea el cierre de FG-4"
+    - "Contenido real de la landing — bloquea FG-7"

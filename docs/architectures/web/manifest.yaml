@@ -1,0 +1,25 @@
+service: web
+type: frontend
+
+# React puro con Create React App. NO es Next.js: el único catálogo frontend disponible
+# (.claude/conventions/nextjs/) asume App Router, Server Components y Server Actions, que
+# acá no existen. Por eso `language: react` no tiene carpeta de catálogo y TODAS las
+# convenciones son custom, escritas desde los patrones observados en el código.
+language: react
+
+conventions:
+  - project-structure   # custom: no hay _base de catálogo para este lenguaje
+  - routing             # custom: react-router-dom v7, client-side
+  - state-management    # custom: Context + useState, sin librería de estado
+  - data-fetching       # custom: fetch nativo en useEffect, sin caché
+  - auth                # custom: JWT en localStorage + Context, sin rutas protegidas
+  - styling             # custom: CSS plano por componente con variables, sin Tailwind
+  - forms               # custom: useState controlado + validación manual
+  - error-handling      # custom: try/catch con estado local, sin error boundaries
+  - testing             # custom: CRA + Testing Library, prácticamente sin cobertura
+
+modules:
+  - auth                # login, registro, Google OAuth, recuperación de password
+  - events              # listado, creación, detalle
+  - event-management    # vista del organizador: etapas, configuración, participantes
+  - voting              # asignación, ranking, borradores, resultados
