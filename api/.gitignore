@@ -66,10 +66,11 @@ coverage.html
 tmp/
 
 /docs
-# Compiled binaries
-api
+# Compiled binaries. Las rutas van con barra inicial: sin ella, `api` y `main`
+# también ignorarían los directorios cmd/api/ y cualquier main.go del árbol.
+/api
 bin/
 *.test
-telescopo-api
-main
+/telescopo-api
+/main
 .claude

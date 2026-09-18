@@ -399,7 +399,7 @@ func (h *AttachmentHandler) DownloadAttachment(c *gin.Context) {
 	c.Header("Content-Length", fmt.Sprintf("%d", attachment.FileSize))
 
 	h.log.Info("serving file download", "attachment_id", attachmentID, "filename", attachment.OriginalName)
-	
+
 	// Stream the file to the response
 	if _, err := io.Copy(c.Writer, fileReader); err != nil {
 		h.log.Error("failed to stream file", "attachment_id", attachmentID, "error", err)
@@ -431,9 +431,20 @@ func (h *AttachmentHandler) DeleteAttachment(c *gin.Context) {
 	//     return
 	// }
 
-	// Check event stage - only allow deletion during participation stage
+	// Check event stage - only allow deletion during participation stage.
+	// The parent event must exist for this validation (and the creator check
+	// below) to run at all - a lookup failure must not silently bypass them.
 	eventEntity, err := h.eventRepo.GetByID(attachment.EventID.String())
-	if err == nil && eventEntity.Stage != event.StageParticipation {
+	if err != nil {
+		h.log.Error("failed to look up parent event for deletion", "attachment_id", attachmentID, "event_id", attachment.EventID.String(), "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to verify event state",
+			"code":  "EVENT_LOOKUP_ERROR",
+		})
+		return
+	}
+
+	if eventEntity.Stage != event.StageParticipation {
 		h.log.Warn("deletion attempt outside participation stage", "attachment_id", attachmentID, "event_stage", eventEntity.Stage)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Attachments can only be deleted during the participation stage",
@@ -443,19 +454,17 @@ func (h *AttachmentHandler) DeleteAttachment(c *gin.Context) {
 	}
 
 	// Prevent event creator from deleting attachments as participant
-	if err == nil {
-		participant, err := h.userRepo.GetByID(attachment.ParticipantID.String())
-		if err == nil && participant.ID == eventEntity.AuthorID {
-			h.log.Warn("event creator attempted to delete attachment as participant",
-				"attachment_id", attachmentID,
-				"event_id", eventEntity.ID.String(),
-				"user_id", participant.ID.String())
-			c.JSON(http.StatusForbidden, gin.H{
-				"error": "Event creator cannot delete attachments as a participant",
-				"code":  "CREATOR_CANNOT_DELETE",
-			})
-			return
-		}
+	participant, err := h.userRepo.GetByID(attachment.ParticipantID.String())
+	if err == nil && participant.ID == eventEntity.AuthorID {
+		h.log.Warn("event creator attempted to delete attachment as participant",
+			"attachment_id", attachmentID,
+			"event_id", eventEntity.ID.String(),
+			"user_id", participant.ID.String())
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "Event creator cannot delete attachments as a participant",
+			"code":  "CREATOR_CANNOT_DELETE",
+		})
+		return
 	}
 
 	// Delete from database

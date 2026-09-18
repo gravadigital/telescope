@@ -13,20 +13,25 @@ import (
 	"github.com/gravadigital/telescopio-api/internal/storage/postgres"
 )
 
-
 // GoogleAuthHandler handles Google OAuth authentication endpoints.
 type GoogleAuthHandler struct {
 	userRepo postgres.UserRepository
 	cfg      *config.Config
 	log      *log.Logger
+
+	// verifyToken validates a Google access token and returns the caller's
+	// profile. Defaults to the real network call (verifyGoogleAccessToken);
+	// swappable in tests to avoid hitting Google's API.
+	verifyToken func(accessToken string) (*GoogleProfile, error)
 }
 
 // NewGoogleAuthHandler creates a new GoogleAuthHandler.
 func NewGoogleAuthHandler(userRepo postgres.UserRepository, cfg *config.Config) *GoogleAuthHandler {
 	return &GoogleAuthHandler{
-		userRepo: userRepo,
-		cfg:      cfg,
-		log:      logger.Handler("google_auth"),
+		userRepo:    userRepo,
+		cfg:         cfg,
+		log:         logger.Handler("google_auth"),
+		verifyToken: verifyGoogleAccessToken,
 	}
 }
 
@@ -56,7 +61,7 @@ func (h *GoogleAuthHandler) VerifyGoogleToken(c *gin.Context) {
 		return
 	}
 
-	profile, err := verifyGoogleAccessToken(req.Token)
+	profile, err := h.verifyToken(req.Token)
 	if err != nil {
 		if errors.Is(err, ErrInvalidGoogleToken) {
 			h.log.Warn("invalid google token received", "error", err)
@@ -135,7 +140,7 @@ func (h *GoogleAuthHandler) RegisterGoogleUser(c *gin.Context) {
 	}
 
 	// Re-validate the Google token to prevent account creation with intercepted tokens
-	profile, err := verifyGoogleAccessToken(req.Token)
+	profile, err := h.verifyToken(req.Token)
 	if err != nil {
 		if errors.Is(err, ErrInvalidGoogleToken) {
 			h.log.Warn("invalid google token in registration", "error", err)
@@ -210,4 +215,3 @@ func (h *GoogleAuthHandler) RegisterGoogleUser(c *gin.Context) {
 		},
 	})
 }
-

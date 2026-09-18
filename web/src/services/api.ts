@@ -575,42 +575,6 @@ export const AttachmentService = {
   }
 };
 
-export const VoteService = {
-  async submitVote(eventId: string, userId: string, voteType: "yes" | "maybe" | "no"): Promise<any> {
-    try {
-      const response = await apiRequest<any>(
-        `/api/v1/votes`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            event_id: eventId,
-            user_id: userId,
-            vote_type: voteType
-          }),
-        }
-      );
-
-      return response;
-    } catch (error) {
-      console.error("Failed to submit vote:", error);
-      throw error;
-    }
-  },
-
-  async getEventVotes(eventId: string): Promise<any[]> {
-    try {
-      const response = await apiRequest<{ data: any[] }>(`/api/v1/votes?event_id=${eventId}`);
-      return response.data || [];
-    } catch (error) {
-      console.error("Failed to fetch event votes:", error);
-      return [];
-    }
-  }
-};
-
 // ========================================
 // Distributed Voting Service
 // ========================================

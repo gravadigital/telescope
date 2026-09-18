@@ -1,0 +1,1693 @@
+openapi: 3.0.3
+
+info:
+  title: Telescopio API
+  version: 1.0.0
+  description: |
+    API del sistema de asignación de tiempo de telescopio.
+
+    Gestiona eventos de convocatoria, participantes, propuestas y el motor de
+    **votación distribuida por pares** (Modified Borda Count, Merrifield & Saari 2009).
+
+    ## Autenticación
+
+    JWT Bearer HS256 con vigencia de 24 horas, obtenido de `/users/authenticate`,
+    `/users` o `/auth/google/verify`. No hay refresh token.
+
+    ## Formas de error
+
+    El servicio **no tiene una forma de error uniforme**. Conviven cuatro:
+
+    - `ApiError` — `{error, code, details?}` — la de los handlers. `error` es el mensaje.
+    - `MiddlewareError` — `{error, message}` — la de los middlewares de auth y permisos.
+      Acá `error` es el **código**: es la inversa de `ApiError`. Aparece en todo endpoint
+      protegido antes de entrar al handler.
+    - `LegacyError` — `{error}` sin `code` — en los endpoints de votación distribuida.
+    - La de `/health`, con `status` y `service`.
+
+    Ver `docs/architectures/telescopio-api/conventions/error-handling.md`.
+
+    ## Envelopes de éxito
+
+    La mayoría usa `{data: ...}`, pero hay heredados: `{event}` en crear evento, `{user}`
+    en los de usuario, `{assignment, event_name, participant_id}` en la asignación, y
+    payload plano en el envío de rankings y en el registro con Google.
+
+servers:
+  - url: http://localhost:8080
+    description: Desarrollo local
+
+tags:
+  - name: Health
+  - name: Usuarios y autenticación
+  - name: Google OAuth
+  - name: Eventos
+  - name: Participación
+  - name: Propuestas
+  - name: Votación distribuida
+  - name: Borradores de voto
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Estado del servicio y de la base
+      security: []
+      responses:
+        '200':
+          description: Servicio operativo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  service: { type: string, example: telescopio-api }
+                  version: { type: string, example: '1.0.0' }
+                  database: { type: string, example: connected }
+        '503':
+          description: Base inaccesible
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: error }
+                  service: { type: string }
+                  error:
+                    type: string
+                    enum: [database connection failed, database ping failed]
+
+  /api/v1/users:
+    post:
+      tags: [Usuarios y autenticación]
+      summary: Registrar usuario
+      description: Crea el usuario y devuelve un JWT listo para usar.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 100 }
+                lastname: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8, format: password }
+      responses:
+        '201':
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: User created successfully }
+                  token: { type: string }
+                  user: { $ref: '#/components/schemas/UserSummary' }
+        '400':
+          description: '`INVALID_PAYLOAD`, `INVALID_PASSWORD`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '409':
+          description: '`EMAIL_ALREADY_EXISTS`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`CREATION_ERROR`, `TOKEN_GENERATION_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/users/authenticate:
+    post:
+      tags: [Usuarios y autenticación]
+      summary: Login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        '200':
+          description: Autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: User authenticated successfully }
+                  token: { type: string }
+                  user: { $ref: '#/components/schemas/UserSummary' }
+        '400':
+          description: '`INVALID_PAYLOAD`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '401':
+          description: |
+            `INVALID_CREDENTIALS` — usuario inexistente o password incorrecta.
+            `OAUTH_ACCOUNT_NO_PASSWORD` — cuenta de Google sin password local.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`TOKEN_GENERATION_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/users/forgot-password:
+    post:
+      tags: [Usuarios y autenticación]
+      summary: Solicitar recuperación de password
+      description: |
+        Responde `200` aunque el email no exista, para no permitir enumeración de usuarios.
+        También responde `200` si falla el envío del mail.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200':
+          description: Solicitud procesada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: If that email is registered, a reset link has been sent.
+        '400':
+          description: '`INVALID_PAYLOAD` (sin `details`)'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`TOKEN_GENERATION_ERROR`, `DB_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/users/reset-password:
+    post:
+      tags: [Usuarios y autenticación]
+      summary: Definir nueva password con token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string, description: Token de 64 caracteres hex, válido 1 hora }
+                password: { type: string, minLength: 8, format: password }
+      responses:
+        '200':
+          description: Password actualizada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: Password updated successfully. }
+        '400':
+          description: '`INVALID_PAYLOAD`, `INVALID_RESET_TOKEN`, `EXPIRED_RESET_TOKEN`, `INVALID_PASSWORD`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`DB_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/auth/google/verify:
+    post:
+      tags: [Google OAuth]
+      summary: Verificar token de Google
+      description: |
+        Recibe un **access token** de Google. La respuesta es polimórfica según si el
+        usuario ya existe (devuelve JWT) o no (devuelve el perfil para completar registro).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '200':
+          description: Token válido
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    title: Usuario existente
+                    properties:
+                      status: { type: string, enum: [existing_user] }
+                      token: { type: string, description: JWT de la aplicación }
+                      user:
+                        type: object
+                        properties:
+                          id: { type: string, format: uuid }
+                          email: { type: string, format: email }
+                          username: { type: string, description: Mapea a User.Name }
+                  - type: object
+                    title: Usuario nuevo
+                    properties:
+                      status: { type: string, enum: [new_user] }
+                      google_token: { type: string, description: El mismo token recibido }
+                      profile:
+                        type: object
+                        properties:
+                          email: { type: string, format: email }
+                          suggested_name: { type: string }
+        '400':
+          description: '`INVALID_PAYLOAD`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '401':
+          description: '`INVALID_GOOGLE_TOKEN`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`GOOGLE_API_ERROR`, `INTERNAL_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/auth/google/register:
+    post:
+      tags: [Google OAuth]
+      summary: Registrar usuario con Google
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, username]
+              properties:
+                token: { type: string }
+                username:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+                  description: Sin tabulaciones ni saltos de línea
+      responses:
+        '201':
+          description: Usuario creado. Sin `message` ni `code`, a diferencia de otros 201.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  user:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      email: { type: string, format: email }
+                      username: { type: string }
+        '400':
+          description: '`INVALID_PAYLOAD`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '401':
+          description: '`INVALID_GOOGLE_TOKEN`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '409':
+          description: '`USERNAME_ALREADY_EXISTS`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`GOOGLE_API_ERROR`, `INTERNAL_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/users/{user_id}:
+    get:
+      tags: [Usuarios y autenticación]
+      summary: Obtener usuario
+      description: |
+        **No verifica ownership**: cualquier usuario autenticado puede leer cualquier otro.
+        Tampoco valida el formato del UUID.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Usuario
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/UserSummary' }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '404':
+          description: '`USER_NOT_FOUND`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/users/{user_id}/events:
+    get:
+      tags: [Usuarios y autenticación]
+      summary: Eventos en los que participa el usuario
+      description: |
+        Solo el propio usuario. Los campos `title`, `date` y `creator_id` están duplicados
+        de `name`, `start_date` y `author_id` por compatibilidad con el frontend.
+
+        **Las fechas acá salen en RFC3339 completo**, no en `YYYY-MM-DD` como en el resto
+        de los endpoints de eventos.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Lista de eventos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        title: { type: string, description: Duplicado de name }
+                        description: { type: string }
+                        stage: { $ref: '#/components/schemas/Stage' }
+                        start_date: { type: string, format: date-time }
+                        date: { type: string, format: date-time, description: Duplicado de start_date }
+                        end_date: { type: string, format: date-time }
+                        organizer: { type: string }
+                        author_id: { type: string, format: uuid }
+                        creator_id: { type: string, format: uuid, description: Duplicado de author_id }
+                        created_at: { type: string, format: date-time }
+                        updated_at: { type: string, format: date-time }
+        '401':
+          description: '`NO_AUTH_TOKEN`, `UNAUTHORIZED_ACCESS` (accediendo a eventos ajenos; semánticamente debería ser 403)'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`RETRIEVAL_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/events:
+    get:
+      tags: [Eventos]
+      summary: Listar eventos
+      description: |
+        Paginación **en memoria**: trae todos los eventos y pagina después, con una consulta
+        de participantes por evento (N+1).
+      security: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1, minimum: 1 }
+          description: Se ignora si es ≤0 o no parseable
+        - name: limit
+          in: query
+          schema: { type: integer, default: 10, minimum: 1, maximum: 100 }
+          description: Solo se acepta entre 1 y 100
+        - name: stage
+          in: query
+          schema: { $ref: '#/components/schemas/Stage' }
+      responses:
+        '200':
+          description: Lista paginada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/EventListItem' }
+                  pagination:
+                    type: object
+                    properties:
+                      page: { type: integer }
+                      limit: { type: integer }
+                      total: { type: integer }
+                      total_pages: { type: integer }
+                  filters:
+                    type: object
+                    properties:
+                      stage: { type: string }
+        '400':
+          description: '`INVALID_STAGE_FILTER` — incluye `valid_stages`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`RETRIEVAL_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+    post:
+      tags: [Eventos]
+      summary: Crear evento
+      description: |
+        El autor sale siempre del JWT. El campo `author_id` del body existe en el struct
+        pero **nunca se lee**.
+
+        El envelope de respuesta es `event`, no `data`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, description, start_date, end_date]
+              properties:
+                name: { type: string, minLength: 3, maxLength: 200 }
+                description: { type: string, minLength: 10, maxLength: 2000 }
+                start_date: { type: string, format: date, description: 'Formato YYYY-MM-DD. No puede ser pasada' }
+                end_date: { type: string, format: date, description: 'Formato YYYY-MM-DD. Duración entre 1 y 365 días' }
+                organizer: { type: string }
+                max_participants:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                  default: 20
+                  nullable: true
+      responses:
+        '201':
+          description: Evento creado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      name: { type: string }
+                      description: { type: string }
+                      start_date: { type: string, format: date }
+                      end_date: { type: string, format: date }
+                      organizer: { type: string }
+                      shareable_link: { type: string, example: '/events/3fa85f64-5717-4562-b3fc-2c963f66afa6' }
+                      max_participants: { type: integer, nullable: true }
+                      stage: { $ref: '#/components/schemas/Stage' }
+                      author_id: { type: string, format: uuid }
+                      created_at: { type: string, format: date-time }
+                  message: { type: string, example: Event created successfully }
+                  code: { type: string, example: EVENT_CREATED }
+        '400':
+          description: |
+            `INVALID_PAYLOAD`, `INVALID_START_DATE`, `INVALID_END_DATE`, `PAST_START_DATE`,
+            `INVALID_DATE_RANGE`, `DURATION_TOO_SHORT`, `DURATION_TOO_LONG`,
+            `INVALID_MAX_PARTICIPANTS`, `MAX_PARTICIPANTS_LIMIT_EXCEEDED`, `VALIDATION_FAILED`
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '401':
+          description: '`UNAUTHORIZED`, `USER_NOT_FOUND`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '409':
+          description: '`DUPLICATE_EVENT_NAME`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`INVALID_TOKEN`, `DB_CREATE_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/events/{event_id}:
+    get:
+      tags: [Eventos]
+      summary: Detalle del evento
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+        - name: include_stats
+          in: query
+          schema: { type: string, enum: ['true'] }
+          description: Si es exactamente `true`, agrega `statistics` en la raíz (no dentro de `data`)
+      responses:
+        '200':
+          description: Evento
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/EventDetail' }
+                  statistics:
+                    type: object
+                    description: Solo con include_stats=true
+                    properties:
+                      participants_count: { type: integer }
+                      duration_days: { type: integer }
+        '400':
+          description: '`MISSING_EVENT_ID`, `INVALID_EVENT_ID`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '404':
+          description: '`EVENT_NOT_FOUND`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/events/{event_id}/share:
+    get:
+      tags: [Eventos]
+      summary: Metadata para compartir en redes
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          description: Metadata social
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      title: { type: string }
+                      description: { type: string, description: Truncada a 197 caracteres + '...' si supera 200 }
+                      share_url: { type: string }
+                      shareable_link: { type: string }
+                      image_url: { type: string }
+                      stage: { $ref: '#/components/schemas/Stage' }
+                      start_date: { type: string, format: date }
+                      end_date: { type: string, format: date }
+                      organizer: { type: string }
+                  statistics:
+                    type: object
+                    properties:
+                      participants_count: { type: integer }
+                      attachments_count: { type: integer }
+                  social_meta:
+                    type: object
+                    properties:
+                      og_title: { type: string }
+                      og_description: { type: string }
+                      og_type: { type: string, example: website }
+                      og_url: { type: string }
+                      og_image: { type: string }
+                      twitter_card: { type: string, example: summary_large_image }
+                      twitter_title: { type: string }
+                      twitter_description: { type: string }
+                      twitter_image: { type: string }
+        '400':
+          description: '`INVALID_EVENT_ID`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '404':
+          description: '`EVENT_NOT_FOUND`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/events/{event_id}/register:
+    post:
+      tags: [Participación]
+      summary: Registrarse en un evento
+      description: |
+        Endpoint público, pensado para el link compartible. **Crea el usuario si el email no
+        existe** (sin password). Solo durante la etapa `participation`. El creador del evento
+        no puede registrarse como participante. Cupo por defecto 20 si el evento no define uno.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [participant_name, participant_email]
+              properties:
+                participant_name: { type: string, minLength: 2, maxLength: 100 }
+                participant_email: { type: string, format: email }
+      responses:
+        '201':
+          description: Participante registrado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      participant_id: { type: string, format: uuid }
+                      participant_name: { type: string }
+                      participant_email: { type: string, format: email }
+                      event_id: { type: string, format: uuid }
+                      event_name: { type: string }
+                      registered_at: { type: string, format: date-time }
+                  message: { type: string }
+                  code: { type: string, example: PARTICIPANT_REGISTERED }
+        '400':
+          description: |
+            `MISSING_EVENT_ID`, `INVALID_EVENT_ID`, `INVALID_PAYLOAD`,
+            `INVALID_REGISTRATION_STAGE` (+ `current_stage`), `CREATOR_CANNOT_REGISTER`,
+            `MAX_PARTICIPANTS_REACHED` (+ `current_count`, `max_participants`)
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '403':
+          description: '`EVENT_PAUSED`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '404':
+          description: '`EVENT_NOT_FOUND`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '409':
+          description: '`ALREADY_REGISTERED`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`USER_CREATE_ERROR`, `PARTICIPANT_CHECK_ERROR`, `REGISTRATION_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/events/{event_id}/stage:
+    patch:
+      tags: [Eventos]
+      summary: Avanzar la etapa del evento
+      description: |
+        Solo el autor del evento o un admin. Las transiciones válidas son
+        `creation → participation → voting → results`, sin retroceso ni saltos.
+
+        `estimated_end_date` es obligatoria cuando la etapa destino es `participation` o
+        `voting`. Pasar a `voting` exige al menos 2 propuestas cargadas.
+
+        Dispara emails a los participantes en segundo plano.
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stage]
+              properties:
+                stage: { $ref: '#/components/schemas/Stage' }
+                estimated_end_date:
+                  type: string
+                  format: date
+                  description: 'YYYY-MM-DD. Obligatoria si stage es participation o voting'
+      responses:
+        '200':
+          description: Etapa actualizada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      name: { type: string }
+                      description: { type: string }
+                      start_date: { type: string, format: date }
+                      end_date: { type: string, format: date }
+                      stage: { $ref: '#/components/schemas/Stage' }
+                      participation_estimated_end_date: { type: string, format: date, nullable: true }
+                      voting_estimated_end_date: { type: string, format: date, nullable: true }
+                      author_id: { type: string, format: uuid }
+                      updated_at: { type: string, format: date-time }
+                  message: { type: string }
+                  code: { type: string, example: STAGE_UPDATED }
+                  transition:
+                    type: object
+                    properties:
+                      from: { $ref: '#/components/schemas/Stage' }
+                      to: { $ref: '#/components/schemas/Stage' }
+        '400':
+          description: |
+            `MISSING_EVENT_ID`, `INVALID_EVENT_ID`, `INVALID_PAYLOAD`, `INVALID_STAGE`,
+            `INVALID_TRANSITION` (+ `current_stage`, `requested_stage`),
+            `MISSING_ESTIMATED_DATE`, `INVALID_DATE_FORMAT`, `INVALID_ESTIMATED_DATE`,
+            `NO_ATTACHMENTS`, `INSUFFICIENT_ATTACHMENTS` (+ `current_count`, `required_minimum`)
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '403': { $ref: '#/components/responses/MiddlewareForbidden' }
+        '404':
+          description: '`EVENT_NOT_FOUND`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`ATTACHMENTS_ERROR`, `DB_UPDATE_ERROR`, `RETRIEVAL_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/events/{event_id}/estimated-end-date:
+    patch:
+      tags: [Eventos]
+      summary: Actualizar fecha estimada de fin de una etapa
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stage, estimated_end_date]
+              properties:
+                stage: { type: string, enum: [participation, voting] }
+                estimated_end_date: { type: string, format: date }
+      responses:
+        '200':
+          description: Fecha actualizada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      event_id: { type: string, format: uuid }
+                      stage: { type: string }
+                      estimated_end_date: { type: string, format: date }
+                      previous_date:
+                        type: string
+                        description: Cadena vacía si no había fecha previa (no null)
+                  code: { type: string, example: ESTIMATED_DATE_UPDATED }
+        '400':
+          description: |
+            `INVALID_EVENT_ID`, `INVALID_PAYLOAD`, `INVALID_STAGE`, `INVALID_DATE_FORMAT`,
+            `INVALID_ESTIMATED_DATE`.
+
+            `CANNOT_ADVANCE_DEADLINE` — solo se puede posponer el deadline de una etapa que
+            todavía no terminó, nunca adelantarlo. `details` es un objeto
+            `{current_date, requested_date}`.
+
+            `INVALID_STAGE_FOR_EDIT` — `details` es un **objeto**
+            `{current_stage, requested_stage}`, no un string.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '403': { $ref: '#/components/responses/MiddlewareForbidden' }
+        '404':
+          description: '`EVENT_NOT_FOUND`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`UPDATE_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/events/{event_id}/cancel:
+    patch:
+      tags: [Eventos]
+      summary: Cancelar el evento
+      description: Sin body. Operación irreversible.
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          description: Evento cancelado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      name: { type: string }
+                      stage: { $ref: '#/components/schemas/Stage' }
+                      is_cancelled: { type: boolean, example: true }
+                  message: { type: string }
+                  code: { type: string, example: EVENT_CANCELLED }
+        '400':
+          description: '`INVALID_EVENT_ID`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '403': { $ref: '#/components/responses/MiddlewareForbidden' }
+        '404':
+          description: '`EVENT_NOT_FOUND`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '409':
+          description: '`ALREADY_CANCELLED`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`CANCEL_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/events/{event_id}/pause:
+    patch:
+      tags: [Eventos]
+      summary: Pausar o reanudar el evento
+      description: |
+        Sin body. Es un **toggle**: invierte el estado actual de `is_paused`.
+        No se puede pausar un evento cancelado.
+
+        Nota: `data.name` y `data.stage` se leen del objeto previo al update.
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          description: Estado de pausa invertido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      name: { type: string }
+                      stage: { $ref: '#/components/schemas/Stage' }
+                      is_paused: { type: boolean }
+                  message: { type: string, example: Event paused successfully }
+                  code:
+                    type: string
+                    enum: [EVENT_PAUSED, EVENT_RESUMED]
+                    description: '`EVENT_PAUSED` también se usa como código de error 403 en otros endpoints'
+        '400':
+          description: '`INVALID_EVENT_ID`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '403': { $ref: '#/components/responses/MiddlewareForbidden' }
+        '404':
+          description: '`EVENT_NOT_FOUND`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '409':
+          description: '`EVENT_CANCELLED` — no se puede pausar un evento cancelado'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`UPDATE_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/events/{event_id}/participants:
+    get:
+      tags: [Participación]
+      summary: Listar participantes del evento
+      description: Cualquier usuario autenticado. El `role` es el rol **dentro del evento**.
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          description: Participantes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      event:
+                        type: object
+                        properties:
+                          id: { type: string, format: uuid }
+                          name: { type: string }
+                          stage: { $ref: '#/components/schemas/Stage' }
+                      participants:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: string, format: uuid }
+                            name: { type: string }
+                            email: { type: string, format: email }
+                            role: { type: string, enum: [creator, participant] }
+                            created_at: { type: string, format: date-time }
+                  count: { type: integer }
+        '400':
+          description: '`MISSING_EVENT_ID`, `INVALID_EVENT_ID`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '404':
+          description: '`EVENT_NOT_FOUND`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`RETRIEVAL_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/events/{event_id}/participant/{participant_id}/attachment:
+    post:
+      tags: [Propuestas]
+      summary: Subir la propuesta de un participante
+      description: |
+        Solo durante la etapa `participation`, y solo el propio participante o el autor del
+        evento. **Una sola propuesta por participante por evento.** El creador del evento no
+        puede subir propuestas.
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+        - $ref: '#/components/parameters/ParticipantId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: |
+                    Tipos permitidos: image/jpeg, image/png, image/gif, application/pdf,
+                    text/plain, application/msword,
+                    application/vnd.openxmlformats-officedocument.wordprocessingml.document.
+                    Tamaño máximo según MAX_FILE_SIZE (10MB por defecto).
+      responses:
+        '201':
+          description: Propuesta cargada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      filename: { type: string, description: Nombre original del archivo }
+                      size: { type: integer, format: int64 }
+                      mime_type: { type: string }
+                      participant: { type: string, description: Nombre del participante }
+                      uploaded_at: { type: string, format: date-time }
+                  message: { type: string }
+                  code: { type: string, example: UPLOAD_SUCCESS }
+        '400':
+          description: |
+            `MISSING_PARAMETERS`, `INVALID_EVENT_ID`, `INVALID_PARTICIPANT_ID`,
+            `INVALID_EVENT_STAGE` (+ `current_stage`), `NO_FILE`,
+            `FILE_TOO_LARGE` (+ `max_size` string, `received_size` int),
+            `INVALID_FILE_TYPE` (+ `received_type`, `allowed_types` con descripciones
+            legibles y orden no determinístico), `INVALID_FILENAME`
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '403':
+          description: '`EVENT_PAUSED`, `CREATOR_CANNOT_UPLOAD`, `NOT_REGISTERED`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '404':
+          description: '`EVENT_NOT_FOUND`, `PARTICIPANT_NOT_FOUND`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '409':
+          description: '`DUPLICATE_ATTACHMENT` (+ `existing_attachment_id`)'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`FILE_SAVE_ERROR`, `DB_SAVE_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/events/{event_id}/attachments:
+    get:
+      tags: [Propuestas]
+      summary: Listar propuestas del evento
+      description: |
+        No valida el formato del UUID ni la existencia del evento: un evento inexistente
+        devuelve `200` con `data: []`.
+
+        Los nombres de campo difieren de los de la subida: acá `original_name` y `file_size`,
+        allá `filename` y `size`.
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          description: Propuestas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        event_id: { type: string, format: uuid }
+                        participant_id: { type: string, format: uuid }
+                        original_name: { type: string }
+                        file_size: { type: integer, format: int64 }
+                        mime_type: { type: string }
+                        uploaded_at: { type: string, format: date-time }
+                        url: { type: string, example: '/api/v1/attachments/3fa85f64-5717-4562-b3fc-2c963f66afa6/download' }
+                  count: { type: integer }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '500':
+          description: '`RETRIEVAL_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/attachments/{attachment_id}/download:
+    get:
+      tags: [Propuestas]
+      summary: Descargar una propuesta
+      description: |
+        **⚠️ Este endpoint NO tiene autenticación.** Está registrado en el grupo `/api/v1`
+        en vez del grupo que aplica `JWTAuthMiddleware` (`cmd/api/main.go:219`), pese a que
+        el comentario del código dice lo contrario. Cualquiera con el UUID de un attachment
+        puede descargar la propuesta.
+
+        Si la copia del stream falla a mitad de camino, la respuesta queda truncada con el
+        `200` ya enviado.
+      security: []
+      parameters:
+        - name: attachment_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: |
+            Contenido binario del archivo. Headers: `Content-Disposition: attachment;
+            filename="<nombre original>"`, `Content-Type`, `Content-Length`.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '404':
+          description: '`ATTACHMENT_NOT_FOUND`, `FILE_NOT_FOUND`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/events/{event_id}/voting-config:
+    post:
+      tags: [Votación distribuida]
+      summary: Configurar los parámetros de votación
+      description: |
+        Solo el autor del evento, un organizador o un admin. Una sola configuración por evento.
+
+        Valida las restricciones matemáticas del algoritmo: `m ≤ k-1` (nadie evalúa lo propio),
+        `m ≥ 2·log₂(k)` para convergencia, y cobertura suficiente (`n·m ≥ k·min_evaluations`).
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [attachments_per_evaluator]
+              properties:
+                attachments_per_evaluator:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+                  description: Parámetro `m`. No puede superar (total de propuestas − 1)
+                quality_good_threshold:
+                  type: number
+                  format: double
+                  minimum: 0
+                  maximum: 1
+                  default: 0.6
+                quality_bad_threshold:
+                  type: number
+                  format: double
+                  minimum: 0
+                  maximum: 1
+                  default: 0.3
+                adjustment_magnitude:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                  default: 3
+                  description: |
+                    Parámetro `n` — posiciones que sube o baja el ajuste. Opcional: si se
+                    omite se aplica el default. El binding usa `omitempty`, así que el rango
+                    solo se valida cuando el campo viene presente.
+                min_evaluations_per_file:
+                  type: integer
+                  minimum: 1
+                  maximum: 20
+                  default: 3
+                  description: Opcional. Mismo tratamiento que `adjustment_magnitude`
+      responses:
+        '201':
+          description: Configuración creada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/VotingConfiguration' }
+                  message: { type: string }
+                  code: { type: string, example: CONFIG_CREATED }
+                  statistics:
+                    type: object
+                    properties:
+                      participants_count: { type: integer }
+                      attachments_count: { type: integer }
+                      max_evaluations: { type: integer }
+                      min_evaluations: { type: integer }
+        '400':
+          description: |
+            `MISSING_EVENT_ID`, `INVALID_EVENT_ID`, `INVALID_PAYLOAD`, `INVALID_THRESHOLDS`,
+            `INVALID_EVENT_STAGE`, `INSUFFICIENT_PARTICIPANTS`, `NO_ATTACHMENTS`,
+            `INSUFFICIENT_ATTACHMENTS`, `M_EXCEEDS_ATTACHMENTS`, `M_EXCEEDS_EVALUABLE`,
+            `VALIDATION_FAILED`, `MATH_CONSTRAINT_VIOLATION`
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '403': { $ref: '#/components/responses/MiddlewareForbidden' }
+        '404':
+          description: '`EVENT_NOT_FOUND`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '409':
+          description: '`CONFIG_EXISTS` (+ `existing_config`)'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`PARTICIPANTS_ERROR`, `ATTACHMENTS_ERROR`, `DB_SAVE_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/events/{event_id}/generate-assignments:
+    post:
+      tags: [Votación distribuida]
+      summary: Generar las asignaciones de evaluación
+      description: |
+        Sin body. Solo durante la etapa `voting` y una sola vez por evento.
+
+        Ejecuta el algoritmo de asignación: garantiza el mínimo de evaluaciones por propuesta,
+        completa hasta `m` por participante y excluye la propuesta propia de cada evaluador.
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '201':
+          description: Asignaciones generadas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      assignments_count: { type: integer }
+                      total_participants: { type: integer }
+                      total_attachments: { type: integer }
+                      total_evaluations: { type: integer }
+                      attachments_per_evaluator: { type: integer }
+                  message: { type: string }
+                  code: { type: string, example: ASSIGNMENTS_GENERATED }
+                  config:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      attachments_per_evaluator: { type: integer }
+                      min_evaluations_per_file: { type: integer }
+        '400':
+          description: |
+            `MISSING_EVENT_ID`, `INVALID_EVENT_ID`, `INVALID_EVENT_STAGE`,
+            `INSUFFICIENT_PARTICIPANTS`, `NO_ATTACHMENTS`, `CONFIG_INVALID`
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '403': { $ref: '#/components/responses/MiddlewareForbidden' }
+        '404':
+          description: '`EVENT_NOT_FOUND`, `CONFIG_NOT_FOUND`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '409':
+          description: '`ASSIGNMENTS_EXIST` (+ `existing_assignments`)'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`PARTICIPANTS_ERROR`, `ATTACHMENTS_ERROR`, `GENERATION_FAILED`, `DB_SAVE_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/events/{event_id}/participants/{participant_id}/assignment:
+    get:
+      tags: [Votación distribuida]
+      summary: Obtener la asignación de un participante
+      description: |
+        Las propuestas que le tocó evaluar. Solo el propio participante, el autor del evento
+        o un admin, y solo durante la etapa `voting`.
+
+        Devuelve la entidad de dominio completa, incluyendo campos internos como
+        `quality_score` y `expertise_match_score`.
+
+        Los errores de este endpoint usan la forma degradada `{error}`, sin `code`.
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+        - $ref: '#/components/parameters/ParticipantId'
+      responses:
+        '200':
+          description: Asignación
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  assignment: { $ref: '#/components/schemas/Assignment' }
+                  event_name: { type: string }
+                  participant_id: { type: string, format: uuid }
+        '400':
+          description: Parámetros faltantes, o el evento no está en etapa de votación (+ `current_stage`)
+          content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '403':
+          description: El participante no está registrado en el evento
+          content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
+        '404':
+          description: Evento o asignación inexistente
+          content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
+
+  /api/v1/events/{event_id}/participants/{participant_id}/ranking-votes:
+    post:
+      tags: [Votación distribuida]
+      summary: Enviar el ranking de evaluación
+      description: |
+        Envío definitivo. Los rangos tienen que ser enteros **consecutivos desde 1**, sin
+        duplicados, y cada propuesta tiene que pertenecer a la asignación del participante.
+
+        Una vez enviados los votos, la asignación queda completa y no admite reenvío.
+
+        Respuesta plana, sin envelope `data` ni `code`.
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+        - $ref: '#/components/parameters/ParticipantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assignment_id, rankings]
+              properties:
+                assignment_id: { type: string, format: uuid }
+                rankings:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [attachment_id, rank]
+                    properties:
+                      attachment_id: { type: string, format: uuid }
+                      rank: { type: integer, minimum: 1, description: '1 = mejor' }
+      responses:
+        '201':
+          description: Votos registrados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: Ranking votes submitted successfully }
+                  event_id: { type: string, format: uuid }
+                  participant_id: { type: string, format: uuid }
+                  votes_count: { type: integer }
+        '400':
+          description: |
+            Payload inválido, etapa incorrecta, `assignment_id` que no corresponde,
+            rangos duplicados o no consecutivos, propuesta no asignada o de otro evento.
+          content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '403':
+          description: El participante no está registrado en el evento
+          content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
+        '404':
+          description: Evento, asignación o propuesta inexistente
+          content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
+        '409':
+          description: '`VOTES_ALREADY_SUBMITTED` (+ `completed_at`) — único error con `code` en este handler'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: Fallo al guardar los votos
+          content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
+
+  /api/v1/events/{event_id}/participants/{participant_id}/vote-draft:
+    put:
+      tags: [Borradores de voto]
+      summary: Guardar borrador del ranking
+      description: |
+        Guardado parcial mientras el participante arma su ranking, para no perder el progreso.
+        A diferencia del envío definitivo, **no** valida duplicados ni consecutividad.
+
+        Un borrador por par (asignación, participante): el guardado es un upsert.
+
+        Nota: `updated_at` en la respuesta sale del objeto previo al upsert, así que suele
+        venir como fecha cero.
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+        - $ref: '#/components/parameters/ParticipantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rankings]
+              properties:
+                rankings:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      attachment_id: { type: string, format: uuid }
+                      rank: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Borrador guardado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      assignment_id: { type: string, format: uuid }
+                      participant_id: { type: string, format: uuid }
+                      rankings_count: { type: integer }
+                      updated_at: { type: string, format: date-time }
+                  code: { type: string, example: DRAFT_SAVED }
+        '400':
+          description: '`INVALID_EVENT_ID`, `INVALID_PARTICIPANT_ID`, `INVALID_PAYLOAD`, `INVALID_ATTACHMENT_ID`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '404':
+          description: '`ASSIGNMENT_NOT_FOUND`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '409':
+          description: '`ASSIGNMENT_ALREADY_COMPLETED` — ya se enviaron los votos definitivos'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`DRAFT_SAVE_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+    get:
+      tags: [Borradores de voto]
+      summary: Recuperar el borrador guardado
+      description: 'Un `404 DRAFT_NOT_FOUND` es la respuesta esperada cuando aún no hay borrador.'
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+        - $ref: '#/components/parameters/ParticipantId'
+      responses:
+        '200':
+          description: Borrador
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      event_id: { type: string, format: uuid }
+                      assignment_id: { type: string, format: uuid }
+                      participant_id: { type: string, format: uuid }
+                      rankings:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            attachment_id: { type: string, format: uuid }
+                            rank: { type: integer }
+                      created_at: { type: string, format: date-time }
+                      updated_at: { type: string, format: date-time }
+        '400':
+          description: '`INVALID_PARTICIPANT_ID`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '404':
+          description: '`ASSIGNMENT_NOT_FOUND`, `DRAFT_NOT_FOUND`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`DRAFT_GET_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/events/{event_id}/distributed-results:
+    get:
+      tags: [Votación distribuida]
+      summary: Resultados de la votación distribuida
+      description: |
+        Devuelve el ranking global (`global_ranking`, por puntaje MBC) y el ranking ajustado
+        por el sistema de incentivos (`adjusted_ranking`), más la calidad de cada evaluador.
+
+        **⚠️ Este GET muta estado:** recalcula el MBC en cada llamada y hace upsert en
+        `voting_results`. No es idempotente.
+
+        Disponible en las etapas `voting` y `results`. Cualquier usuario autenticado.
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+        - name: include_metrics
+          in: query
+          schema: { type: string, enum: ['true'] }
+          description: Si es exactamente `true`, agrega `data.configuration`
+      responses:
+        '200':
+          description: Resultados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      event_id: { type: string, format: uuid }
+                      global_ranking:
+                        type: array
+                        items: { $ref: '#/components/schemas/AttachmentResult' }
+                      adjusted_ranking:
+                        type: array
+                        items: { $ref: '#/components/schemas/AttachmentResult' }
+                      participant_qualities:
+                        type: object
+                        additionalProperties: { type: number, format: double }
+                        description: 'UUID del participante → Q_i en [0,1]'
+                      total_participants: { type: integer }
+                      total_votes: { type: integer }
+                      attachments_per_evaluator: { type: integer }
+                      calculated_at: { type: string, format: date-time }
+                      updated_at: { type: string, format: date-time }
+                      configuration: { $ref: '#/components/schemas/VotingConfiguration' }
+        '400':
+          description: '`event_id` ausente o con formato inválido'
+          content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '403':
+          description: Etapa incorrecta (+ `current_stage`). Semánticamente debería ser 400.
+          content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
+        '404':
+          description: Evento o configuración de votación inexistente
+          content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
+        '500':
+          description: Fallo al calcular o guardar los resultados
+          content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
+
+  /api/v1/events/{event_id}/voting-statistics:
+    get:
+      tags: [Votación distribuida]
+      summary: Estadísticas de avance de la votación
+      description: |
+        Progreso de la votación sin recalcular resultados. No valida el UUID ni la existencia
+        del evento.
+
+        Los umbrales de calidad usados acá están **hardcodeados** (≥0.7 bueno, ≤0.3 malo) y no
+        coinciden con los configurables por evento.
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          description: Estadísticas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      event_id: { type: string, format: uuid }
+                      total_votes: { type: integer }
+                      total_assignments: { type: integer }
+                      completed_assignments: { type: integer }
+                      completion_rate:
+                        type: number
+                        format: double
+                        description: 'Fracción entre 0 y 1, no porcentaje'
+                      attachments_with_votes: { type: integer }
+                      unique_voters: { type: integer }
+                      average_quality_score: { type: number, format: double }
+                      participants_with_good_quality: { type: integer }
+                      participants_with_bad_quality: { type: integer }
+                      participant_voting_status:
+                        type: object
+                        additionalProperties: { type: boolean }
+                        description: 'UUID del participante → si ya votó'
+        '400':
+          description: '`event_id` ausente'
+          content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '500':
+          description: Fallo al obtener votos o asignaciones
+          content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'JWT HS256, 24 horas de vigencia. Header: `Authorization: Bearer <token>`'
+
+  parameters:
+    EventId:
+      name: event_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ParticipantId:
+      name: participant_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    UserId:
+      name: user_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    MiddlewareUnauthorized:
+      description: |
+        Token ausente, mal formado o inválido. Emitido por `JWTAuthMiddleware`, con la
+        forma `{error: "UNAUTHORIZED", message: "..."}` — inversa a la de los handlers.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/MiddlewareError' }
+    MiddlewareForbidden:
+      description: |
+        Autenticado pero sin permiso sobre el recurso. Emitido por los middlewares de
+        permisos, con la forma `{error: "FORBIDDEN", message: "..."}`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/MiddlewareError' }
+
+  schemas:
+
+    ApiError:
+      type: object
+      description: |
+        Forma de error de los handlers. `error` es el mensaje legible y `code` el
+        identificador estable. Algunas respuestas agregan claves ad-hoc según el caso
+        (`current_stage`, `valid_stages`, `max_size`, etc.).
+      properties:
+        error: { type: string, description: Mensaje legible }
+        code: { type: string, description: 'Identificador en SCREAMING_SNAKE' }
+        details:
+          description: 'String en casi todos los casos; objeto en `INVALID_STAGE_FOR_EDIT`'
+          oneOf:
+            - type: string
+            - type: object
+      required: [error]
+
+    MiddlewareError:
+      type: object
+      description: |
+        Forma de error de los middlewares de autenticación y permisos. **`error` contiene el
+        código** y `message` el texto: es la inversa de `ApiError`. Nunca trae `code`.
+      properties:
+        error:
+          type: string
+          enum: [UNAUTHORIZED, FORBIDDEN, BAD_REQUEST, NOT_FOUND]
+        message: { type: string }
+      required: [error, message]
+
+    LegacyError:
+      type: object
+      description: |
+        Forma degradada sin `code`, en los endpoints de votación distribuida. Puede sumar
+        claves sueltas como `current_stage` o `details`.
+      properties:
+        error: { type: string }
+        details: { type: string }
+        current_stage: { $ref: '#/components/schemas/Stage' }
+      required: [error]
+
+    Stage:
+      type: string
+      enum: [creation, participation, voting, results]
+      description: |
+        Etapa del evento. Las transiciones son estrictamente
+        `creation → participation → voting → results`, sin retroceso ni saltos.
+
+    UserSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        lastname: { type: string }
+        email: { type: string, format: email }
+        role:
+          type: string
+          enum: [admin, organizer, participant]
+          nullable: true
+          description: 'Rol global. Distinto del rol por evento (creator/participant)'
+        created_at: { type: string, format: date-time }
+
+    EventListItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        stage: { $ref: '#/components/schemas/Stage' }
+        author_id: { type: string, format: uuid }
+        max_participants: { type: integer, nullable: true }
+        participation_estimated_end_date: { type: string, format: date, nullable: true }
+        voting_estimated_end_date: { type: string, format: date, nullable: true }
+        participant_ids:
+          type: array
+          items: { type: string, format: uuid }
+        is_cancelled: { type: boolean }
+        is_paused: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    EventDetail:
+      allOf:
+        - $ref: '#/components/schemas/EventListItem'
+        - type: object
+          properties:
+            organizer:
+              type: string
+              description: Si el evento no define organizador, cae al nombre del autor
+            attachment_count: { type: integer }
+
+    VotingConfiguration:
+      type: object
+      description: Parámetros matemáticos del algoritmo de votación para un evento
+      properties:
+        id: { type: string, format: uuid }
+        event_id: { type: string, format: uuid }
+        attachments_per_evaluator: { type: integer, description: 'Parámetro m' }
+        quality_good_threshold: { type: number, format: double }
+        quality_bad_threshold: { type: number, format: double }
+        adjustment_magnitude: { type: integer, description: 'Parámetro n' }
+        min_evaluations_per_file: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Assignment:
+      type: object
+      description: Conjunto de propuestas que un participante debe evaluar
+      properties:
+        id: { type: string, format: uuid }
+        event_id: { type: string, format: uuid }
+        participant_id: { type: string, format: uuid }
+        attachment_ids:
+          type: array
+          items: { type: string, format: uuid }
+        assignment_round: { type: integer, default: 1 }
+        is_completed:
+          type: boolean
+          description: Lo mantiene un trigger de Postgres según la cantidad de votos emitidos
+        completed_at: { type: string, format: date-time, nullable: true }
+        quality_score:
+          type: number
+          format: double
+          nullable: true
+          description: 'Q_i del evaluador, en [0,1]'
+        expertise_match_score: { type: number, format: double, nullable: true }
+        conflict_of_interest: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    AttachmentResult:
+      type: object
+      description: Resultado de una propuesta en el ranking
+      properties:
+        attachment_id: { type: string, format: uuid }
+        filename: { type: string }
+        participant_id: { type: string, format: uuid }
+        participant_name: { type: string, description: Puede estar ausente }
+        mbc_score:
+          type: number
+          format: double
+          description: 'Puntaje Modified Borda Count normalizado en [0,1]'
+        global_rank: { type: integer, description: Posición por puntaje MBC }
+        adjusted_rank: { type: integer, description: Posición tras aplicar incentivos por calidad }
+        vote_count: { type: integer }
+        average_rank: { type: number, format: double }

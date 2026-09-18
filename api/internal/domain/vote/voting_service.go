@@ -75,31 +75,40 @@ func (vs *VotingService) GenerateAssignments(eventID uuid.UUID, participants []u
 	}
 
 	evaluationsPerAttachment := make([]int, k)
+	assignmentsPerParticipant := make([]int, n)
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	// Phase 1: Ensure minimum evaluations per file
+	// Phase 1: Ensure minimum evaluations per file, without ever pushing a
+	// participant past m assignments. Candidates already at m (or in
+	// conflict of interest) are skipped in favor of the next one in the
+	// shuffled order, so a file may end up below MinEvaluationsPerFile when
+	// there aren't enough eligible participants left under the m cap.
 	for attachmentIdx := range k {
 		participantIndices := rng.Perm(n)
-		for evalCount := 0; evalCount < config.MinEvaluationsPerFile && evalCount < n; evalCount++ {
-			participantIdx := participantIndices[evalCount]
+		assigned := 0
+		for _, participantIdx := range participantIndices {
+			if assigned >= config.MinEvaluationsPerFile {
+				break
+			}
+
+			if assignmentsPerParticipant[participantIdx] >= m {
+				continue
+			}
 
 			// Check if participant can evaluate this attachment (conflict of interest)
 			if !vs.hasConflictOfInterest(participants[participantIdx], attachments[attachmentIdx]) {
 				assignmentMatrix[participantIdx][attachmentIdx] = true
 				evaluationsPerAttachment[attachmentIdx]++
+				assignmentsPerParticipant[participantIdx]++
+				assigned++
 			}
 		}
 	}
 
 	// Phase 2: Complete assignments to reach exactly m attachments per participant
 	for participantIdx := range n {
-		currentAssignments := 0
-		for attachmentIdx := range k {
-			if assignmentMatrix[participantIdx][attachmentIdx] {
-				currentAssignments++
-			}
-		}
+		currentAssignments := assignmentsPerParticipant[participantIdx]
 
 		attachmentIndices := rng.Perm(k)
 		for _, attachmentIdx := range attachmentIndices {

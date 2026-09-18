@@ -584,8 +584,8 @@ func (h *EventHandler) UpdateEstimatedEndDate(c *gin.Context) {
 		currentDate = existingEvent.VotingEstimatedEndDate
 	}
 
-	// Removed restriction: organizer can freely change estimated end date (advance or postpone)
-	if false && currentDate != nil && !currentDate.Before(today) && newDate.Before(*currentDate) {
+	// Only allow postponing the deadline of a stage that hasn't ended yet, never bringing it forward.
+	if currentDate != nil && !currentDate.Before(today) && newDate.Before(*currentDate) {
 		h.log.Warn("attempt to advance deadline",
 			"event_id", eventID,
 			"current_date", currentDate.Format("2006-01-02"),

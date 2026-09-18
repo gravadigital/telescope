@@ -90,8 +90,8 @@ func (h *DistributedVoteHandler) CreateVotingConfiguration(c *gin.Context) {
 		AttachmentsPerEvaluator int     `json:"attachments_per_evaluator" binding:"required,min=1,max=50"`
 		QualityGoodThreshold    float64 `json:"quality_good_threshold" binding:"min=0,max=1"`
 		QualityBadThreshold     float64 `json:"quality_bad_threshold" binding:"min=0,max=1"`
-		AdjustmentMagnitude     int     `json:"adjustment_magnitude" binding:"min=1,max=10"`
-		MinEvaluationsPerFile   int     `json:"min_evaluations_per_file" binding:"min=1,max=20"`
+		AdjustmentMagnitude     int     `json:"adjustment_magnitude" binding:"omitempty,min=1,max=10"`
+		MinEvaluationsPerFile   int     `json:"min_evaluations_per_file" binding:"omitempty,min=1,max=20"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -1282,8 +1282,8 @@ func (h *DistributedVoteHandler) PreviewVotingConfiguration(c *gin.Context) {
 		AttachmentsPerEvaluator int     `json:"attachments_per_evaluator" binding:"required,min=1,max=50"`
 		QualityGoodThreshold    float64 `json:"quality_good_threshold" binding:"min=0,max=1"`
 		QualityBadThreshold     float64 `json:"quality_bad_threshold" binding:"min=0,max=1"`
-		AdjustmentMagnitude     int     `json:"adjustment_magnitude" binding:"min=1,max=10"`
-		MinEvaluationsPerFile   int     `json:"min_evaluations_per_file" binding:"min=1,max=20"`
+		AdjustmentMagnitude     int     `json:"adjustment_magnitude" binding:"omitempty,min=1,max=10"`
+		MinEvaluationsPerFile   int     `json:"min_evaluations_per_file" binding:"omitempty,min=1,max=20"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -1325,21 +1325,39 @@ func (h *DistributedVoteHandler) PreviewVotingConfiguration(c *gin.Context) {
 		MinEvaluationsPerFile:   req.MinEvaluationsPerFile,
 	}
 
-	// Set defaults
+	// Set defaults (mirrors CreateVotingConfiguration's smart defaults)
 	if tempConfig.QualityGoodThreshold == 0 {
 		tempConfig.QualityGoodThreshold = 0.6
 	}
 	if tempConfig.QualityBadThreshold == 0 {
 		tempConfig.QualityBadThreshold = 0.3
 	}
+	if tempConfig.AdjustmentMagnitude == 0 {
+		tempConfig.AdjustmentMagnitude = 3
+	}
+	if tempConfig.MinEvaluationsPerFile == 0 {
+		tempConfig.MinEvaluationsPerFile = 3
+	}
 
-	// Validate and calculate metrics
+	// Validate and calculate metrics. Use tempConfig (defaults applied) for
+	// AdjustmentMagnitude/MinEvaluationsPerFile rather than the raw request,
+	// so an omitted field reflects the default that will actually be saved
+	// instead of a stale zero.
 	validationErr := h.votingService.ValidateVotingConfiguration(tempConfig, len(attachments), len(participants))
 
 	maxPossibleAssignments := req.AttachmentsPerEvaluator * len(participants)
-	minRequiredAssignments := req.MinEvaluationsPerFile * len(attachments)
+	minRequiredAssignments := tempConfig.MinEvaluationsPerFile * len(attachments)
 
-	avgEvaluationsPerFile := float64(maxPossibleAssignments) / float64(len(attachments))
+	// Guard against division by zero: len(attachments) comes from the
+	// database, not request validation, so it can legitimately be 0 (e.g.
+	// previewing a configuration before any files have been uploaded).
+	// json.Marshal cannot encode +Inf/NaN, so an unguarded division here
+	// would silently corrupt the response body while still returning 200.
+	var avgEvaluationsPerFile, evaluationCoverageRatio float64
+	if len(attachments) > 0 {
+		avgEvaluationsPerFile = float64(maxPossibleAssignments) / float64(len(attachments))
+		evaluationCoverageRatio = avgEvaluationsPerFile / float64(tempConfig.MinEvaluationsPerFile)
+	}
 	workloadBalance := float64(req.AttachmentsPerEvaluator)
 
 	response := gin.H{
@@ -1347,8 +1365,8 @@ func (h *DistributedVoteHandler) PreviewVotingConfiguration(c *gin.Context) {
 			"attachments_per_evaluator": req.AttachmentsPerEvaluator,
 			"quality_good_threshold":    tempConfig.QualityGoodThreshold,
 			"quality_bad_threshold":     tempConfig.QualityBadThreshold,
-			"adjustment_magnitude":      req.AdjustmentMagnitude,
-			"min_evaluations_per_file":  req.MinEvaluationsPerFile,
+			"adjustment_magnitude":      tempConfig.AdjustmentMagnitude,
+			"min_evaluations_per_file":  tempConfig.MinEvaluationsPerFile,
 		},
 		"current_data": gin.H{
 			"participants_count": len(participants),
@@ -1359,7 +1377,7 @@ func (h *DistributedVoteHandler) PreviewVotingConfiguration(c *gin.Context) {
 			"min_required_evaluations":  minRequiredAssignments,
 			"avg_evaluations_per_file":  avgEvaluationsPerFile,
 			"workload_per_participant":  workloadBalance,
-			"evaluation_coverage_ratio": avgEvaluationsPerFile / float64(req.MinEvaluationsPerFile),
+			"evaluation_coverage_ratio": evaluationCoverageRatio,
 		},
 		"validation": gin.H{
 			"is_valid": validationErr == nil,

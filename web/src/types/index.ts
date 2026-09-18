@@ -63,8 +63,6 @@ export interface ApiConfig {
     EVENT_PARTICIPANTS: (eventId: string) => string;
     EVENT_SHARE: (eventId: string) => string;
     EVENT_ATTACHMENT: (eventId: string, participantId: string) => string;
-    EVENT_VOTE: (eventId: string) => string;
-    EVENT_RESULTS: (eventId: string) => string;
 
     // Nuevos endpoints del sistema de votación distribuida
     VOTING_CONFIG: (eventId: string) => string;

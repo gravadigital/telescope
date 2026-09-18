@@ -321,18 +321,22 @@ const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBack }) =>
                 </div>
               ) : (
                 <div className="upload-section">
-                  <div className="registered-info">
-                    <h3>✅ You're Registered</h3>
-                    <p>You can now upload your file for this event.</p>
-                  </div>
-                  <h3>📎 Upload File</h3>
+
                   {userHasSubmittedFile ? (
-                    <div className="message success-message">
-                      ✅ You have already submitted your file. Only one submission is allowed per participant.
+                    <div className="edp-submitted-state">
+                      <span className="edp-submitted-icon">✅</span>
+                      <div>
+                        <p className="edp-submitted-title">Submission received</p>
+                        <p className="edp-submitted-sub">You've already uploaded your file. Only one submission is allowed per participant.</p>
+                      </div>
                     </div>
                   ) : (
-                    <>
-                      <p>Upload your submission for this event.</p>
+                    <div className="edp-upload-form">
+                      <div className="edp-upload-header">
+                        <span className="edp-upload-badge">✅ Registered</span>
+                        <p>Upload your submission for this event.</p>
+                      </div>
+
                       <div className="file-upload">
                         <input
                           ref={fileInputRef}
@@ -361,16 +365,13 @@ const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBack }) =>
                           {uploadLoading ? 'Uploading...' : 'Upload File'}
                         </button>
                       </div>
+
                       <div className="upload-info">
-                        <h4>📋 Allowed file types:</h4>
-                        <ul>
-                          <li>Images: JPEG, PNG, GIF, WebP</li>
-                          <li>Documents: PDF, TXT, DOC, DOCX</li>
-                          <li>Maximum size: 10 MB</li>
-                        </ul>
+                        <p>Accepted: JPEG, PNG, GIF, WebP, PDF, TXT, DOC, DOCX · Max 10 MB</p>
                       </div>
-                    </>
+                    </div>
                   )}
+
                 </div>
               )}
             </div>

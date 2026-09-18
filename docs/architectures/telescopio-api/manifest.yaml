@@ -1,0 +1,25 @@
+service: telescopio-api
+type: api
+language: golang
+
+# Convenciones activas.
+# _base es implícito. error-handling se auto-incluye por required_by (http-server,
+# validation, auth-jwt) y por eso no se lista, pero existe como custom porque el
+# formato de error del servicio no es el del catálogo.
+conventions:
+  - http-server      # custom: Gin, no chi
+  - database         # custom: GORM + migraciones en Go, no sqlc + pgx
+  - auth-jwt         # custom: mismo paquete que el catálogo, permisos por middleware compuesto
+  - validation       # custom: binding tags de Gin + validación manual de reglas de negocio
+  - logging          # custom: charmbracelet/log, no zerolog
+  - config           # custom: os.Getenv manual + godotenv, no caarlos0/env
+  - testing          # custom: solo integración con build tag, sin unit tests
+  - file-storage     # custom: no existe en el catálogo
+  - dockerfile       # catálogo: multi-stage, binario estático, usuario no-root
+
+modules:
+  - event            # ciclo de vida del evento, etapas, cancelación y pausa
+  - participant      # usuarios, roles, autenticación, recuperación de password
+  - attachment       # carga y descarga de propuestas
+  - vote             # asignación distribuida, MBC, calidad e incentivos
+  - email            # notificaciones SMTP

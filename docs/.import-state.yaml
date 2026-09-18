@@ -1,0 +1,219 @@
+import:
+  status: ready_to_consolidate   # los 2 servicios del monorepo están analizados
+  last_updated: 2026-09-18
+  mode: monorepo
+  next_step: /product-consolidate-services
+
+  # Sincronización desde los repos originales (~/Documentos/Proyectos/Telescopio),
+  # ambos en rama dev. Tras ella, api/ y web/ son idénticos a sus originales.
+  synced_from_origin:
+    date: 2026-09-18
+    api:
+      source: Telescopio/telescopio-api (dev @ 76edd36)
+      changes:
+        - "Suite de tests unitarios: ~4.300 líneas, 10 archivos, mocks a mano. Pasan sin base de datos"
+        - "Fix en GenerateAssignments: la fase 1 respeta el tope m por participante (antes podía excederlo y violar el trigger)"
+        - "GoogleAuthHandler: verifyToken inyectable para poder testear sin llamar a Google"
+        - "UpdateEstimatedEndDate: se activó la regla 'solo posponer' que estaba tras un `if false`"
+        - "DeleteAttachment: un fallo al buscar el evento padre ya no saltea las validaciones (500 EVENT_LOOKUP_ERROR)"
+        - "voting-config: campos opcionales pasaron a binding omitempty, con defaults aplicados antes de validar"
+        - "Nuevo cmd/migrate: CLI de migraciones con flag -rollback"
+        - "Eliminado vote_handler.go (551 líneas de código muerto)"
+    web:
+      source: Telescopio/Telescopio-web (dev @ d789597)
+      changes:
+        - "Eliminados components/event-detail/ (duplicado, ~800 líneas de CSS), VoteService y las constantes EVENT_VOTE / EVENT_RESULTS"
+        - "Rediseño del bloque de subida en EventDetailPage: nuevo microcopy y lista de tipos en una línea"
+
+  services:
+    - name: telescopio-api
+      type: backend
+      responsibility: >-
+        Backend del sistema de asignación de tiempo de telescopio: eventos de
+        convocatoria, identidad, propuestas y motor de votación distribuida por
+        pares (Modified Borda Count).
+      tech_stack: "Go 1.26.6 · Gin · GORM · PostgreSQL · MinIO · JWT"
+      path: api/
+      status: analyzed
+      analyzed_at: 2026-09-18
+
+      architecture:
+        format: manifest
+        language: golang
+        conventions_total: 10
+        conventions_custom: 9
+        modules: [event, participant, attachment, vote, email]
+
+      documentation:
+        analysis: docs/analysis/services/telescopio-api.md
+        architecture: docs/architectures/telescopio-api/
+        api_spec: docs/apis/telescopio-api.yaml
+        db_schema: docs/db-schemas/telescopio_db.md
+
+      interfaces:
+        exposes:
+          - type: rest_api
+            details: "30 endpoints bajo /api/v1, autenticación JWT Bearer"
+          - type: health_check
+            details: "GET /health, incluye verificación de la base"
+        consumes:
+          - type: database
+            target: postgresql (telescopio_db)
+            details: "Estado completo del sistema. Reglas de negocio en triggers plpgsql"
+          - type: object_storage
+            target: minio
+            details: "Opcional — alternativa al filesystem local (STORAGE_PROVIDER)"
+          - type: external_service
+            target: smtp
+            details: "Notificaciones de etapa, cancelación y reset de password"
+          - type: external_api
+            target: google_oauth
+            details: "Verificación de tokens de identidad"
+
+      findings:
+        - severity: high
+          title: "Endpoint de descarga de propuestas sin autenticación"
+          detail: >-
+            GET /api/v1/attachments/{id}/download está registrado fuera del grupo
+            que aplica JWTAuthMiddleware (cmd/api/main.go:219). Cualquiera con el
+            UUID descarga la propuesta.
+        - severity: high
+          title: "JWT_SECRET con default hardcodeado"
+          detail: >-
+            Si falta la variable, el servicio arranca con un secreto conocido y
+            solo emite un warning (middleware/auth/jwt.go:20-26).
+        - severity: medium
+          title: "Reglas de negocio en triggers de PostgreSQL"
+          detail: >-
+            Conflicto de interés, completitud de asignaciones y vote_count viven
+            en plpgsql, no en Go. No es un defecto pero es invisible desde el código.
+        - severity: medium
+          title: "GET /distributed-results muta estado"
+          detail: "Recalcula el MBC y hace upsert en voting_results en cada llamada."
+        - severity: medium
+          title: "GET /users/{user_id} sin verificación de ownership"
+          detail: "Cualquier usuario autenticado lee cualquier otro usuario."
+        - severity: low
+          title: "Cuatro formatos de error distintos"
+          detail: "Handlers, middlewares, endpoints de votación y health no coinciden."
+        - severity: low
+          title: "Columnas de base no conocidas por el dominio"
+          detail: >-
+            voting_configurations y voting_results tienen columnas creadas por
+            migrations/models.go que las entidades de dominio no leen ni escriben.
+        - severity: low
+          title: "Sin tests de middlewares ni repositorios"
+          detail: >-
+            Los tests cubren handlers y el algoritmo de votación, pero
+            internal/middleware/auth (JWT y permisos) e internal/storage/postgres
+            siguen sin cobertura.
+
+    - name: telescopio-web
+      type: frontend
+      responsibility: >-
+        Única interfaz de usuario del producto. Cubre el recorrido del participante
+        (registro, carga de propuesta, evaluación por pares, resultados) y el del
+        organizador (creación, etapas, configuración de votación). Sin lógica de
+        negocio propia.
+      tech_stack: "React 19 · react-router 7 · CRA · TypeScript · CSS plano"
+      path: web/
+      status: analyzed
+      analyzed_at: 2026-09-18
+
+      architecture:
+        format: manifest
+        language: react
+        catalog_available: false   # solo existe .claude/conventions/nextjs/, que no aplica
+        conventions_total: 9
+        conventions_custom: 9
+        modules: [auth, events, event-management, voting]
+
+      documentation:
+        analysis: docs/analysis/services/telescopio-web.md
+        architecture: docs/architectures/telescopio-web/
+        ux_survey: docs/analysis/ux/telescopio-web/
+
+      ux_survey:
+        platform: web
+        breakpoints: [1024, 768, 600, 480]   # todos max-width, desktop-first
+        real_layout_switch: 768
+        viewports: [desktop, mobile]
+        screens: 6
+        overlays_and_panels: 10
+        design_tokens: 79                    # en styles/global.css; index.css duplica 57
+        token_adoption: "753 var() vs 350 hex hardcodeados"
+
+      interfaces:
+        exposes:
+          - type: web_ui
+            details: "SPA con 6 rutas, servida como estáticos"
+        consumes:
+          - type: api
+            target: telescopio-api
+            details: "REST con JWT Bearer. Toda la funcionalidad del producto"
+          - type: external_api
+            target: google_oauth
+            details: "@react-oauth/google, obtención del token en el cliente"
+          - type: browser_storage
+            target: localStorage
+            details: "Sesión: telescopio_user y telescopio_token"
+
+      findings:
+        - severity: high
+          title: "El fallback demo anula la validación del login"
+          detail: >-
+            El catch externo de AuthForm.handleSubmit (AuthForm.tsx:132-152) crea un
+            usuario ficticio con token "demo-token-{ts}" y lo loguea. Como las
+            validaciones usan throw, ese catch las captura: enviar con email vacío
+            deja al usuario logueado en vez de mostrar el error.
+        - severity: high
+          title: "Participants muestra datos mock cuando la API falla"
+          detail: >-
+            El catch rellena la lista con tres personas inventadas (Participants.tsx:24-56)
+            y la condición de render no excluye error: se ven el mensaje de error y los
+            participantes falsos a la vez.
+        - severity: high
+          title: "ManageEventPage presenta fallos de API como ausencia de datos"
+          detail: >-
+            Participantes, adjuntos y estadísticas fallan solo a consola. Si la API de
+            participantes cae, se muestra "No participants have registered yet." como si
+            no hubiera ninguno.
+        - severity: medium
+          title: "Sin rutas protegidas ni ruta 404"
+          detail: >-
+            /events/create y /events/:eventId/manage son alcanzables por URL sin sesión.
+            Una URL desconocida renderiza el navbar sobre contenido vacío.
+        - severity: medium
+          title: "En mobile desaparecen las fechas límite"
+          detail: >-
+            EventTimeline.css:239-259 oculta .etl-deadline bajo 600px. Para un
+            participante en teléfono el deadline es invisible.
+        - severity: medium
+          title: "Tabla de participantes ilegible en mobile"
+          detail: >-
+            El CSS usa content:attr(data-label) al apilar, pero el JSX nunca setea
+            data-label (verificado: 0 archivos .tsx).
+        - severity: medium
+          title: "Loop de navegación para el organizador"
+          detail: >-
+            handleBack va a /events/{id} y el wrapper redirige al creador de vuelta a
+            /manage: el botón de volver rebota a la misma pantalla.
+        - severity: medium
+          title: "La fecha del evento se autogenera sin que el usuario la vea"
+          detail: >-
+            CreateEventPage.tsx:43-49 envía hoy+1día como date. No hay campo de fecha
+            en el formulario.
+        - severity: medium
+          title: "Validaciones de avance de etapa inconsistentes entre pantallas"
+          detail: >-
+            ManageEventPage valida participantes y votos antes de avanzar;
+            EventDetailPage permite el mismo avance sin chequeos.
+        - severity: low
+          title: "Código muerto"
+          detail: >-
+            ApiStatusAuth.tsx y Voting.tsx sin referencias. Varias clases CSS
+            referenciadas desde el JSX sin definir en ningún archivo
+            (UsernameModal, ForgotPasswordForm), que se renderizan sin estilos.
+        - severity: low
+          title: "Tokens de diseño duplicados y un tercio de colores hardcodeado"
+          detail: "global.css repite las 57 variables de index.css. 350 hex vs 753 var()."
