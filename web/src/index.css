@@ -310,7 +310,7 @@ code {
 .form-select:focus {
   outline: none;
   border-color: var(--color-primary);
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--glass-bg-light);
   box-shadow: 0 0 0 3px rgba(106, 90, 205, 0.2);
 }
 

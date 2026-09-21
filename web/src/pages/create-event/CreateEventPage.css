@@ -77,11 +77,11 @@
   font-weight: 700 !important;
 }
 
-.form-group {
+.create-event-form .form-group {
   margin-bottom: 25px;
 }
 
-.form-label {
+.create-event-form .form-label {
   display: block;
   margin-bottom: 8px;
   font-weight: 700 !important;
@@ -98,8 +98,8 @@
   text-shadow: none !important;
 }
 
-.form-input,
-.form-textarea {
+.create-event-form .form-input,
+.create-event-form .form-textarea {
   width: 100%;
   padding: 12px 16px;
   border: 2px solid #e2e8f0;
@@ -111,32 +111,32 @@
   box-sizing: border-box;
 }
 
-.form-input:focus,
-.form-textarea:focus {
+.create-event-form .form-input:focus,
+.create-event-form .form-textarea:focus {
   outline: none;
   border-color: #667eea;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-.form-input::placeholder,
-.form-textarea::placeholder {
+.create-event-form .form-input::placeholder,
+.create-event-form .form-textarea::placeholder {
   color: #a0aec0;
   opacity: 1;
 }
 
-.form-input::selection,
-.form-textarea::selection {
+.create-event-form .form-input::selection,
+.create-event-form .form-textarea::selection {
   background-color: #667eea;
   color: white;
 }
 
-.form-input::-moz-selection,
-.form-textarea::-moz-selection {
+.create-event-form .form-input::-moz-selection,
+.create-event-form .form-textarea::-moz-selection {
   background-color: #667eea;
   color: white;
 }
 
-.form-textarea {
+.create-event-form .form-textarea {
   resize: vertical;
   min-height: 120px;
   font-family: inherit;
@@ -210,7 +210,7 @@
   color: white !important;
 }
 
-.btn-primary:disabled {
+.create-event-form .btn-primary:disabled {
   background: #cbd5e0 !important;
   border-color: #cbd5e0 !important;
   cursor: not-allowed;

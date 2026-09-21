@@ -798,5 +798,5 @@ func TestGetAllEvents_PaginatesResults(t *testing.T) {
 }
 
 func attachmentFor(eventID, participantID uuid.UUID) *attachment.Attachment {
-	return attachment.NewAttachment(eventID, participantID, "f.jpg", "photo.jpg", "/tmp/f.jpg", "image/jpeg", 1024)
+	return attachment.NewAttachment(eventID, participantID, "f.jpg", "photo.jpg", "/tmp/f.jpg", "image/jpeg", 1024, "")
 }

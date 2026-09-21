@@ -138,6 +138,12 @@ func GetMigrations() []Migration {
 			Up:   migration020Up,
 			Down: migration020Down,
 		},
+		{
+			ID:   "021",
+			Name: "add_description_to_attachments",
+			Up:   migration021Up,
+			Down: migration021Down,
+		},
 	}
 }
 

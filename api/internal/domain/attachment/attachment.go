@@ -16,6 +16,7 @@ type Attachment struct {
 	FilePath      string    `json:"file_path" gorm:"not null"`
 	FileSize      int64     `json:"file_size" gorm:"not null"`
 	MimeType      string    `json:"mime_type" gorm:"not null"`
+	Description   string    `json:"description,omitempty" gorm:"type:text"`
 	VoteCount     int       `json:"vote_count" gorm:"default:0"`
 	UploadedAt    time.Time `json:"uploaded_at" gorm:"autoCreateTime"`
 }
@@ -33,7 +34,7 @@ func (a *Attachment) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-func NewAttachment(eventID, participantID uuid.UUID, filename, originalName, filePath, mimeType string, fileSize int64) *Attachment {
+func NewAttachment(eventID, participantID uuid.UUID, filename, originalName, filePath, mimeType string, fileSize int64, description string) *Attachment {
 	return &Attachment{
 		ID:            uuid.New(),
 		EventID:       eventID,
@@ -43,6 +44,7 @@ func NewAttachment(eventID, participantID uuid.UUID, filename, originalName, fil
 		FilePath:      filePath,
 		FileSize:      fileSize,
 		MimeType:      mimeType,
+		Description:   description,
 		VoteCount:     0,
 		UploadedAt:    time.Now(),
 	}

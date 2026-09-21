@@ -221,8 +221,13 @@ func main() {
 			events.GET("/:event_id/voting-statistics", distributedVoteHandler.GetVotingStatistics)
 		}
 
-		// Attachment download - Available to authenticated users
-		api.GET("/attachments/:attachment_id/download", attachmentHandler.DownloadAttachment)
+		// Attachment download/delete - ownership checked in the handler
+		attachments := api.Group("/attachments")
+		attachments.Use(auth.JWTAuthMiddleware())
+		{
+			attachments.GET("/:attachment_id/download", attachmentHandler.DownloadAttachment)
+			attachments.DELETE("/:attachment_id", attachmentHandler.DeleteAttachment)
+		}
 	}
 
 	log.Info("Starting Telescopio API server", "port", cfg.Server.Port)

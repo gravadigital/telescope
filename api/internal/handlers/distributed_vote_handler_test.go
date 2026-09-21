@@ -117,7 +117,7 @@ func addParticipants(s *testHandlerSet, eventID uuid.UUID, n int) []*participant
 func addAttachments(s *testHandlerSet, eventID uuid.UUID, owners []*participant.User) []*attachment.Attachment {
 	out := make([]*attachment.Attachment, len(owners))
 	for i, owner := range owners {
-		a := attachment.NewAttachment(eventID, owner.ID, "f.jpg", "photo.jpg", "/tmp/f.jpg", "image/jpeg", 1024)
+		a := attachment.NewAttachment(eventID, owner.ID, "f.jpg", "photo.jpg", "/tmp/f.jpg", "image/jpeg", 1024, "")
 		s.attachmentRepo.addAttachment(a)
 		out[i] = a
 	}
@@ -497,7 +497,7 @@ func TestSubmitRankingVotes_RejectsNonConsecutiveRanks(t *testing.T) {
 func TestSubmitRankingVotes_RejectsAttachmentNotInAssignment(t *testing.T) {
 	s := newTestHandlerSet()
 	e, p, assignment, _ := setupVotingScenario(t, s)
-	foreignAttachment := attachment.NewAttachment(e.ID, uuid.New(), "x.jpg", "x.jpg", "/tmp/x.jpg", "image/jpeg", 10)
+	foreignAttachment := attachment.NewAttachment(e.ID, uuid.New(), "x.jpg", "x.jpg", "/tmp/x.jpg", "image/jpeg", 10, "")
 	s.attachmentRepo.addAttachment(foreignAttachment)
 
 	body := map[string]interface{}{

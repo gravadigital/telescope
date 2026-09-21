@@ -6,6 +6,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -45,8 +46,19 @@ func newTestAttachmentHandlerSet() *testAttachmentHandlerSet {
 // "file" field, and returns a Gin context ready to hand to the handler.
 func buildMultipartUpload(t *testing.T, params gin.Params, filename, contentType string, content []byte) (*httptest.ResponseRecorder, *gin.Context) {
 	t.Helper()
+	return buildMultipartUploadWithFields(t, params, filename, contentType, content, nil)
+}
+
+// buildMultipartUploadWithFields is buildMultipartUpload plus extra plain
+// form fields (e.g. "description"), for cases that need more than the file.
+func buildMultipartUploadWithFields(t *testing.T, params gin.Params, filename, contentType string, content []byte, fields map[string]string) (*httptest.ResponseRecorder, *gin.Context) {
+	t.Helper()
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
+
+	for key, value := range fields {
+		require.NoError(t, writer.WriteField(key, value))
+	}
 
 	part, err := writer.CreatePart(map[string][]string{
 		"Content-Disposition": {`form-data; name="file"; filename="` + filename + `"`},
@@ -95,6 +107,51 @@ func TestUploadAttachment_Success(t *testing.T) {
 	attachments, _ := s.attachmentRepo.GetByEventID(e.ID.String())
 	require.Len(t, attachments, 1)
 	assert.Equal(t, "photo.jpg", attachments[0].OriginalName)
+	assert.Equal(t, "", attachments[0].Description, "description is optional and defaults to empty")
+}
+
+func TestUploadAttachment_AcceptsOptionalDescription(t *testing.T) {
+	s := newTestAttachmentHandlerSet()
+	e, _ := newParticipationStageEvent()
+	s.eventRepo.addEvent(e)
+	p := participant.NewParticipant("P", "One", "p@example.com")
+	s.userRepo.addUser(p)
+	s.eventRepo.byParticipant[p.ID.String()] = []*event.Event{e}
+
+	w, c := buildMultipartUploadWithFields(t,
+		gin.Params{{Key: "event_id", Value: e.ID.String()}, {Key: "participant_id", Value: p.ID.String()}},
+		"photo.jpg", "image/jpeg", []byte("fake image bytes"),
+		map[string]string{"description": "  Final draft, high resolution  "})
+
+	s.handler.UploadAttachment(c)
+
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	attachments, _ := s.attachmentRepo.GetByEventID(e.ID.String())
+	require.Len(t, attachments, 1)
+	assert.Equal(t, "Final draft, high resolution", attachments[0].Description, "description should be trimmed")
+	assert.Equal(t, "Final draft, high resolution", jsonBody(t, w)["data"].(map[string]interface{})["description"])
+}
+
+func TestUploadAttachment_RejectsDescriptionTooLong(t *testing.T) {
+	s := newTestAttachmentHandlerSet()
+	e, _ := newParticipationStageEvent()
+	s.eventRepo.addEvent(e)
+	p := participant.NewParticipant("P", "One", "p@example.com")
+	s.userRepo.addUser(p)
+	s.eventRepo.byParticipant[p.ID.String()] = []*event.Event{e}
+
+	tooLong := strings.Repeat("a", 1001)
+	w, c := buildMultipartUploadWithFields(t,
+		gin.Params{{Key: "event_id", Value: e.ID.String()}, {Key: "participant_id", Value: p.ID.String()}},
+		"photo.jpg", "image/jpeg", []byte("fake image bytes"),
+		map[string]string{"description": tooLong})
+
+	s.handler.UploadAttachment(c)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, "DESCRIPTION_TOO_LONG", jsonBody(t, w)["code"])
+	attachments, _ := s.attachmentRepo.GetByEventID(e.ID.String())
+	assert.Empty(t, attachments, "no attachment should be created when the description is rejected")
 }
 
 func TestUploadAttachment_RejectsWrongStage(t *testing.T) {
@@ -174,7 +231,7 @@ func TestUploadAttachment_RejectsDuplicateAttachment(t *testing.T) {
 	p := participant.NewParticipant("P", "One", "p@example.com")
 	s.userRepo.addUser(p)
 	s.eventRepo.byParticipant[p.ID.String()] = []*event.Event{e}
-	existing := attachment.NewAttachment(e.ID, p.ID, "old.jpg", "old.jpg", "old-key", "image/jpeg", 10)
+	existing := attachment.NewAttachment(e.ID, p.ID, "old.jpg", "old.jpg", "old-key", "image/jpeg", 10, "")
 	s.attachmentRepo.addAttachment(existing)
 
 	w, c := buildMultipartUpload(t,
@@ -259,7 +316,7 @@ func TestGetAttachment_RejectsMissing(t *testing.T) {
 func TestGetEventAttachments_Success(t *testing.T) {
 	s := newTestAttachmentHandlerSet()
 	e, _ := newParticipationStageEvent()
-	att := attachment.NewAttachment(e.ID, uuid.New(), "f.jpg", "photo.jpg", "key", "image/jpeg", 10)
+	att := attachment.NewAttachment(e.ID, uuid.New(), "f.jpg", "photo.jpg", "key", "image/jpeg", 10, "")
 	s.attachmentRepo.addAttachment(att)
 
 	w := performRequest(t, http.MethodGet, s.handler.GetEventAttachments,
@@ -276,11 +333,14 @@ func TestGetEventAttachments_Success(t *testing.T) {
 
 func TestDownloadAttachment_Success(t *testing.T) {
 	s := newTestAttachmentHandlerSet()
-	att := attachment.NewAttachment(uuid.New(), uuid.New(), "f.jpg", "photo.jpg", "storage-key", "image/jpeg", 5)
+	e, _ := newParticipationStageEvent()
+	s.eventRepo.addEvent(e)
+	owner := uuid.New()
+	att := attachment.NewAttachment(e.ID, owner, "f.jpg", "photo.jpg", "storage-key", "image/jpeg", 5, "")
 	s.attachmentRepo.addAttachment(att)
 	s.fileStorage.files["storage-key"] = []byte("hello")
 
-	w, c := newDownloadTestContext(gin.Params{{Key: "attachment_id", Value: att.ID.String()}})
+	w, c := newDownloadTestContext(gin.Params{{Key: "attachment_id", Value: att.ID.String()}}, owner, participant.RoleParticipant)
 	s.handler.DownloadAttachment(c)
 
 	require.Equal(t, http.StatusOK, w.Code)
@@ -288,24 +348,78 @@ func TestDownloadAttachment_Success(t *testing.T) {
 	assert.Contains(t, w.Header().Get("Content-Disposition"), "photo.jpg")
 }
 
+func TestDownloadAttachment_AllowsEventOwner(t *testing.T) {
+	s := newTestAttachmentHandlerSet()
+	e, authorID := newParticipationStageEvent()
+	s.eventRepo.addEvent(e)
+	att := attachment.NewAttachment(e.ID, uuid.New(), "f.jpg", "photo.jpg", "storage-key", "image/jpeg", 5, "")
+	s.attachmentRepo.addAttachment(att)
+	s.fileStorage.files["storage-key"] = []byte("hello")
+
+	w, c := newDownloadTestContext(gin.Params{{Key: "attachment_id", Value: att.ID.String()}}, authorID, participant.RoleOrganizer)
+	s.handler.DownloadAttachment(c)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+}
+
+func TestDownloadAttachment_AllowsAdmin(t *testing.T) {
+	s := newTestAttachmentHandlerSet()
+	e, _ := newParticipationStageEvent()
+	s.eventRepo.addEvent(e)
+	att := attachment.NewAttachment(e.ID, uuid.New(), "f.jpg", "photo.jpg", "storage-key", "image/jpeg", 5, "")
+	s.attachmentRepo.addAttachment(att)
+	s.fileStorage.files["storage-key"] = []byte("hello")
+
+	w, c := newDownloadTestContext(gin.Params{{Key: "attachment_id", Value: att.ID.String()}}, uuid.New(), participant.RoleAdmin)
+	s.handler.DownloadAttachment(c)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+}
+
+func TestDownloadAttachment_RejectsOtherParticipant(t *testing.T) {
+	s := newTestAttachmentHandlerSet()
+	e, _ := newParticipationStageEvent()
+	s.eventRepo.addEvent(e)
+	att := attachment.NewAttachment(e.ID, uuid.New(), "f.jpg", "photo.jpg", "storage-key", "image/jpeg", 5, "")
+	s.attachmentRepo.addAttachment(att)
+	s.fileStorage.files["storage-key"] = []byte("hello")
+
+	w, c := newDownloadTestContext(gin.Params{{Key: "attachment_id", Value: att.ID.String()}}, uuid.New(), participant.RoleParticipant)
+	s.handler.DownloadAttachment(c)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	assert.Equal(t, "FORBIDDEN", jsonBody(t, w)["code"])
+}
+
 func TestDownloadAttachment_RejectsMissingFileInStorage(t *testing.T) {
 	s := newTestAttachmentHandlerSet()
-	att := attachment.NewAttachment(uuid.New(), uuid.New(), "f.jpg", "photo.jpg", "missing-key", "image/jpeg", 5)
+	e, _ := newParticipationStageEvent()
+	s.eventRepo.addEvent(e)
+	owner := uuid.New()
+	att := attachment.NewAttachment(e.ID, owner, "f.jpg", "photo.jpg", "missing-key", "image/jpeg", 5, "")
 	s.attachmentRepo.addAttachment(att)
 	// File never added to mockFileStorage.
 
-	w, c := newDownloadTestContext(gin.Params{{Key: "attachment_id", Value: att.ID.String()}})
+	w, c := newDownloadTestContext(gin.Params{{Key: "attachment_id", Value: att.ID.String()}}, owner, participant.RoleParticipant)
 	s.handler.DownloadAttachment(c)
 
 	assert.Equal(t, http.StatusNotFound, w.Code)
 	assert.Equal(t, "FILE_NOT_FOUND", jsonBody(t, w)["code"])
 }
 
-func newDownloadTestContext(params gin.Params) (*httptest.ResponseRecorder, *gin.Context) {
+func newDownloadTestContext(params gin.Params, userID uuid.UUID, role participant.Role) (*httptest.ResponseRecorder, *gin.Context) {
+	return newAuthedTestContext(http.MethodGet, params, userID, role)
+}
+
+// newAuthedTestContext builds a gin.Context as JWTAuthMiddleware would leave it
+// for an authenticated request, for handlers that read the user from context.
+func newAuthedTestContext(method string, params gin.Params, userID uuid.UUID, role participant.Role) (*httptest.ResponseRecorder, *gin.Context) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
+	c.Request = httptest.NewRequest(method, "/test", nil)
 	c.Params = params
+	c.Set("user_id", userID.String())
+	c.Set("user_role", role)
 	return w, c
 }
 
@@ -319,12 +433,13 @@ func TestDeleteAttachment_Success(t *testing.T) {
 	s.eventRepo.addEvent(e)
 	owner := participant.NewParticipant("Owner", "One", "owner@example.com")
 	s.userRepo.addUser(owner)
-	att := attachment.NewAttachment(e.ID, owner.ID, "f.jpg", "photo.jpg", "storage-key", "image/jpeg", 5)
+	att := attachment.NewAttachment(e.ID, owner.ID, "f.jpg", "photo.jpg", "storage-key", "image/jpeg", 5, "")
 	s.attachmentRepo.addAttachment(att)
 	s.fileStorage.files["storage-key"] = []byte("hello")
 
-	w := performRequest(t, http.MethodDelete, s.handler.DeleteAttachment,
-		gin.Params{{Key: "attachment_id", Value: att.ID.String()}}, "", nil)
+	w, c := newAuthedTestContext(http.MethodDelete,
+		gin.Params{{Key: "attachment_id", Value: att.ID.String()}}, owner.ID, participant.RoleParticipant)
+	s.handler.DeleteAttachment(c)
 
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	_, err := s.attachmentRepo.GetByID(att.ID.String())
@@ -332,16 +447,51 @@ func TestDeleteAttachment_Success(t *testing.T) {
 	assert.Contains(t, s.fileStorage.deletedKeys, "storage-key")
 }
 
+func TestDeleteAttachment_RejectsOtherParticipant(t *testing.T) {
+	s := newTestAttachmentHandlerSet()
+	e, _ := newParticipationStageEvent()
+	s.eventRepo.addEvent(e)
+	owner := uuid.New()
+	att := attachment.NewAttachment(e.ID, owner, "f.jpg", "photo.jpg", "storage-key", "image/jpeg", 5, "")
+	s.attachmentRepo.addAttachment(att)
+
+	w, c := newAuthedTestContext(http.MethodDelete,
+		gin.Params{{Key: "attachment_id", Value: att.ID.String()}}, uuid.New(), participant.RoleParticipant)
+	s.handler.DeleteAttachment(c)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	assert.Equal(t, "FORBIDDEN", jsonBody(t, w)["code"])
+	_, err := s.attachmentRepo.GetByID(att.ID.String())
+	assert.NoError(t, err, "attachment must survive an unauthorized delete attempt")
+}
+
+func TestDeleteAttachment_RejectsEventOwner(t *testing.T) {
+	s := newTestAttachmentHandlerSet()
+	e, authorID := newParticipationStageEvent()
+	s.eventRepo.addEvent(e)
+	att := attachment.NewAttachment(e.ID, uuid.New(), "f.jpg", "photo.jpg", "storage-key", "image/jpeg", 5, "")
+	s.attachmentRepo.addAttachment(att)
+
+	w, c := newAuthedTestContext(http.MethodDelete,
+		gin.Params{{Key: "attachment_id", Value: att.ID.String()}}, authorID, participant.RoleOrganizer)
+	s.handler.DeleteAttachment(c)
+
+	assert.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+	assert.Equal(t, "FORBIDDEN", jsonBody(t, w)["code"])
+}
+
 func TestDeleteAttachment_RejectsWrongStage(t *testing.T) {
 	s := newTestAttachmentHandlerSet()
 	e, _ := newParticipationStageEvent()
 	e.Stage = event.StageVoting
 	s.eventRepo.addEvent(e)
-	att := attachment.NewAttachment(e.ID, uuid.New(), "f.jpg", "photo.jpg", "storage-key", "image/jpeg", 5)
+	owner := uuid.New()
+	att := attachment.NewAttachment(e.ID, owner, "f.jpg", "photo.jpg", "storage-key", "image/jpeg", 5, "")
 	s.attachmentRepo.addAttachment(att)
 
-	w := performRequest(t, http.MethodDelete, s.handler.DeleteAttachment,
-		gin.Params{{Key: "attachment_id", Value: att.ID.String()}}, "", nil)
+	w, c := newAuthedTestContext(http.MethodDelete,
+		gin.Params{{Key: "attachment_id", Value: att.ID.String()}}, owner, participant.RoleParticipant)
+	s.handler.DeleteAttachment(c)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Equal(t, "INVALID_EVENT_STAGE", jsonBody(t, w)["code"])
@@ -362,12 +512,14 @@ func TestDeleteAttachment_RejectsWrongStage(t *testing.T) {
 // than an implicit "skip validation".
 func TestDeleteAttachment_RejectsWhenParentEventLookupFails(t *testing.T) {
 	s := newTestAttachmentHandlerSet()
+	owner := uuid.New()
 	// Intentionally do NOT add the parent event to eventRepo, so GetByID fails.
-	att := attachment.NewAttachment(uuid.New(), uuid.New(), "f.jpg", "photo.jpg", "storage-key", "image/jpeg", 5)
+	att := attachment.NewAttachment(uuid.New(), owner, "f.jpg", "photo.jpg", "storage-key", "image/jpeg", 5, "")
 	s.attachmentRepo.addAttachment(att)
 
-	w := performRequest(t, http.MethodDelete, s.handler.DeleteAttachment,
-		gin.Params{{Key: "attachment_id", Value: att.ID.String()}}, "", nil)
+	w, c := newAuthedTestContext(http.MethodDelete,
+		gin.Params{{Key: "attachment_id", Value: att.ID.String()}}, owner, participant.RoleParticipant)
+	s.handler.DeleteAttachment(c)
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code, w.Body.String())
 	assert.Equal(t, "EVENT_LOOKUP_ERROR", jsonBody(t, w)["code"])

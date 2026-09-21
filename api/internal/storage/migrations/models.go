@@ -138,6 +138,7 @@ type Attachment struct {
 	FilePath      string    `gorm:"not null" json:"file_path"`
 	FileSize      int64     `gorm:"not null" json:"file_size"`
 	MimeType      string    `gorm:"size:100;not null" json:"mime_type"`
+	Description   string    `gorm:"type:text" json:"description,omitempty"`
 	VoteCount     int       `gorm:"default:0" json:"vote_count"`
 	UploadedAt    time.Time `gorm:"autoCreateTime" json:"uploaded_at"`
 

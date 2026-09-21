@@ -956,6 +956,16 @@
   line-height: 1.5;
 }
 
+.edp-download-error {
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+  margin: var(--spacing-xs) 0 0 !important;
+}
+
+.edp-submitted-actions {
+  margin-top: var(--spacing-md);
+}
+
 /* Upload form */
 .edp-upload-form {
   background: rgba(255, 255, 255, 0.03);
@@ -1106,6 +1116,19 @@
   color: #fca5a5;
 }
 
+.optional-label {
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 400;
+  font-size: 0.85em;
+}
+
+.edp-submitted-description {
+  font-size: var(--text-sm);
+  color: rgba(255, 255, 255, 0.7);
+  margin: var(--spacing-xs) 0 0 !important;
+  white-space: pre-wrap;
+}
+
 .upload-confirm-modal h3 {
   color: #f1f5f9;
   margin: 0 0 8px 0;
@@ -1141,13 +1164,20 @@
   color: #cbd5e1;
 }
 
+.upload-confirm-description {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+  margin: 0 0 24px !important;
+  white-space: pre-wrap;
+}
+
 .upload-confirm-actions {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
 }
 
-.upload-confirm-actions .secondary-btn {
+.secondary-btn {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.3);
   color: #e2e8f0;
@@ -1159,10 +1189,15 @@
   transition: background 0.2s, border-color 0.2s, color 0.2s;
 }
 
-.upload-confirm-actions .secondary-btn:hover {
+.secondary-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.15);
   border-color: rgba(255, 255, 255, 0.5);
   color: #ffffff;
+}
+
+.secondary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .upload-info {

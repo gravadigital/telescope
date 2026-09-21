@@ -73,6 +73,8 @@ export interface ApiConfig {
     VOTING_STATISTICS: (eventId: string) => string;
     UPLOAD_ATTACHMENT: (eventId: string, participantId: string) => string;
     EVENT_ATTACHMENTS: (eventId: string) => string;
+    DOWNLOAD_ATTACHMENT: (attachmentId: string) => string;
+    DELETE_ATTACHMENT: (attachmentId: string) => string;
 
     // Fechas estimativas (S-003)
     EVENT_ESTIMATED_DATE: (eventId: string) => string;
@@ -218,6 +220,7 @@ export interface Attachment {
   stored_name: string;
   file_size: number;
   mime_type: string;
+  description?: string;
   uploaded_at: string;
   url?: string;
 }

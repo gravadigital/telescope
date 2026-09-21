@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { Event } from '../../types';
+import { Event, Attachment } from '../../types';
 import { EventService, ApiHealthService, AttachmentService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import Participants from '../../components/participants/Participants';
@@ -12,6 +12,7 @@ import Modal from '../../components/modal/Modal';
 import EventTimeline from '../../components/event-timeline/EventTimeline';
 import StageAdvanceModal from '../../components/stage-advance-modal/StageAdvanceModal';
 import '../../components/stage-advance-modal/StageAdvanceModal.css';
+import '../../components/link-button/styles.css';
 
 interface EventDetailPageProps {
   eventId: string;
@@ -26,6 +27,7 @@ const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBack }) =>
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [attachmentDescription, setAttachmentDescription] = useState<string>('');
   const [uploadLoading, setUploadLoading] = useState<boolean>(false);
   const [showUploadConfirm, setShowUploadConfirm] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -35,6 +37,11 @@ const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBack }) =>
   const [stageLoading, setStageLoading] = useState<boolean>(false);
   const [votingConfigured, setVotingConfigured] = useState<boolean>(false);
   const [userHasSubmittedFile, setUserHasSubmittedFile] = useState<boolean>(false);
+  const [userAttachment, setUserAttachment] = useState<Attachment | null>(null);
+  const [downloadError, setDownloadError] = useState<string>('');
+  const [replaceLoading, setReplaceLoading] = useState<boolean>(false);
+  const [replaceError, setReplaceError] = useState<string>('');
+  const [showReplaceConfirm, setShowReplaceConfirm] = useState<boolean>(false);
   const [showStageModal, setShowStageModal] = useState<boolean>(false);
 
   useEffect(() => {
@@ -70,12 +77,12 @@ const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBack }) =>
         if (user && eventData.stage === 'participation') {
           try {
             const attachments = await AttachmentService.getEventAttachments(eventId);
-            const userAttachment = attachments.find((att: any) =>
-              att.participant_id === user.id || att.author_id === user.id
-            );
-            setUserHasSubmittedFile(!!userAttachment);
+            const ownAttachment = attachments.find(att => att.participant_id === user.id);
+            setUserHasSubmittedFile(!!ownAttachment);
+            setUserAttachment(ownAttachment || null);
           } catch {
             setUserHasSubmittedFile(false);
+            setUserAttachment(null);
           }
         }
       } else {
@@ -119,7 +126,6 @@ const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBack }) =>
     setSuccess('');
     try {
       await EventService.registerForEvent(event.id, user.name, user.email);
-      setSuccess('Successfully registered! You can now upload your file.');
       setIsUserRegistered(true);
       if (joinEvent) joinEvent(event.id);
       await fetchEventDetails();
@@ -140,8 +146,37 @@ const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBack }) =>
     setError('');
   };
 
+  const handleDownloadAttachment = async (): Promise<void> => {
+    if (!userAttachment) return;
+    setDownloadError('');
+    try {
+      await AttachmentService.downloadAttachment(userAttachment.id, userAttachment.original_name);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setDownloadError(`Failed to download your file: ${errorMessage}.`);
+    }
+  };
+
+  const handleReplaceFile = async (): Promise<void> => {
+    if (!userAttachment) return;
+    setShowReplaceConfirm(false);
+    setReplaceError('');
+    setReplaceLoading(true);
+    try {
+      await AttachmentService.deleteAttachment(userAttachment.id);
+      setUserHasSubmittedFile(false);
+      setUserAttachment(null);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setReplaceError(`Failed to remove your file: ${errorMessage}.`);
+    } finally {
+      setReplaceLoading(false);
+    }
+  };
+
   const handleClearFile = (): void => {
     setSelectedFile(null);
+    setAttachmentDescription('');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -152,9 +187,10 @@ const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBack }) =>
     setError('');
     setSuccess('');
     try {
-      await AttachmentService.uploadAttachment(event.id, user.id, selectedFile);
+      await AttachmentService.uploadAttachment(event.id, user.id, selectedFile, attachmentDescription.trim());
       setSuccess('File uploaded successfully!');
       setSelectedFile(null);
+      setAttachmentDescription('');
       if (fileInputRef.current) fileInputRef.current.value = '';
       await fetchEventDetails();
     } catch (err: any) {
@@ -327,7 +363,36 @@ const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBack }) =>
                       <span className="edp-submitted-icon">✅</span>
                       <div>
                         <p className="edp-submitted-title">Submission received</p>
-                        <p className="edp-submitted-sub">You've already uploaded your file. Only one submission is allowed per participant.</p>
+                        <p className="edp-submitted-sub">You can replace it until voting starts.</p>
+                        {userAttachment && (
+                          <button
+                            type="button"
+                            className="link-button-component-button"
+                            onClick={handleDownloadAttachment}
+                            title={`Download ${userAttachment.original_name}`}
+                          >
+                            {userAttachment.original_name}
+                          </button>
+                        )}
+                        {userAttachment?.description && (
+                          <p className="edp-submitted-description">{userAttachment.description}</p>
+                        )}
+                        {downloadError && (
+                          <p className="edp-download-error" role="alert">{downloadError}</p>
+                        )}
+                        <div className="edp-submitted-actions">
+                          <button
+                            type="button"
+                            className="secondary-btn"
+                            onClick={() => setShowReplaceConfirm(true)}
+                            disabled={replaceLoading}
+                          >
+                            {replaceLoading ? 'Removing...' : 'Replace file'}
+                          </button>
+                        </div>
+                        {replaceError && (
+                          <p className="edp-download-error" role="alert">{replaceError}</p>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -355,6 +420,23 @@ const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBack }) =>
                               </div>
                             </div>
                             <button className="file-clear-btn" onClick={handleClearFile} title="Remove selected file">×</button>
+                          </div>
+                        )}
+                        {selectedFile && (
+                          <div className="form-group">
+                            <label className="form-label" htmlFor="attachment-description">
+                              Comment <span className="optional-label">(optional)</span>
+                            </label>
+                            <textarea
+                              id="attachment-description"
+                              className="form-textarea"
+                              value={attachmentDescription}
+                              onChange={(e) => setAttachmentDescription(e.target.value)}
+                              placeholder="Add any context, notes, or comments about your submission..."
+                              maxLength={1000}
+                              rows={4}
+                              disabled={uploadLoading || !canUploadAttachment}
+                            />
                           </div>
                         )}
                         <button
@@ -442,9 +524,29 @@ const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBack }) =>
               <span className="upload-confirm-filename">{selectedFile.name}</span>
               <span className="upload-confirm-filesize">{(selectedFile.size / 1024).toFixed(2)} KB</span>
             </div>
+            {attachmentDescription.trim() && (
+              <p className="upload-confirm-description">{attachmentDescription.trim()}</p>
+            )}
             <div className="upload-confirm-actions">
               <button className="secondary-btn" onClick={() => setShowUploadConfirm(false)}>Cancel</button>
               <button className="primary-btn" onClick={handleUploadAttachment}>Upload</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Replace file confirmation modal */}
+      {showReplaceConfirm && userAttachment && (
+        <Modal onClose={() => setShowReplaceConfirm(false)}>
+          <div className="upload-confirm-modal">
+            <h3>Replace your submission?</h3>
+            <p>Your current file will be permanently deleted, and you'll need to upload a new one.</p>
+            <div className="upload-confirm-file">
+              <span className="upload-confirm-filename">{userAttachment.original_name}</span>
+            </div>
+            <div className="upload-confirm-actions">
+              <button className="secondary-btn" onClick={() => setShowReplaceConfirm(false)}>Cancel</button>
+              <button className="primary-btn" onClick={handleReplaceFile}>Replace</button>
             </div>
           </div>
         </Modal>

@@ -15,10 +15,16 @@ import (
 	"github.com/gravadigital/telescopio-api/internal/config"
 	"github.com/gravadigital/telescopio-api/internal/domain/attachment"
 	"github.com/gravadigital/telescopio-api/internal/domain/event"
+	"github.com/gravadigital/telescopio-api/internal/domain/participant"
 	"github.com/gravadigital/telescopio-api/internal/logger"
+	"github.com/gravadigital/telescopio-api/internal/middleware/auth"
 	"github.com/gravadigital/telescopio-api/internal/storage"
 	"github.com/gravadigital/telescopio-api/internal/storage/postgres"
 )
+
+// maxAttachmentDescriptionLength bounds the optional description a participant
+// can attach to their submission, to keep it a caption rather than a document.
+const maxAttachmentDescriptionLength = 1000
 
 type AttachmentHandler struct {
 	attachmentRepo postgres.AttachmentRepository
@@ -183,6 +189,16 @@ func (h *AttachmentHandler) UploadAttachment(c *gin.Context) {
 	}
 	defer file.Close()
 
+	description := strings.TrimSpace(c.Request.FormValue("description"))
+	if len(description) > maxAttachmentDescriptionLength {
+		h.log.Warn("attachment description too long", "length", len(description))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("Description cannot exceed %d characters", maxAttachmentDescriptionLength),
+			"code":  "DESCRIPTION_TOO_LONG",
+		})
+		return
+	}
+
 	h.log.Debug("file received", "filename", header.Filename, "size", header.Size, "content_type", header.Header.Get("Content-Type"))
 
 	// Validate file size using configuration
@@ -260,6 +276,7 @@ func (h *AttachmentHandler) UploadAttachment(c *gin.Context) {
 		storageKey, // Use storage key instead of file path
 		contentType,
 		header.Size,
+		description,
 	)
 
 	if err := h.attachmentRepo.Create(newAttachment); err != nil {
@@ -288,6 +305,7 @@ func (h *AttachmentHandler) UploadAttachment(c *gin.Context) {
 			"filename":    newAttachment.OriginalName,
 			"size":        newAttachment.FileSize,
 			"mime_type":   newAttachment.MimeType,
+			"description": newAttachment.Description,
 			"participant": participant.Name,
 			"uploaded_at": newAttachment.UploadedAt,
 		},
@@ -318,6 +336,7 @@ func (h *AttachmentHandler) GetAttachment(c *gin.Context) {
 			"filename":       attachment.OriginalName,
 			"size":           attachment.FileSize,
 			"mime_type":      attachment.MimeType,
+			"description":    attachment.Description,
 			"vote_count":     attachment.VoteCount,
 			"uploaded_at":    attachment.UploadedAt,
 			"event_id":       attachment.EventID.String(),
@@ -353,6 +372,7 @@ func (h *AttachmentHandler) GetEventAttachments(c *gin.Context) {
 			"original_name":  att.OriginalName,
 			"file_size":      att.FileSize,
 			"mime_type":      att.MimeType,
+			"description":    att.Description,
 			"uploaded_at":    att.UploadedAt,
 			"url":            downloadURL,
 		}
@@ -376,6 +396,15 @@ func (h *AttachmentHandler) DownloadAttachment(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "Attachment not found",
 			"code":  "ATTACHMENT_NOT_FOUND",
+		})
+		return
+	}
+
+	if !h.canDownload(c, attachment) {
+		h.log.Warn("unauthorized attachment download attempt", "attachment_id", attachmentID)
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "You are not authorized to download this attachment",
+			"code":  "FORBIDDEN",
 		})
 		return
 	}
@@ -424,12 +453,17 @@ func (h *AttachmentHandler) DeleteAttachment(c *gin.Context) {
 		return
 	}
 
-	// TODO: Add authorization check - only allow deletion by attachment owner or admin
-	// participantID := c.GetString("user_id") // From JWT middleware
-	// if attachment.ParticipantID.String() != participantID {
-	//     c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to delete this attachment"})
-	//     return
-	// }
+	// Only the attachment's own owner may delete it - not the event organizer,
+	// who has no business removing another participant's submission.
+	userID, err := auth.GetUserIDFromContext(c)
+	if err != nil || attachment.ParticipantID != userID {
+		h.log.Warn("unauthorized attachment deletion attempt", "attachment_id", attachmentID)
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "You are not authorized to delete this attachment",
+			"code":  "FORBIDDEN",
+		})
+		return
+	}
 
 	// Check event stage - only allow deletion during participation stage.
 	// The parent event must exist for this validation (and the creator check
@@ -490,4 +524,28 @@ func (h *AttachmentHandler) DeleteAttachment(c *gin.Context) {
 		"message": "Attachment deleted successfully",
 		"code":    "DELETE_SUCCESS",
 	})
+}
+
+// canDownload reports whether the authenticated user (set by JWTAuthMiddleware)
+// may download the given attachment: its owner, the parent event's author, or an admin.
+func (h *AttachmentHandler) canDownload(c *gin.Context, att *attachment.Attachment) bool {
+	userID, err := auth.GetUserIDFromContext(c)
+	if err != nil {
+		return false
+	}
+
+	if role, err := auth.GetUserRoleFromContext(c); err == nil && role == participant.RoleAdmin {
+		return true
+	}
+
+	if att.ParticipantID == userID {
+		return true
+	}
+
+	eventEntity, err := h.eventRepo.GetByID(att.EventID.String())
+	if err != nil {
+		return false
+	}
+
+	return eventEntity.AuthorID == userID
 }

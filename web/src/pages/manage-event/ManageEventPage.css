@@ -331,6 +331,12 @@
   align-items: center;
 }
 
+.download-error {
+  color: var(--color-danger);
+  font-size: 0.9rem;
+  padding: var(--spacing-sm) 0;
+}
+
 /* Loading States */
 .loading-state,
 .error-state {

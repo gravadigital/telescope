@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { EventService, AttachmentService, DistributedVotingService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Event, User } from '../../types';
+import { Event, User, Attachment } from '../../types';
 import VotingResultsPanel from '../../components/voting-results-panel/VotingResultsPanel';
 import VotingConfigurationPanel from '../../components/voting-configuration-panel/VotingConfigurationPanel';
 import StageAdvanceModal from '../../components/stage-advance-modal/StageAdvanceModal';
 import EventTimeline from '../../components/event-timeline/EventTimeline';
 import '../../components/stage-advance-modal/StageAdvanceModal.css';
+import '../../components/link-button/styles.css';
 import './ManageEventPage.css';
 
 const ManageEventPage: React.FC = () => {
@@ -17,7 +18,8 @@ const ManageEventPage: React.FC = () => {
 
   const [event, setEvent] = useState<Event | null>(null);
   const [participants, setParticipants] = useState<User[]>([]);
-  const [attachments, setAttachments] = useState<any[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [downloadError, setDownloadError] = useState<string>('');
   const [votingStatus, setVotingStatus] = useState<{ [key: string]: boolean }>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
@@ -78,20 +80,10 @@ const ManageEventPage: React.FC = () => {
       
       // Load attachments
       try {
-        console.log('🔄 Loading attachments for event:', eventId);
         const attachmentsData = await AttachmentService.getEventAttachments(eventId);
-        console.log('📎 Raw attachments data:', attachmentsData);
-        console.log('📊 Attachment count:', attachmentsData.length);
-        console.log('📋 Attachment details:', attachmentsData.map(a => ({
-          id: a.id,
-          participant_id: a.participant_id,
-          author_id: a.author_id,
-          filename: a.filename
-        })));
         setAttachments(attachmentsData);
-      } catch (err: any) {
-        console.error('❌ Failed to load attachments:', err);
-        console.error('Error details:', err.message);
+      } catch (err) {
+        console.error('Failed to load attachments:', err);
         setAttachments([]);
       }
 
@@ -270,6 +262,16 @@ const ManageEventPage: React.FC = () => {
       setError('Error updating event. Please try again.');
     } finally {
       setUpdatingStage(false);
+    }
+  };
+
+  const handleDownloadAttachment = async (attachment: Attachment): Promise<void> => {
+    setDownloadError('');
+    try {
+      await AttachmentService.downloadAttachment(attachment.id, attachment.original_name);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setDownloadError(`Failed to download "${attachment.original_name}": ${errorMessage}.`);
     }
   };
 
@@ -548,12 +550,15 @@ const getStageName = (stage: Event['stage']): string => {
                   <div className="header-cell">Voting Status</div>
                 </div>
 
+                {downloadError && (
+                  <div className="download-error" role="alert">{downloadError}</div>
+                )}
                 <div className="table-body">
                   {participants
                     .filter(p => p.id !== event.creator_id)
                     .map((participant) => {
-                    const hasSubmittedFile = attachments.some(
-                      att => att.participant_id === participant.id || att.author_id === participant.id
+                    const participantAttachment = attachments.find(
+                      att => att.participant_id === participant.id
                     );
                     const hasVoted = votingStatus[participant.id] === true;
 
@@ -562,10 +567,20 @@ const getStageName = (stage: Event['stage']): string => {
                         <div className="table-cell">{participant.name}</div>
                         <div className="table-cell">{participant.email}</div>
                         <div className="table-cell">
-                          {hasSubmittedFile
-                            ? <span className="badge badge-success">✓ Submitted</span>
-                            : <span className="badge badge-warning">⏳ Pending</span>
-                          }
+                          {participantAttachment ? (
+                            <button
+                              type="button"
+                              className="link-button-component-button"
+                              onClick={() => handleDownloadAttachment(participantAttachment)}
+                              title={participantAttachment.description
+                                ? `Download ${participantAttachment.original_name} — ${participantAttachment.description}`
+                                : `Download ${participantAttachment.original_name}`}
+                            >
+                              ✓ {participantAttachment.original_name}
+                            </button>
+                          ) : (
+                            <span className="badge badge-warning">⏳ Pending</span>
+                          )}
                         </div>
                         <div className="table-cell">
                           {event.stage === 'voting' || event.stage === 'results' ? (

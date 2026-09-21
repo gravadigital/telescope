@@ -20,6 +20,10 @@ export const API_CONFIG: ApiConfig = {
       `/api/v1/events/${eventId}/participant/${participantId}/attachment`,
     EVENT_ATTACHMENTS: (eventId: string) =>
       `/api/v1/events/${eventId}/attachments`,
+    DOWNLOAD_ATTACHMENT: (attachmentId: string) =>
+      `/api/v1/attachments/${attachmentId}/download`,
+    DELETE_ATTACHMENT: (attachmentId: string) =>
+      `/api/v1/attachments/${attachmentId}`,
 
     // Sistema de Votación Distribuida (MBC)
     VOTING_CONFIG: (eventId: string) =>
@@ -160,6 +164,32 @@ export const uploadFile = async (endpoint: string, formData: FormData): Promise<
     console.error('File upload failed:', { endpoint, error });
     throw error;
   }
+};
+
+// Descarga un archivo protegido por JWT y dispara el guardado en el navegador.
+// No puede ser un <a href> directo: el backend exige Authorization: Bearer.
+export const downloadFile = async (endpoint: string, filename: string): Promise<void> => {
+  const url = `${API_CONFIG.BASE_URL}${endpoint}`;
+  const token = localStorage.getItem('telescopio_token');
+
+  const response = await fetch(url, {
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const blobUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(blobUrl);
 };
 
 // Helper para verificar conectividad con la API
