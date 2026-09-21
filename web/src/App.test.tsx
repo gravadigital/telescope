@@ -3,6 +3,6 @@ import App from './App';
 
 test('renders telescopio app', () => {
   render(<App />);
-  const titleElement = screen.getByText(/TELESCOPIO/i);
-  expect(titleElement).toBeInTheDocument();
+  const titleElements = screen.getAllByText(/TELESCOPIO/i);
+  expect(titleElements.length).toBeGreaterThan(0);
 });

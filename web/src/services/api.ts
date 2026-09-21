@@ -1,4 +1,4 @@
-import { apiRequest, checkApiHealth, API_CONFIG } from "../config/api";
+import { apiRequest, checkApiHealth, downloadFile, API_CONFIG } from "../config/api";
 import {
   Event,
   User,
@@ -6,7 +6,8 @@ import {
   Assignment,
   RankingVote,
   VotingResults,
-  VotingStatistics
+  VotingStatistics,
+  Attachment
 } from "../types";
 
 interface CreateEventRequest {
@@ -77,37 +78,8 @@ export const EventService = {
       
       return events;
     } catch (error) {
-      console.warn("⚠️ Failed to fetch events from API, using fallback:", error);
-      
-      // Fallback con los IDs reales del backend para que funcione en modo offline
-      return [
-        {
-          id: "68a94135-77f9-42a8-9b43-fea50d6ca524",
-          title: "Asignación de Tiempo de Telescopio Q2 2025",
-          description: "Evaluación de propuestas para tiempo de telescopio destinado al estudio de galaxias con corrimiento al rojo z > 2.",
-          date: "2025-09-23",
-          organizer: "Sistema Telescopio",
-          status: "active" as const,
-          stage: "voting" as const,
-          participant_ids: [],
-          voteCount: { yes: 5, maybe: 2, no: 0 },
-          attachmentCount: 3,
-          max_participants: 20
-        },
-        {
-          id: "660e8400-e29b-41d4-a716-446655440000",
-          title: "Distributed Telescope Time Allocation 2026",
-          description: "Annual telescope time allocation using distributed voting system based on Merrifield & Saari (2009) mathematical framework for fair and efficient proposal evaluation.",
-          date: "2026-01-15",
-          organizer: "Sistema Telescopio",
-          status: "active" as const,
-          stage: "results" as const,
-          participant_ids: [],
-          voteCount: { yes: 8, maybe: 1, no: 0 },
-          attachmentCount: 5,
-          max_participants: 20
-        }
-      ];
+      console.error("Failed to fetch events from API:", error);
+      throw error;
     }
   },
 
@@ -178,9 +150,9 @@ export const EventService = {
   async getEventById(id: string): Promise<Event | null> {
     try {
       const response = await apiRequest<{ data: any }>(`${API_CONFIG.ENDPOINTS.EVENTS}/${id}`);
-      
+
       if (!response || !response.data) {
-        throw new Error("No response from API");
+        return null;
       }
 
       const event = response.data;
@@ -208,23 +180,8 @@ export const EventService = {
         is_cancelled: event.is_cancelled || false
       };
     } catch (error) {
-      console.warn("⚠️ Failed to fetch event by ID from API, checking fallback data:", error);
-      
-      // Try to find event in the fallback/demo data
-      try {
-        const allEvents = await this.getAllEvents();
-        const event = allEvents.find(e => e.id === id);
-        
-        if (event) {
-          console.log("📦 Found event in fallback data:", event.title);
-          return event;
-        }
-      } catch (fallbackError) {
-        console.error("Fallback also failed:", fallbackError);
-      }
-      
-      console.error("❌ Event not found:", id);
-      return null;
+      console.error("Failed to fetch event by ID from API:", error);
+      throw error;
     }
   },
 
@@ -531,18 +488,21 @@ export const UserService = {
       return response.data.map(event => event.id);
     } catch (error) {
       console.error("Failed to fetch user events:", error);
-      return [];
+      throw error;
     }
   }
 };
 
 export const AttachmentService = {
-  async uploadAttachment(eventId: string, participantId: string, file: File): Promise<any> {
+  async uploadAttachment(eventId: string, participantId: string, file: File, description?: string): Promise<Attachment> {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      if (description) {
+        formData.append("description", description);
+      }
 
-      const response = await apiRequest<any>(
+      const response = await apiRequest<{ data: Attachment }>(
         API_CONFIG.ENDPOINTS.UPLOAD_ATTACHMENT(eventId, participantId),
         {
           method: "POST",
@@ -550,7 +510,6 @@ export const AttachmentService = {
         }
       );
 
-      console.log('✅ Attachment uploaded:', response.data);
       return response.data;
     } catch (error) {
       console.error("Failed to upload attachment:", error);
@@ -558,20 +517,25 @@ export const AttachmentService = {
     }
   },
 
-  async getEventAttachments(eventId: string): Promise<any[]> {
+  async getEventAttachments(eventId: string): Promise<Attachment[]> {
     try {
-      console.log('🔍 Fetching attachments for event:', eventId);
       const endpoint = API_CONFIG.ENDPOINTS.EVENT_ATTACHMENTS(eventId);
-      console.log('📡 Endpoint:', endpoint);
-      
-      const response = await apiRequest<{ data: any[] }>(endpoint);
-      console.log('✅ Raw attachment response:', response);
-      
+      const response = await apiRequest<{ data: Attachment[] }>(endpoint);
       return response.data || [];
     } catch (error) {
-      console.error("❌ Failed to fetch event attachments:", error);
+      console.error("Failed to fetch event attachments:", error);
       throw error;
     }
+  },
+
+  async downloadAttachment(attachmentId: string, filename: string): Promise<void> {
+    await downloadFile(API_CONFIG.ENDPOINTS.DOWNLOAD_ATTACHMENT(attachmentId), filename);
+  },
+
+  async deleteAttachment(attachmentId: string): Promise<void> {
+    await apiRequest(API_CONFIG.ENDPOINTS.DELETE_ATTACHMENT(attachmentId), {
+      method: "DELETE",
+    });
   }
 };
 

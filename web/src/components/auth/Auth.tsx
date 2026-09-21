@@ -7,7 +7,7 @@ import LinkButton from "../link-button/LinkButton";
 import GoogleLoginButton from "./GoogleLoginButton";
 import UsernameModal from "./UsernameModal";
 import { useAuth } from "../../context/AuthContext";
-import { GoogleAuthService } from "../../services/api";
+import { ApiHealthService, GoogleAuthService } from "../../services/api";
 
 type OAuthState =
   | { phase: 'idle' }
@@ -29,8 +29,8 @@ const Auth: React.FC<AuthProps> = ({ initialMode = "login", onClose }) => {
   const { login } = useAuth();
 
   useEffect(() => {
-    const checkApi = () => {
-      const isHealthy = true;
+    const checkApi = async () => {
+      const isHealthy = await ApiHealthService.checkHealth();
       setApiAvailable(isHealthy);
     };
     checkApi();
