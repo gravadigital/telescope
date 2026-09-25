@@ -150,7 +150,9 @@ cliente después de una llamada a la API — lo que produce un parpadeo de carga
 
 **HTTP REST sincrónico, JWT Bearer.** Es la única integración de datos del frontend.
 
-- Base URL desde `REACT_APP_API_URL` (default `http://localhost:8080`).
+- Base URL configurable al arrancar el contenedor (`API_URL`, escrita en `config.js`), o
+  `REACT_APP_API_URL` fuera de Docker. Default `http://localhost:8080`. La imagen publicada no
+  lleva ninguna URL adentro.
 - El JWT se lee de `localStorage` en cada request y viaja en `Authorization: Bearer`.
 - **Manejo global de expiración**: ante un `401`, el cliente HTTP limpia la sesión y emite un
   `CustomEvent` `auth:logout` que `AuthContext` escucha para desloguear **sin recargar la

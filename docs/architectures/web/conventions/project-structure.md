@@ -88,15 +88,24 @@ sube, hay que verificar el navegador mínimo soportado.
 
 ## Variables de entorno
 
-CRA solo expone las que empiezan con `REACT_APP_`:
+**La configuración se resuelve al arrancar el contenedor, no al compilar.** CRA reemplaza cada
+`process.env.REACT_APP_*` por su valor literal en el build, lo que ataría la imagen publicada a
+una instalación. Por eso:
 
-| Variable | Default | Uso |
-|---|---|---|
-| `REACT_APP_API_URL` | `http://localhost:8080` | Base de la API |
-| `REACT_APP_GOOGLE_CLIENT_ID` | `''` | Google OAuth |
+1. Al iniciar, el contenedor escribe `/config.js` con `window.__CONFIG__` a partir de `API_URL`
+   y `GOOGLE_CLIENT_ID` (`web/docker/40-runtime-config.sh`).
+2. `public/index.html` lo carga antes que la app.
+3. `src/config/runtime.ts` expone `RUNTIME_CONFIG`: toma `window.__CONFIG__` y, si está vacío,
+   cae a las `REACT_APP_*` (que es lo que pasa con `npm start` / `make web`).
 
-Se leen en `src/config/api.ts` y en `src/App.tsx:197`. Se inyectan en build time: cambiar
-una exige recompilar.
+| En el contenedor | Fuera de Docker | Default | Uso |
+|---|---|---|---|
+| `API_URL` | `REACT_APP_API_URL` | `http://localhost:8080` | Base de la API |
+| `GOOGLE_CLIENT_ID` | `REACT_APP_GOOGLE_CLIENT_ID` | `''` | Google OAuth |
+
+**Leé la configuración siempre de `RUNTIME_CONFIG`** (o de `API_CONFIG.BASE_URL` para la URL
+de la api), nunca de `process.env` ni con una URL escrita a mano: cualquiera de las dos cosas
+vuelve a atar la imagen a una instalación.
 
 ## Logging
 

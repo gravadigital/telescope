@@ -39,8 +39,8 @@ make reset    # remove everything, data included
 make logs     # follow the logs; one service with: make logs s=api
 ```
 
-`make up` always rebuilds. The web bakes its configuration in at build time, so an old image
-would keep pointing at the previous settings without any warning.
+`make up` always rebuilds, so code changes are picked up. Configuration changes do not need a
+rebuild: the containers read it when they start.
 
 ## Each part by hand
 

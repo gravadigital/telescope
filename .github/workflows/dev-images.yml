@@ -63,19 +63,9 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # La web congela REACT_APP_* en el build, no al arrancar: la URL de la api tiene
-      # que entrar acá. La api no necesita ningún build-arg más que la versión.
-      - name: Build args de la web
-        id: webargs
-        if: matrix.service == 'web'
-        run: |
-          {
-            echo 'args<<EOF'
-            echo 'REACT_APP_API_URL=https://api.telescope.dev.grava.io'
-            echo "REACT_APP_GOOGLE_CLIENT_ID=${{ secrets.REACT_APP_GOOGLE_CLIENT_ID }}"
-            echo EOF
-          } >> "$GITHUB_OUTPUT"
-
+      # Ninguna de las dos imágenes lleva configuración de una instalación: la api la lee
+      # del entorno y la web la escribe en config.js al arrancar. El único build-arg es
+      # la versión, así lo publicado sirve igual para dev, producción o cualquiera que la baje.
       # Dos tags: `dev`, que se mueve, y `dev-<sha>`, que no. El inmutable es lo que
       # hace diagnosticable una imagen dev mala — sin él, "la imagen dev de ayer" es
       # irrecuperable una vez que el tag se movió.
@@ -90,7 +80,6 @@ jobs:
           push: true
           build-args: |
             VERSION=dev-${{ github.sha }}
-            ${{ steps.webargs.outputs.args }}
           tags: |
             ${{ env.REGISTRY_NAMESPACE }}/telescope-${{ matrix.service }}:dev
             ${{ env.REGISTRY_NAMESPACE }}/telescope-${{ matrix.service }}:dev-${{ github.sha }}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DistributedVotingService, AttachmentService, VoteDraftService, DraftRanking } from '../../services/api';
 import { Assignment, Attachment } from '../../types';
+import { API_CONFIG } from '../../config/api';
 import './RankingVotePanel.css';
 
 interface RankingVotePanelProps {
@@ -239,7 +240,7 @@ const RankingVotePanel: React.FC<RankingVotePanelProps> = ({
               </small>
               {att.url && (
                 <a 
-                  href={`http://localhost:8080${att.url}`}
+                  href={`${API_CONFIG.BASE_URL}${att.url}`}
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="download-link"

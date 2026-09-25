@@ -10,6 +10,7 @@ import CreateEventPage from './pages/create-event/CreateEventPage';
 import ManageEventPage from './pages/manage-event/ManageEventPage';
 import ResetPasswordPage from './pages/reset-password/ResetPasswordPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { RUNTIME_CONFIG } from './config/runtime';
 
 // Importar utilidades de testing en desarrollo
 if (process.env.NODE_ENV === 'development') {
@@ -194,7 +195,7 @@ function AppContent(): JSX.Element {
 
 function App(): JSX.Element {
   return (
-    <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID || ''}>
+    <GoogleOAuthProvider clientId={RUNTIME_CONFIG.GOOGLE_CLIENT_ID}>
       <AuthProvider>
         <BrowserRouter>
           <AppContent />

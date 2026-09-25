@@ -132,18 +132,19 @@ services:
       minio-init:
         condition: service_completed_successfully
 
-  # REACT_APP_* van como build-args, no como environment: CRA las congela al construir.
-  # Por eso se levanta siempre con --build: una imagen vieja seguiría apuntando a la
-  # configuración anterior sin ningún aviso.
+  # La configuración entra al arrancar, no al construir: el contenedor la escribe en
+  # config.js (web/docker/40-runtime-config.sh). Cambiarla sólo pide recrear el
+  # contenedor, no reconstruir la imagen.
   web:
     build:
       context: ../web
       dockerfile: docker/Dockerfile
-      args:
-        REACT_APP_API_URL: http://localhost:${API_PORT:-8080}
-        REACT_APP_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     container_name: telescope-local-web
     restart: unless-stopped
+    environment:
+      # Como la ve el navegador, no el contenedor: nunca http://api:8080.
+      API_URL: http://localhost:${API_PORT:-8080}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     ports:
       - "${WEB_PORT:-3000}:80"
     depends_on:

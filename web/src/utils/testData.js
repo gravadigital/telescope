@@ -66,7 +66,7 @@ import { createTestEvents, updateEventToParticipation } from './src/utils/testDa
 await createTestEvents();
 
 // Obtener la lista de eventos para ver sus IDs
-const events = await fetch('http://localhost:8080/api/events').then(r => r.json());
+const events = await fetch('${API_CONFIG.BASE_URL}/api/v1/events').then(r => r.json());
 console.log('Eventos:', events);
 
 // Actualizar un evento a fase de participación (usar el ID del evento)
@@ -80,8 +80,8 @@ await updateEventToParticipation('EVENT_ID_AQUI');
    - Votar
    
 4. COMANDOS ÚTILES:
-   - Ver todos los eventos: fetch('http://localhost:8080/api/events').then(r => r.json())
-   - Ver participantes: fetch('http://localhost:8080/api/events/EVENT_ID/participants').then(r => r.json())
+   - Ver todos los eventos: fetch('${API_CONFIG.BASE_URL}/api/v1/events').then(r => r.json())
+   - Ver participantes: fetch('${API_CONFIG.BASE_URL}/api/v1/events/EVENT_ID/participants').then(r => r.json())
   `);
 };
 

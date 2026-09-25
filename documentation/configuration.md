@@ -46,8 +46,9 @@ over.
 
 ## On a server
 
-The published images carry the api's configuration as environment variables, read at
-startup. The web is different: its settings are baked in when the image is built.
+Both published images read their configuration from environment variables when the
+container starts. Neither carries the settings of any installation, so the same image runs
+anywhere: changing a value means recreating the container, not rebuilding the image.
 
 ### api
 
@@ -86,19 +87,27 @@ used. Check `/health` after deploying — it reports whether the database is rea
 
 ### web
 
-Built into the image, not read at startup. Changing either means building a new image.
+> **Upgrading from an image built before this change:** those images had the api URL baked in
+> and needed no variables. Current images need `API_URL` set on the web container, or the web
+> points at `http://localhost:8080`. Add it before pulling the new image.
 
-| Build argument | What goes in it |
+| Variable | What goes in it |
 |---|---|
-| `REACT_APP_API_URL` | The public URL of the api, **as the browser sees it** — never an internal container name |
-| `REACT_APP_GOOGLE_CLIENT_ID` | Same value as the api's `GOOGLE_CLIENT_ID`, or empty |
-
-The images published by CI are built with these fixed per environment: the `dev` tag points at
-`https://api.telescope.dev.grava.io`, and release tags at `https://api.telescope.grava.io`.
-To point at another api, build the image yourself:
+| `API_URL` | The public URL of the api, **as the browser sees it** — never an internal container name like `http://api:8080`. Empty falls back to `http://localhost:8080` |
+| `GOOGLE_CLIENT_ID` | Same value as the api's `GOOGLE_CLIENT_ID`, or empty to hide the Google button |
 
 ```sh
-docker build web -f web/docker/Dockerfile \
-  --build-arg REACT_APP_API_URL=https://api.example.com \
-  -t telescope-web
+docker run -p 80:80 \
+  -e API_URL=https://api.example.com \
+  -e GOOGLE_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com \
+  gravadigital/telescope-web:1.2.3
 ```
+
+How it works: the web is a static bundle, and Create React App would bake any
+`REACT_APP_*` into it at build time. Instead, when the container starts, a script writes
+these two variables into `/config.js`, which `index.html` loads before the app. The file is
+served with `Cache-Control: no-store`, so a new value is picked up on the next page load.
+The container logs what it wrote: `runtime config: API_URL=...`.
+
+`REACT_APP_API_URL` and `REACT_APP_GOOGLE_CLIENT_ID` still work, but only outside Docker:
+`make web` uses them, because there is no container to write `config.js`.

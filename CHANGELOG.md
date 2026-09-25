@@ -83,6 +83,17 @@ Para correr un servidor contra él, su compose (en el repo de deploy) tiene que 
   restos de cuando eran repositorios separados. La licencia pasa a la raíz.
 - **CI**: los tests de web vuelven a correr.
 
+- **La imagen de la web ya no lleva configuración adentro.** La URL de la api y el Client
+  ID de Google se leen al arrancar el contenedor (`API_URL`, `GOOGLE_CLIENT_ID`) y se
+  escriben en `config.js`. La misma imagen publicada sirve para cualquier instalación, y el
+  CI deja de pasar build-args. Se eliminan las URLs `localhost:8080` escritas a mano.
+
+  > ⚠️ **Requiere un cambio en cada servidor antes de actualizar la imagen de la web.** El
+  > servicio web tiene que recibir `API_URL` (la URL pública de la api) y, si se usa login
+  > con Google, `GOOGLE_CLIENT_ID`. Sin `API_URL`, la web apunta a `http://localhost:8080`
+  > y deja de funcionar. En dev: `API_URL=https://api.telescope.dev.grava.io`. El secret
+  > `REACT_APP_GOOGLE_CLIENT_ID` de GitHub deja de usarse.
+
 ### Corregido
 
 - **`make up` fallaba en `go mod download`** en máquinas con una copia vieja de
