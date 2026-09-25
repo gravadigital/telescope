@@ -31,7 +31,7 @@ COPY . .
 # Build the binary
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
     -ldflags "-extldflags '-static' -X main.version=${VERSION}" \
-    -o main cmd/api/main.go
+    -o main ./cmd/api
 
 # Final stage
 FROM scratch

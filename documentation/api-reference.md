@@ -34,7 +34,7 @@ Authorization: Bearer <token>
 
 | Method | Path | Access | What it does |
 |---|---|---|---|
-| `GET` | `/health` | public | Service status and database reachability. `503` if the database is down |
+| `GET` | `/health` | public | Service status, database reachability and the running version (`0.2.0`, `dev-<sha>`, or `dev` for a local build). `503` if the database is down |
 
 ## Users and authentication
 

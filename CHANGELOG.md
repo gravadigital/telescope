@@ -96,6 +96,11 @@ Para correr un servidor contra él, su compose (en el repo de deploy) tiene que 
 
 ### Corregido
 
+- **`/health` informaba siempre `"version": "1.0.0"`**, un valor escrito a mano. Ahora
+  devuelve la versión con la que se compiló el binario (`0.2.0`, `dev-<sha>`, o `dev` en
+  un build local), así se puede saber qué versión corre un servidor. El `Dockerfile` pasa
+  a compilar el paquete `./cmd/api` y no sólo `main.go`.
+
 - **`make up` fallaba en `go mod download`** en máquinas con una copia vieja de
   `golang:1.26-alpine` (Go 1.26.5 contra el 1.26.6 que pide `go.mod`). Las imágenes base
   quedan fijadas: `golang:1.26.6-alpine` y `node:22-alpine`, alineadas con `go.mod` y

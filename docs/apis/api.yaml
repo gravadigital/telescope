@@ -67,7 +67,10 @@ paths:
                 properties:
                   status: { type: string, example: ok }
                   service: { type: string, example: api }
-                  version: { type: string, example: '1.0.0' }
+                  version:
+                    type: string
+                    example: '0.2.0'
+                    description: 'La versión con la que se compiló el binario: `0.2.0` en un release, `dev-<sha>` en una imagen dev, `dev` en un build a mano'
                   database: { type: string, example: connected }
         '503':
           description: Base inaccesible
@@ -78,6 +81,7 @@ paths:
                 properties:
                   status: { type: string, example: error }
                   service: { type: string }
+                  version: { type: string }
                   error:
                     type: string
                     enum: [database connection failed, database ping failed]
