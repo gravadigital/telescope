@@ -96,6 +96,7 @@ Middlewares de permisos disponibles (`internal/middleware/auth/permissions.go`):
 | `RequireEventOwner(repo)` | El autor del evento, o un `admin` |
 | `RequireEventOwnerOrOrganizer(repo)` | Lo anterior, más cualquier `organizer` |
 | `RequireParticipantOrOwner(repo)` | El propio participante, el autor del evento, o un `admin` |
+| `RequireSelfOrEventCreator(repo)` | El propio usuario (`:user_id`), o el autor de un evento en el que participa. Sin bypass `admin` |
 
 > **Cuidado al agregar rutas.** Un endpoint declarado en `api.Group("/api/v1")` en vez de
 > en el grupo que tiene `.Use(auth.JWTAuthMiddleware())` queda **público**. Así estuvo

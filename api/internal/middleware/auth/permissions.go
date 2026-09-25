@@ -15,7 +15,7 @@ func RequireRole(roles ...participant.Role) gin.HandlerFunc {
 		userRole, err := GetUserRoleFromContext(c)
 		if err != nil {
 			c.JSON(401, gin.H{
-				"error": "UNAUTHORIZED",
+				"error":   "UNAUTHORIZED",
 				"message": "User role not found in context",
 			})
 			c.Abort()
@@ -33,7 +33,7 @@ func RequireRole(roles ...participant.Role) gin.HandlerFunc {
 
 		if !hasRole {
 			c.JSON(403, gin.H{
-				"error": "FORBIDDEN",
+				"error":   "FORBIDDEN",
 				"message": fmt.Sprintf("This action requires one of the following roles: %v", roles),
 			})
 			c.Abort()
@@ -52,7 +52,7 @@ func RequireEventOwner(eventRepo postgres.EventRepository) gin.HandlerFunc {
 		userID, err := GetUserIDFromContext(c)
 		if err != nil {
 			c.JSON(401, gin.H{
-				"error": "UNAUTHORIZED",
+				"error":   "UNAUTHORIZED",
 				"message": "User ID not found in context",
 			})
 			c.Abort()
@@ -62,7 +62,7 @@ func RequireEventOwner(eventRepo postgres.EventRepository) gin.HandlerFunc {
 		userRole, err := GetUserRoleFromContext(c)
 		if err != nil {
 			c.JSON(401, gin.H{
-				"error": "UNAUTHORIZED",
+				"error":   "UNAUTHORIZED",
 				"message": "User role not found in context",
 			})
 			c.Abort()
@@ -79,7 +79,7 @@ func RequireEventOwner(eventRepo postgres.EventRepository) gin.HandlerFunc {
 		eventIDStr := c.Param("event_id")
 		if eventIDStr == "" {
 			c.JSON(400, gin.H{
-				"error": "BAD_REQUEST",
+				"error":   "BAD_REQUEST",
 				"message": "Event ID is required",
 			})
 			c.Abort()
@@ -89,7 +89,7 @@ func RequireEventOwner(eventRepo postgres.EventRepository) gin.HandlerFunc {
 		eventID, err := uuid.Parse(eventIDStr)
 		if err != nil {
 			c.JSON(400, gin.H{
-				"error": "BAD_REQUEST",
+				"error":   "BAD_REQUEST",
 				"message": "Invalid event ID format",
 			})
 			c.Abort()
@@ -100,7 +100,7 @@ func RequireEventOwner(eventRepo postgres.EventRepository) gin.HandlerFunc {
 		event, err := eventRepo.GetByID(eventID.String())
 		if err != nil {
 			c.JSON(404, gin.H{
-				"error": "NOT_FOUND",
+				"error":   "NOT_FOUND",
 				"message": "Event not found",
 			})
 			c.Abort()
@@ -110,7 +110,7 @@ func RequireEventOwner(eventRepo postgres.EventRepository) gin.HandlerFunc {
 		// Check if user is the event author
 		if event.AuthorID != userID {
 			c.JSON(403, gin.H{
-				"error": "FORBIDDEN",
+				"error":   "FORBIDDEN",
 				"message": "Only the event creator or an admin can perform this action",
 			})
 			c.Abort()
@@ -129,7 +129,7 @@ func RequireEventOwnerOrOrganizer(eventRepo postgres.EventRepository) gin.Handle
 		userID, err := GetUserIDFromContext(c)
 		if err != nil {
 			c.JSON(401, gin.H{
-				"error": "UNAUTHORIZED",
+				"error":   "UNAUTHORIZED",
 				"message": "User ID not found in context",
 			})
 			c.Abort()
@@ -139,7 +139,7 @@ func RequireEventOwnerOrOrganizer(eventRepo postgres.EventRepository) gin.Handle
 		userRole, err := GetUserRoleFromContext(c)
 		if err != nil {
 			c.JSON(401, gin.H{
-				"error": "UNAUTHORIZED",
+				"error":   "UNAUTHORIZED",
 				"message": "User role not found in context",
 			})
 			c.Abort()
@@ -156,7 +156,7 @@ func RequireEventOwnerOrOrganizer(eventRepo postgres.EventRepository) gin.Handle
 		eventIDStr := c.Param("event_id")
 		if eventIDStr == "" {
 			c.JSON(400, gin.H{
-				"error": "BAD_REQUEST",
+				"error":   "BAD_REQUEST",
 				"message": "Event ID is required",
 			})
 			c.Abort()
@@ -166,7 +166,7 @@ func RequireEventOwnerOrOrganizer(eventRepo postgres.EventRepository) gin.Handle
 		eventID, err := uuid.Parse(eventIDStr)
 		if err != nil {
 			c.JSON(400, gin.H{
-				"error": "BAD_REQUEST",
+				"error":   "BAD_REQUEST",
 				"message": "Invalid event ID format",
 			})
 			c.Abort()
@@ -177,7 +177,7 @@ func RequireEventOwnerOrOrganizer(eventRepo postgres.EventRepository) gin.Handle
 		event, err := eventRepo.GetByID(eventID.String())
 		if err != nil {
 			c.JSON(404, gin.H{
-				"error": "NOT_FOUND",
+				"error":   "NOT_FOUND",
 				"message": "Event not found",
 			})
 			c.Abort()
@@ -187,7 +187,7 @@ func RequireEventOwnerOrOrganizer(eventRepo postgres.EventRepository) gin.Handle
 		// Check if user is the event author
 		if event.AuthorID != userID {
 			c.JSON(403, gin.H{
-				"error": "FORBIDDEN",
+				"error":   "FORBIDDEN",
 				"message": "Only the event creator, organizers, or admins can perform this action",
 			})
 			c.Abort()
@@ -206,7 +206,7 @@ func RequireParticipantOrOwner(eventRepo postgres.EventRepository) gin.HandlerFu
 		userID, err := GetUserIDFromContext(c)
 		if err != nil {
 			c.JSON(401, gin.H{
-				"error": "UNAUTHORIZED",
+				"error":   "UNAUTHORIZED",
 				"message": "User ID not found in context",
 			})
 			c.Abort()
@@ -216,7 +216,7 @@ func RequireParticipantOrOwner(eventRepo postgres.EventRepository) gin.HandlerFu
 		userRole, err := GetUserRoleFromContext(c)
 		if err != nil {
 			c.JSON(401, gin.H{
-				"error": "UNAUTHORIZED",
+				"error":   "UNAUTHORIZED",
 				"message": "User role not found in context",
 			})
 			c.Abort()
@@ -233,7 +233,7 @@ func RequireParticipantOrOwner(eventRepo postgres.EventRepository) gin.HandlerFu
 		participantIDStr := c.Param("participant_id")
 		if participantIDStr == "" {
 			c.JSON(400, gin.H{
-				"error": "BAD_REQUEST",
+				"error":   "BAD_REQUEST",
 				"message": "Participant ID is required",
 			})
 			c.Abort()
@@ -243,7 +243,7 @@ func RequireParticipantOrOwner(eventRepo postgres.EventRepository) gin.HandlerFu
 		participantID, err := uuid.Parse(participantIDStr)
 		if err != nil {
 			c.JSON(400, gin.H{
-				"error": "BAD_REQUEST",
+				"error":   "BAD_REQUEST",
 				"message": "Invalid participant ID format",
 			})
 			c.Abort()
@@ -260,7 +260,7 @@ func RequireParticipantOrOwner(eventRepo postgres.EventRepository) gin.HandlerFu
 		eventIDStr := c.Param("event_id")
 		if eventIDStr == "" {
 			c.JSON(403, gin.H{
-				"error": "FORBIDDEN",
+				"error":   "FORBIDDEN",
 				"message": "You can only access your own resources",
 			})
 			c.Abort()
@@ -270,7 +270,7 @@ func RequireParticipantOrOwner(eventRepo postgres.EventRepository) gin.HandlerFu
 		eventID, err := uuid.Parse(eventIDStr)
 		if err != nil {
 			c.JSON(400, gin.H{
-				"error": "BAD_REQUEST",
+				"error":   "BAD_REQUEST",
 				"message": "Invalid event ID format",
 			})
 			c.Abort()
@@ -281,7 +281,7 @@ func RequireParticipantOrOwner(eventRepo postgres.EventRepository) gin.HandlerFu
 		event, err := eventRepo.GetByID(eventID.String())
 		if err != nil {
 			c.JSON(404, gin.H{
-				"error": "NOT_FOUND",
+				"error":   "NOT_FOUND",
 				"message": "Event not found",
 			})
 			c.Abort()
@@ -291,8 +291,62 @@ func RequireParticipantOrOwner(eventRepo postgres.EventRepository) gin.HandlerFu
 		// Check if user is the event author
 		if event.AuthorID != userID {
 			c.JSON(403, gin.H{
-				"error": "FORBIDDEN",
+				"error":   "FORBIDDEN",
 				"message": "You can only access your own resources or resources from events you created",
+			})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// RequireSelfOrEventCreator is a middleware that allows a request only when the
+// authenticated user is the target user (:user_id) or the author of an event in
+// which the target user participates. It has no admin bypass.
+func RequireSelfOrEventCreator(eventRepo postgres.EventRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Get user info from context
+		userID, err := GetUserIDFromContext(c)
+		if err != nil {
+			c.JSON(401, gin.H{
+				"error":   "UNAUTHORIZED",
+				"message": "User ID not found in context",
+			})
+			c.Abort()
+			return
+		}
+
+		targetID, err := uuid.Parse(c.Param("user_id"))
+		if err != nil {
+			c.JSON(400, gin.H{
+				"error":   "BAD_REQUEST",
+				"message": "Invalid user ID format",
+			})
+			c.Abort()
+			return
+		}
+
+		if userID == targetID {
+			c.Next()
+			return
+		}
+
+		isCreator, err := eventRepo.IsCreatorOfEventWithParticipant(userID.String(), targetID.String())
+		if err != nil {
+			c.JSON(500, gin.H{
+				"error":   "INTERNAL_ERROR",
+				"message": "Failed to verify permissions",
+			})
+			c.Abort()
+			return
+		}
+
+		if !isCreator {
+			c.JSON(403, gin.H{
+				"error":   "FORBIDDEN",
+				"message": "You can only access your own data or data of participants in events you created",
 			})
 			c.Abort()
 			return

@@ -70,6 +70,7 @@ events.PATCH("/:event_id/stage",
 | `RequireEventOwner(repo)` | Autor del evento, o `admin` |
 | `RequireEventOwnerOrOrganizer(repo)` | Lo anterior, más cualquier `organizer` |
 | `RequireParticipantOrOwner(repo)` | El propio participante, el autor del evento, o `admin` |
+| `RequireSelfOrEventCreator(repo)` | El propio usuario (`:user_id`), o el autor de un evento en el que participa. **Sin bypass `admin`** (S-003) |
 
 Estos middlewares responden con la **forma B** de error (`{"error": "CODE", "message": "..."}`),
 distinta de la de los handlers. Ver la convención `error-handling`.
@@ -106,7 +107,7 @@ tests lo prueban contra un servidor falso. El flujo tiene dos pasos: `verify` in
    `JWTAuthMiddleware()` el endpoint queda público. Así estuvo expuesto
    `/attachments/:attachment_id/download` hasta que se lo movió a un grupo propio.
 2. **Autenticado no es autorizado.** Si el recurso pertenece a alguien, sumá el middleware
-   de permiso. Hoy `GET /users/:user_id` no verifica ownership y cualquier autenticado lee
-   cualquier usuario.
+   de permiso. `GET /users/:user_id` verifica ownership con `RequireSelfOrEventCreator` (S-003):
+   solo el propio usuario o el autor de un evento en el que participa.
 3. **La verificación de permisos va en el middleware, no en el handler**, salvo que dependa
    del body.

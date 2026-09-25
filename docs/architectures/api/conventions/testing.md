@@ -21,15 +21,18 @@ internal/
 ├── domain/vote/
 │   ├── mocks_test.go              # fakes de VoteRepository, AttachmentRepository, UserRepository
 │   └── voting_service_test.go     # el algoritmo de votación
-└── handlers/
-    ├── mocks_repository_test.go   # fakes de todos los repositorios
-    ├── mocks_storage_test.go      # fake de FileStorage
-    ├── event_handler_test.go
-    ├── distributed_vote_handler_test.go
-    ├── attachment_handler_test.go
-    ├── user_handler_test.go
-    ├── google_auth_handler_test.go
-    └── vote_draft_handler_test.go
+├── handlers/
+│   ├── mocks_repository_test.go   # fakes de todos los repositorios
+│   ├── mocks_storage_test.go      # fake de FileStorage
+│   ├── event_handler_test.go
+│   ├── distributed_vote_handler_test.go
+│   ├── attachment_handler_test.go
+│   ├── user_handler_test.go
+│   ├── google_auth_handler_test.go
+│   └── vote_draft_handler_test.go
+└── middleware/auth/
+    ├── mocks_repository_test.go   # fake de EventRepository (embebe la interfaz)
+    └── permissions_test.go        # RequireSelfOrEventCreator
 
 cmd/api/integration_test.go        # conexión y migraciones, detrás de build tag
 ```
@@ -134,5 +137,7 @@ error de plpgsql poco descriptivo.
 
 ## Qué falta
 
-- Los middlewares de `internal/middleware/auth` (JWT y permisos) no tienen tests.
+- De los middlewares de `internal/middleware/auth`, solo `RequireSelfOrEventCreator` tiene
+  tests (S-003). `JWTAuthMiddleware` y el resto de los middlewares de `permissions.go` siguen
+  sin tests.
 - Los repositorios de `internal/storage/postgres` tampoco.

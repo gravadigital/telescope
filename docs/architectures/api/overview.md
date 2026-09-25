@@ -97,26 +97,20 @@ no conocen cuál está activo. Ver la convención custom `file-storage`.
 
 Relevada del código, para que no se confunda con decisión de diseño:
 
-1. **Los evaluadores no pueden descargar las propuestas que tienen asignadas.** La descarga
-   exige autenticación y `canDownload` (`attachment_handler.go`) solo la permite al dueño,
-   al autor del evento o a un `admin`: el participante al que se le asignó la propuesta no
-   está incluido. Además, el panel de ranking del frontend la abre con un `<a href>` sin
-   token. **Bloquea el flujo central** — ver D-15 en `docs/prd/requirements.md`.
+1. **El panel de ranking del frontend abre la descarga con un `<a href>` sin token.**
+   `canDownload` (`attachment_handler.go`) ya permite al evaluador descargar las propuestas de
+   su Asignación durante `voting` (S-003, corrige D-15 del lado `api`); falta el lado `web`,
+   pendiente de S-004.
 2. **`GET /events/:event_id/distributed-results` muta estado**: recalcula el MBC y hace
    upsert en `voting_results`. Un GET no idempotente.
 3. **Cuatro formatos de error distintos** conviviendo — ver la convención custom
    `error-handling`, que documenta cuál es el objetivo y cuál es el estado actual.
 4. **Umbrales de calidad duplicados**: `voting-statistics` tiene `0.7`/`0.3` hardcodeados,
    distintos de los configurables por evento.
-5. **`GET /users/:user_id` no verifica ownership**: cualquier usuario autenticado lee
-   cualquier otro usuario.
-6. **Paginación en memoria con N+1**: `GET /events` trae todo y pagina después, haciendo
+5. **Paginación en memoria con N+1**: `GET /events` trae todo y pagina después, haciendo
    una consulta de participantes por evento.
-7. **Handlers implementados sin rutas**: `UpdateEvent`/`DeleteEvent` (devuelven 501),
+6. **Handlers implementados sin rutas**: `UpdateEvent`/`DeleteEvent` (devuelven 501),
    `GetVotingConfiguration`, `UpdateVotingConfiguration`, `DeleteVotingConfiguration`,
    `PreviewVotingConfiguration`, `GetAttachment`, `RemoveParticipant`.
-8. **Código sin `gofmt`**: hay bloques con indentación rota que hacen difícil leer el
-   control de flujo (por ejemplo `event_handler.go:196-207`, cuya lógica es correcta pero
-   parece rota). `_base` exige `gofumpt`.
-9. **JWT secret con default hardcodeado**: si falta `JWT_SECRET` arranca igual con
+7. **JWT secret con default hardcodeado**: si falta `JWT_SECRET` arranca igual con
    `"telescopio-dev-secret-change-in-production"` y solo imprime un warning.

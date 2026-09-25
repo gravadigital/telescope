@@ -73,7 +73,7 @@ func main() {
 	log.Info("Email service initialized", "enabled", cfg.Email.Enabled)
 
 	eventHandler := handlers.NewEventHandler(eventRepo, userRepo, attachmentRepo, emailService, cfg)
-	attachmentHandler := handlers.NewAttachmentHandler(attachmentRepo, eventRepo, userRepo, fileStorage, cfg)
+	attachmentHandler := handlers.NewAttachmentHandler(attachmentRepo, eventRepo, voteRepo, userRepo, fileStorage, cfg)
 	userHandler := handlers.NewUserHandler(userRepo, eventRepo, emailService, cfg)
 	googleAuthHandler := handlers.NewGoogleAuthHandler(userRepo, cfg)
 
@@ -118,10 +118,10 @@ func main() {
 		// User management - Public endpoints (no auth required)
 		users := api.Group("/users")
 		{
-			users.POST("", userHandler.CreateUser)                         // Register new user (returns JWT)
-			users.POST("/authenticate", userHandler.AuthenticateUser)      // Login (returns JWT)
-			users.POST("/forgot-password", userHandler.ForgotPassword)     // Request password reset email
-			users.POST("/reset-password", userHandler.ResetPassword)       // Set new password with token
+			users.POST("", userHandler.CreateUser)                     // Register new user (returns JWT)
+			users.POST("/authenticate", userHandler.AuthenticateUser)  // Login (returns JWT)
+			users.POST("/forgot-password", userHandler.ForgotPassword) // Request password reset email
+			users.POST("/reset-password", userHandler.ResetPassword)   // Set new password with token
 		}
 
 		// Google OAuth - Public endpoints (no auth required)
@@ -131,13 +131,13 @@ func main() {
 			googleAuth.POST("/register", googleAuthHandler.RegisterGoogleUser)
 		}
 
-	// Protected user endpoints (require authentication)
-	usersProtected := api.Group("/users")
-	usersProtected.Use(auth.JWTAuthMiddleware())
-	{
-		usersProtected.GET("/:user_id", userHandler.GetUser)
-		usersProtected.GET("/:user_id/events", userHandler.GetUserEvents) // Get events where user participates
-	}
+		// Protected user endpoints (require authentication)
+		usersProtected := api.Group("/users")
+		usersProtected.Use(auth.JWTAuthMiddleware())
+		{
+			usersProtected.GET("/:user_id", auth.RequireSelfOrEventCreator(eventRepo), userHandler.GetUser)
+			usersProtected.GET("/:user_id/events", userHandler.GetUserEvents) // Get events where user participates
+		}
 
 		// Event management - Public endpoints (no authentication required)
 		eventsPublic := api.Group("/events")

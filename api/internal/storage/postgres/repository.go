@@ -64,6 +64,7 @@ type EventRepository interface {
 	GetParticipantRole(eventID, userID string) (*event.EventParticipantRole, error)
 	IsEventCreator(eventID, userID string) (bool, error)
 	IsEventParticipant(eventID, userID string) (bool, error)
+	IsCreatorOfEventWithParticipant(creatorID, userID string) (bool, error)
 	CancelEvent(eventID string) error
 	PauseEvent(eventID string, paused bool) error
 }

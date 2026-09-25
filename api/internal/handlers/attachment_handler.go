@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -29,16 +30,18 @@ const maxAttachmentDescriptionLength = 1000
 type AttachmentHandler struct {
 	attachmentRepo postgres.AttachmentRepository
 	eventRepo      postgres.EventRepository
+	voteRepo       postgres.VoteRepository
 	userRepo       postgres.UserRepository
 	fileStorage    storage.FileStorage
 	config         *config.Config
 	log            *log.Logger
 }
 
-func NewAttachmentHandler(attachmentRepo postgres.AttachmentRepository, eventRepo postgres.EventRepository, userRepo postgres.UserRepository, fileStorage storage.FileStorage, cfg *config.Config) *AttachmentHandler {
+func NewAttachmentHandler(attachmentRepo postgres.AttachmentRepository, eventRepo postgres.EventRepository, voteRepo postgres.VoteRepository, userRepo postgres.UserRepository, fileStorage storage.FileStorage, cfg *config.Config) *AttachmentHandler {
 	return &AttachmentHandler{
 		attachmentRepo: attachmentRepo,
 		eventRepo:      eventRepo,
+		voteRepo:       voteRepo,
 		userRepo:       userRepo,
 		fileStorage:    fileStorage,
 		config:         cfg,
@@ -527,7 +530,9 @@ func (h *AttachmentHandler) DeleteAttachment(c *gin.Context) {
 }
 
 // canDownload reports whether the authenticated user (set by JWTAuthMiddleware)
-// may download the given attachment: its owner, the parent event's author, or an admin.
+// may download the given attachment: its owner, the parent event's author, an
+// admin, or an evaluator with the attachment in their Assignment while the
+// event is in voting and not cancelled.
 func (h *AttachmentHandler) canDownload(c *gin.Context, att *attachment.Attachment) bool {
 	userID, err := auth.GetUserIDFromContext(c)
 	if err != nil {
@@ -547,5 +552,19 @@ func (h *AttachmentHandler) canDownload(c *gin.Context, att *attachment.Attachme
 		return false
 	}
 
-	return eventEntity.AuthorID == userID
+	if eventEntity.AuthorID == userID {
+		return true
+	}
+
+	if eventEntity.Stage != event.StageVoting || eventEntity.IsCancelled {
+		return false
+	}
+
+	assignment, err := h.voteRepo.GetAssignmentByParticipant(att.EventID.String(), userID.String())
+	if err != nil {
+		h.log.Debug("no assignment for download", "attachment_id", att.ID, "user_id", userID, "error", err)
+		return false
+	}
+
+	return slices.Contains(assignment.AttachmentIDs, att.ID.String())
 }

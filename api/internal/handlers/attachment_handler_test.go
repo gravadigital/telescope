@@ -16,6 +16,9 @@ import (
 	"github.com/gravadigital/telescopio-api/internal/domain/attachment"
 	"github.com/gravadigital/telescopio-api/internal/domain/event"
 	"github.com/gravadigital/telescopio-api/internal/domain/participant"
+	"github.com/gravadigital/telescopio-api/internal/domain/vote"
+	"github.com/gravadigital/telescopio-api/internal/middleware/auth"
+	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,6 +27,7 @@ import (
 type testAttachmentHandlerSet struct {
 	attachmentRepo *mockAttachmentRepository
 	eventRepo      *mockEventRepository
+	voteRepo       *mockVoteRepository
 	userRepo       *mockUserRepository
 	fileStorage    *mockFileStorage
 	handler        *AttachmentHandler
@@ -33,12 +37,13 @@ func newTestAttachmentHandlerSet() *testAttachmentHandlerSet {
 	s := &testAttachmentHandlerSet{
 		attachmentRepo: newMockAttachmentRepository(),
 		eventRepo:      newMockEventRepository(),
+		voteRepo:       newMockVoteRepository(),
 		userRepo:       newMockUserRepository(),
 		fileStorage:    newMockFileStorage(),
 	}
 	cfg := &config.Config{}
 	cfg.Upload.MaxFileSize = 10 * 1024 * 1024
-	s.handler = NewAttachmentHandler(s.attachmentRepo, s.eventRepo, s.userRepo, s.fileStorage, cfg)
+	s.handler = NewAttachmentHandler(s.attachmentRepo, s.eventRepo, s.voteRepo, s.userRepo, s.fileStorage, cfg)
 	return s
 }
 
@@ -405,6 +410,254 @@ func TestDownloadAttachment_RejectsMissingFileInStorage(t *testing.T) {
 
 	assert.Equal(t, http.StatusNotFound, w.Code)
 	assert.Equal(t, "FILE_NOT_FOUND", jsonBody(t, w)["code"])
+}
+
+// ---------------------------------------------------------------------------
+// DownloadAttachment - evaluator access to their Assignment (S-003)
+// ---------------------------------------------------------------------------
+
+// evaluatorDownloadFixture builds the common scenario for TS-1 to TS-9: an
+// event E authored by Ana, in voting, attC owned by Carla and attD owned by
+// Diego, plus Bruno's Assignment covering attC (and one other attachment).
+type evaluatorDownloadFixture struct {
+	s          *testAttachmentHandlerSet
+	e          *event.Event
+	ana        uuid.UUID
+	bruno      uuid.UUID
+	carla      uuid.UUID
+	diego      uuid.UUID
+	attC       *attachment.Attachment
+	attD       *attachment.Attachment
+	assignment *vote.Assignment
+}
+
+func newEvaluatorDownloadFixture() *evaluatorDownloadFixture {
+	s := newTestAttachmentHandlerSet()
+
+	ana := uuid.New()
+	e := event.NewEvent("Becas 2026", "desc", ana, time.Now(), time.Now().AddDate(0, 0, 5), "org")
+	e.Stage = event.StageVoting
+	s.eventRepo.addEvent(e)
+
+	bruno := uuid.New()
+	carla := uuid.New()
+	diego := uuid.New()
+
+	attC := attachment.NewAttachment(e.ID, carla, "carla.pdf", "carla.pdf", "key-carla", "application/pdf", 5, "")
+	s.attachmentRepo.addAttachment(attC)
+	s.fileStorage.files["key-carla"] = []byte("hello")
+
+	attD := attachment.NewAttachment(e.ID, diego, "diego.pdf", "diego.pdf", "key-diego", "application/pdf", 5, "")
+	s.attachmentRepo.addAttachment(attD)
+	s.fileStorage.files["key-diego"] = []byte("diego")
+
+	assignment := &vote.Assignment{
+		ID:            uuid.New(),
+		EventID:       e.ID,
+		ParticipantID: bruno,
+		AttachmentIDs: pq.StringArray{attC.ID.String(), uuid.New().String()},
+		IsCompleted:   false,
+	}
+	s.voteRepo.assignments[assignment.ID.String()] = assignment
+
+	return &evaluatorDownloadFixture{
+		s: s, e: e, ana: ana, bruno: bruno, carla: carla, diego: diego,
+		attC: attC, attD: attD, assignment: assignment,
+	}
+}
+
+func TestDownloadAttachment_EvaluatorAssignmentRules(t *testing.T) {
+	tests := []struct {
+		name       string
+		setup      func(f *evaluatorDownloadFixture)
+		attachment func(f *evaluatorDownloadFixture) *attachment.Attachment
+		userID     func(f *evaluatorDownloadFixture) uuid.UUID
+		wantStatus int
+		wantBody   string
+		wantCode   string
+	}{
+		{
+			// TS-1: evaluator downloads an attachment in their Assignment during voting.
+			name:       "AllowsAssignedEvaluator",
+			attachment: func(f *evaluatorDownloadFixture) *attachment.Attachment { return f.attC },
+			userID:     func(f *evaluatorDownloadFixture) uuid.UUID { return f.bruno },
+			wantStatus: http.StatusOK,
+			wantBody:   "hello",
+		},
+		{
+			// TS-2: a paused event does not block the evaluator's download.
+			name: "PauseDoesNotBlock",
+			setup: func(f *evaluatorDownloadFixture) {
+				f.e.IsPaused = true
+			},
+			attachment: func(f *evaluatorDownloadFixture) *attachment.Attachment { return f.attC },
+			userID:     func(f *evaluatorDownloadFixture) uuid.UUID { return f.bruno },
+			wantStatus: http.StatusOK,
+			wantBody:   "hello",
+		},
+		{
+			// TS-3: submitting the ranking does not close the download.
+			name: "CompletedRankingDoesNotClose",
+			setup: func(f *evaluatorDownloadFixture) {
+				f.assignment.IsCompleted = true
+			},
+			attachment: func(f *evaluatorDownloadFixture) *attachment.Attachment { return f.attC },
+			userID:     func(f *evaluatorDownloadFixture) uuid.UUID { return f.bruno },
+			wantStatus: http.StatusOK,
+			wantBody:   "hello",
+		},
+		{
+			// TS-4: attachment outside the evaluator's Assignment.
+			name:       "RejectsAttachmentOutsideAssignment",
+			attachment: func(f *evaluatorDownloadFixture) *attachment.Attachment { return f.attD },
+			userID:     func(f *evaluatorDownloadFixture) uuid.UUID { return f.bruno },
+			wantStatus: http.StatusForbidden,
+			wantCode:   "FORBIDDEN",
+		},
+		{
+			// TS-5: the results stage closes the evaluator's download.
+			name: "ResultsStageCloses",
+			setup: func(f *evaluatorDownloadFixture) {
+				f.e.Stage = event.StageResult
+			},
+			attachment: func(f *evaluatorDownloadFixture) *attachment.Attachment { return f.attC },
+			userID:     func(f *evaluatorDownloadFixture) uuid.UUID { return f.bruno },
+			wantStatus: http.StatusForbidden,
+			wantCode:   "FORBIDDEN",
+		},
+		{
+			// TS-6: cancelling the event closes the evaluator's download.
+			name: "CancellationCloses",
+			setup: func(f *evaluatorDownloadFixture) {
+				f.e.IsCancelled = true
+			},
+			attachment: func(f *evaluatorDownloadFixture) *attachment.Attachment { return f.attC },
+			userID:     func(f *evaluatorDownloadFixture) uuid.UUID { return f.bruno },
+			wantStatus: http.StatusForbidden,
+			wantCode:   "FORBIDDEN",
+		},
+		{
+			// TS-7: a stage prior to voting also closes the download, even with the Assignment loaded.
+			name: "PreVotingStageCloses",
+			setup: func(f *evaluatorDownloadFixture) {
+				f.e.Stage = event.StageParticipation
+			},
+			attachment: func(f *evaluatorDownloadFixture) *attachment.Attachment { return f.attC },
+			userID:     func(f *evaluatorDownloadFixture) uuid.UUID { return f.bruno },
+			wantStatus: http.StatusForbidden,
+			wantCode:   "FORBIDDEN",
+		},
+		{
+			// TS-8: no Assignment at all in the event.
+			name:       "RejectsUserWithoutAssignment",
+			attachment: func(f *evaluatorDownloadFixture) *attachment.Attachment { return f.attC },
+			userID:     func(f *evaluatorDownloadFixture) uuid.UUID { return f.diego },
+			wantStatus: http.StatusForbidden,
+			wantCode:   "FORBIDDEN",
+		},
+		{
+			// TS-9: the assignment repository fails closed.
+			name: "FailsClosedOnAssignmentRepoError",
+			setup: func(f *evaluatorDownloadFixture) {
+				f.s.voteRepo.getAssignmentByPartErr = errors.New("db down")
+			},
+			attachment: func(f *evaluatorDownloadFixture) *attachment.Attachment { return f.attC },
+			userID:     func(f *evaluatorDownloadFixture) uuid.UUID { return f.bruno },
+			wantStatus: http.StatusForbidden,
+			wantCode:   "FORBIDDEN",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newEvaluatorDownloadFixture()
+			if tt.setup != nil {
+				tt.setup(f)
+			}
+			att := tt.attachment(f)
+			userID := tt.userID(f)
+
+			w, c := newDownloadTestContext(gin.Params{{Key: "attachment_id", Value: att.ID.String()}}, userID, participant.RoleParticipant)
+			f.s.handler.DownloadAttachment(c)
+
+			require.Equal(t, tt.wantStatus, w.Code, w.Body.String())
+			if tt.wantBody != "" {
+				assert.Equal(t, tt.wantBody, w.Body.String())
+			}
+			if tt.wantCode != "" {
+				assert.Equal(t, tt.wantCode, jsonBody(t, w)["code"])
+			}
+		})
+	}
+}
+
+func TestDownloadAttachment_OwnerCanDownloadInResultsWithoutAssignmentLookup(t *testing.T) {
+	// TS-10: the owner in `results` must succeed without ever consulting the Assignment.
+	f := newEvaluatorDownloadFixture()
+	f.e.Stage = event.StageResult
+	f.s.voteRepo.getAssignmentByPartErr = errors.New("must not be called")
+
+	w, c := newDownloadTestContext(gin.Params{{Key: "attachment_id", Value: f.attC.ID.String()}}, f.carla, participant.RoleParticipant)
+	f.s.handler.DownloadAttachment(c)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Equal(t, "hello", w.Body.String())
+}
+
+func TestDownloadAttachment_AuthorCanDownloadInCancelledResults(t *testing.T) {
+	// TS-11: the author in a cancelled event in `results` must still succeed.
+	f := newEvaluatorDownloadFixture()
+	f.e.Stage = event.StageResult
+	f.e.IsCancelled = true
+
+	w, c := newDownloadTestContext(gin.Params{{Key: "attachment_id", Value: f.attC.ID.String()}}, f.ana, participant.RoleOrganizer)
+	f.s.handler.DownloadAttachment(c)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Equal(t, "hello", w.Body.String())
+}
+
+func TestDownloadAttachment_EvaluatorMissingFileInStorage(t *testing.T) {
+	// TS-12: the evaluator's assigned attachment is missing from storage.
+	f := newEvaluatorDownloadFixture()
+	missing := attachment.NewAttachment(f.e.ID, f.carla, "missing.pdf", "missing.pdf", "missing-key", "application/pdf", 5, "")
+	f.s.attachmentRepo.addAttachment(missing)
+	f.assignment.AttachmentIDs = pq.StringArray{missing.ID.String()}
+
+	w, c := newDownloadTestContext(gin.Params{{Key: "attachment_id", Value: missing.ID.String()}}, f.bruno, participant.RoleParticipant)
+	f.s.handler.DownloadAttachment(c)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Equal(t, "FILE_NOT_FOUND", jsonBody(t, w)["code"])
+}
+
+func TestDownloadAttachment_NonexistentAttachment(t *testing.T) {
+	// TS-13: attachment_id does not exist at all.
+	f := newEvaluatorDownloadFixture()
+
+	w, c := newDownloadTestContext(gin.Params{{Key: "attachment_id", Value: "99999999-0000-0000-0000-000000000009"}}, f.bruno, participant.RoleParticipant)
+	f.s.handler.DownloadAttachment(c)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Equal(t, "ATTACHMENT_NOT_FOUND", jsonBody(t, w)["code"])
+}
+
+func TestDownloadAttachment_NoToken(t *testing.T) {
+	// TS-14: no Authorization header, real middleware chain.
+	f := newEvaluatorDownloadFixture()
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/api/v1/attachments/:attachment_id/download", auth.JWTAuthMiddleware(), f.s.handler.DownloadAttachment)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/attachments/"+f.attC.ID.String()+"/download", nil)
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+	body := jsonBody(t, w)
+	assert.Equal(t, "UNAUTHORIZED", body["error"])
+	assert.Equal(t, "Missing Authorization header", body["message"])
 }
 
 func newDownloadTestContext(params gin.Params, userID uuid.UUID, role participant.Role) (*httptest.ResponseRecorder, *gin.Context) {

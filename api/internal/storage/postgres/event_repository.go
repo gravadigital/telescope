@@ -129,7 +129,6 @@ func (r *PostgresEventRepository) GetUserParticipatingEvents(userID string) ([]*
 		Where("events.author_id != ?", userUUID).
 		Order("events.created_at DESC").
 		Find(&events).Error
-
 	if err != nil {
 		r.log.Error("failed to get user participating events", "user_id", userID, "error", err)
 		return nil, err
@@ -553,6 +552,38 @@ func (r *PostgresEventRepository) IsEventParticipant(eventID, userID string) (bo
 		return false, err
 	}
 	return true, nil
+}
+
+// IsCreatorOfEventWithParticipant reports whether creatorID authored at least one
+// event in which userID has an event_participants row, in any stage.
+func (r *PostgresEventRepository) IsCreatorOfEventWithParticipant(creatorID, userID string) (bool, error) {
+	r.log.Debug("checking creator of event with participant", "creator_id", creatorID, "user_id", userID)
+
+	creatorUUID, err := uuid.Parse(creatorID)
+	if err != nil {
+		r.log.Error("invalid creator ID format", "creator_id", creatorID, "error", err)
+		return false, fmt.Errorf("invalid creator ID format: %w", err)
+	}
+
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		r.log.Error("invalid user ID format", "user_id", userID, "error", err)
+		return false, fmt.Errorf("invalid user ID format: %w", err)
+	}
+
+	var exists bool
+	query := `SELECT EXISTS (
+		SELECT 1 FROM events e
+		JOIN event_participants ep ON ep.event_id = e.id
+		WHERE e.author_id = ? AND ep.user_id = ?
+	)`
+
+	if err := r.db.Raw(query, creatorUUID, userUUID).Scan(&exists).Error; err != nil {
+		r.log.Error("failed to check creator of event with participant", "creator_id", creatorID, "user_id", userID, "error", err)
+		return false, fmt.Errorf("failed to check creator of event with participant: %w", err)
+	}
+
+	return exists, nil
 }
 
 // PauseEvent toggles the is_paused field of an event.

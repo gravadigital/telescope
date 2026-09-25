@@ -31,20 +31,23 @@ var (
 // ---------------------------------------------------------------------------
 
 type mockEventRepository struct {
-	events            map[string]*event.Event
-	byParticipant     map[string][]*event.Event
-	getByIDErr        error
-	updateStageErr    error
-	addParticipantErr error
-	removeErr         error
-	cancelErr         error
-	pauseErr          error
+	events                    map[string]*event.Event
+	byParticipant             map[string][]*event.Event
+	getByIDErr                error
+	updateStageErr            error
+	addParticipantErr         error
+	removeErr                 error
+	cancelErr                 error
+	pauseErr                  error
+	creatorOfParticipant      map[string]map[string]bool
+	isCreatorOfParticipantErr error
 }
 
 func newMockEventRepository() *mockEventRepository {
 	return &mockEventRepository{
-		events:        make(map[string]*event.Event),
-		byParticipant: make(map[string][]*event.Event),
+		events:               make(map[string]*event.Event),
+		byParticipant:        make(map[string][]*event.Event),
+		creatorOfParticipant: make(map[string]map[string]bool),
 	}
 }
 
@@ -160,6 +163,13 @@ func (m *mockEventRepository) IsEventParticipant(eventID, userID string) (bool, 
 		}
 	}
 	return false, nil
+}
+
+func (m *mockEventRepository) IsCreatorOfEventWithParticipant(creatorID, userID string) (bool, error) {
+	if m.isCreatorOfParticipantErr != nil {
+		return false, m.isCreatorOfParticipantErr
+	}
+	return m.creatorOfParticipant[creatorID][userID], nil
 }
 
 func (m *mockEventRepository) CancelEvent(eventID string) error {
