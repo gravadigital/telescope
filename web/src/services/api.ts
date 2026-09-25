@@ -330,18 +330,8 @@ export const EventService = {
         API_CONFIG.ENDPOINTS.EVENT_PARTICIPANTS(eventId)
       );
 
-      console.log('📊 Participants API Response:', {
-        fullResponse: response,
-        hasData: !!response.data,
-        hasParticipants: !!response.data?.participants,
-        participantsCount: response.data?.participants?.length || 0,
-        count: response.count
-      });
-
       // El backend devuelve { count, data: { event, participants } }
       const participants = response.data?.participants || [];
-
-      console.log('✅ Parsed participants:', participants);
 
       return participants.map(participant => ({
         id: participant.id,
@@ -353,7 +343,7 @@ export const EventService = {
       }));
     } catch (error) {
       console.error("❌ Failed to fetch event participants:", error);
-      return [];
+      throw error;
     }
   },
 

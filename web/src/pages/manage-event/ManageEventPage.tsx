@@ -11,6 +11,37 @@ import '../../components/stage-advance-modal/StageAdvanceModal.css';
 import '../../components/link-button/styles.css';
 import './ManageEventPage.css';
 
+// Banner de error por recurso con reintento puntual (Registered Participants,
+// Files Submitted, Voting Statistics). No se comparte fuera de esta página.
+const LoadErrorAlert: React.FC<{ message: string; onRetry: () => Promise<void> }> = ({
+  message,
+  onRetry,
+}) => {
+  const [retrying, setRetrying] = useState<boolean>(false);
+
+  const handleRetry = async (): Promise<void> => {
+    setRetrying(true);
+    try {
+      await onRetry();
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  return (
+    <div className="alert alert-danger" role="alert">
+      <p>{message}</p>
+      <button
+        onClick={handleRetry}
+        disabled={retrying}
+        className="btn btn-secondary btn-sm"
+      >
+        {retrying ? 'Retrying...' : 'Retry'}
+      </button>
+    </div>
+  );
+};
+
 const ManageEventPage: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
@@ -23,6 +54,9 @@ const ManageEventPage: React.FC = () => {
   const [votingStatus, setVotingStatus] = useState<{ [key: string]: boolean }>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
+  const [participantsError, setParticipantsError] = useState<string>('');
+  const [attachmentsError, setAttachmentsError] = useState<string>('');
+  const [votingStatsError, setVotingStatsError] = useState<string>('');
   const [updatingStage, setUpdatingStage] = useState<boolean>(false);
   const [votingConfigured, setVotingConfigured] = useState<boolean>(false);
   
@@ -42,6 +76,58 @@ const ManageEventPage: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId, isAuthenticated, navigate]);
+
+  const loadParticipants = async (id: string): Promise<void> => {
+    setParticipantsError('');
+    try {
+      const participantsData = await EventService.getEventParticipants(id);
+      setParticipants(participantsData);
+    } catch (err) {
+      console.error('Could not load participants:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setParticipantsError(`Could not load participants: ${errorMessage}.`);
+    }
+  };
+
+  const loadAttachments = async (id: string): Promise<void> => {
+    setAttachmentsError('');
+    try {
+      const attachmentsData = await AttachmentService.getEventAttachments(id);
+      setAttachments(attachmentsData);
+    } catch (err) {
+      console.error('Could not load submitted files:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setAttachmentsError(`Could not load submitted files: ${errorMessage}.`);
+    }
+  };
+
+  const loadVotingStats = async (id: string, stage: Event['stage']): Promise<void> => {
+    if (stage !== 'voting' && stage !== 'results') {
+      setVotingConfigured(false);
+      setVotingStatsError('');
+      return;
+    }
+
+    setVotingStatsError('');
+    try {
+      const statsData = await DistributedVotingService.getVotingStatistics(id);
+
+      if (statsData && statsData.participant_voting_status) {
+        setVotingStatus(statsData.participant_voting_status);
+
+        // Check if there are actual assignments (voting is configured)
+        // If participant_voting_status is not empty, voting is configured
+        const hasAssignments = Object.keys(statsData.participant_voting_status).length > 0;
+        setVotingConfigured(hasAssignments);
+      } else {
+        setVotingConfigured(false);
+      }
+    } catch (err) {
+      console.error('Could not load voting statistics:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setVotingStatsError(`Could not load voting statistics: ${errorMessage}.`);
+    }
+  };
 
   const loadEventData = async (): Promise<void> => {
     if (!eventId) return;
@@ -69,51 +155,9 @@ const ManageEventPage: React.FC = () => {
 
       setEvent(eventData);
 
-      // Load participants
-      try {
-        const participantsData = await EventService.getEventParticipants(eventId);
-        setParticipants(participantsData);
-      } catch (err) {
-        console.warn('Could not load participants:', err);
-        setParticipants([]);
-      }
-      
-      // Load attachments
-      try {
-        const attachmentsData = await AttachmentService.getEventAttachments(eventId);
-        setAttachments(attachmentsData);
-      } catch (err) {
-        console.error('Failed to load attachments:', err);
-        setAttachments([]);
-      }
-
-      // Load voting statistics if in voting or results stage
-      if (eventData.stage === 'voting' || eventData.stage === 'results') {
-        try {
-          const statsData = await DistributedVotingService.getVotingStatistics(eventId);
-          console.log('📊 Voting statistics:', statsData);
-
-          if (statsData && statsData.participant_voting_status) {
-            setVotingStatus(statsData.participant_voting_status);
-
-            // Check if there are actual assignments (voting is configured)
-            // If participant_voting_status is not empty, voting is configured
-            const hasAssignments = Object.keys(statsData.participant_voting_status).length > 0;
-            setVotingConfigured(hasAssignments);
-
-            console.log('✅ Voting configured status:', hasAssignments);
-          } else {
-            setVotingConfigured(false);
-          }
-        } catch (err) {
-          console.warn('Could not load voting statistics:', err);
-          // If we can't load stats, voting might not be configured yet
-          setVotingConfigured(false);
-        }
-      } else {
-        // Not in voting/results stage, reset voting status
-        setVotingConfigured(false);
-      }
+      await loadParticipants(eventId);
+      await loadAttachments(eventId);
+      await loadVotingStats(eventId, eventData.stage);
     } catch (err) {
       console.error('Error loading event:', err);
       setError('Error loading event data. Please try again.');
@@ -222,6 +266,14 @@ const ManageEventPage: React.FC = () => {
   };
 
   const validateStageAdvance = (currentStage: Event['stage'], targetStage: Event['stage']): string | null => {
+    // Data not verified: block the decision instead of deciding on stale/empty data.
+    if (participantsError) {
+      return 'Cannot advance: the participant list could not be verified. Retry before continuing.';
+    }
+    if (currentStage === 'voting' && targetStage === 'results' && votingStatsError) {
+      return 'Cannot advance: voting progress could not be verified. Retry before continuing.';
+    }
+
     // Can't advance from participation if no participants
     if (currentStage === 'participation' && participants.length === 0) {
       return 'Cannot advance: No participants registered yet.';
@@ -394,13 +446,17 @@ const getStageName = (stage: Event['stage']): string => {
 
             <div className="meta-item">
               <span className="meta-label">Participants:</span>
-              <span className="meta-value">{participants.length} / {event.max_participants || 20}</span>
+              <span className="meta-value">
+                {participantsError ? '—' : `${participants.length} / ${event.max_participants || 20}`}
+              </span>
             </div>
-            
+
             <div className="meta-item">
               <span className="meta-label">Files Submitted:</span>
               <span className="meta-value">
-                {new Set(attachments.map(a => a.participant_id)).size} / {participants.length}
+                {participantsError || attachmentsError
+                  ? '—'
+                  : `${new Set(attachments.map(a => a.participant_id)).size} / ${participants.length}`}
               </span>
             </div>
 
@@ -471,7 +527,11 @@ const getStageName = (stage: Event['stage']): string => {
             {nextStage && (
               <button
                 onClick={handleAdvanceStageClick}
-                disabled={updatingStage}
+                disabled={
+                  updatingStage ||
+                  !!participantsError ||
+                  (event.stage === 'voting' && !!votingStatsError)
+                }
                 className="btn btn-primary btn-lg"
               >
                 {updatingStage ? (
@@ -505,23 +565,35 @@ const getStageName = (stage: Event['stage']): string => {
           </div>
         </div>
 
+        {/* Voting Statistics Error (replaces configuration panel / underway message) */}
+        {event.stage === 'voting' && votingStatsError && (
+          <LoadErrorAlert
+            message={votingStatsError}
+            onRetry={() => loadVotingStats(event.id, event.stage)}
+          />
+        )}
+
         {/* Voting Configuration Section (only show in voting stage if not configured) */}
-        {event.stage === 'voting' && !votingConfigured && (
-          <div className="voting-configuration-section">
-            <VotingConfigurationPanel
-              eventId={event.id}
-              totalAttachments={attachments.length}
-              totalParticipants={participants.length}
-              onConfigured={() => {
-                setVotingConfigured(true);
-                loadEventData();
-              }}
-            />
-          </div>
+        {event.stage === 'voting' &&
+          !votingConfigured &&
+          !votingStatsError &&
+          !participantsError &&
+          !attachmentsError && (
+            <div className="voting-configuration-section">
+              <VotingConfigurationPanel
+                eventId={event.id}
+                totalAttachments={attachments.length}
+                totalParticipants={participants.length}
+                onConfigured={() => {
+                  setVotingConfigured(true);
+                  loadEventData();
+                }}
+              />
+            </div>
         )}
 
         {/* Voting Configured Message */}
-        {event.stage === 'voting' && votingConfigured && (
+        {event.stage === 'voting' && votingConfigured && !votingStatsError && (
           <div className="voting-configured-section">
             <div className="alert alert-success">
               <h3>✅ Voting is underway</h3>
@@ -531,71 +603,90 @@ const getStageName = (stage: Event['stage']): string => {
           </div>
         )}
 
+        {/* Load errors for participants/attachments: shown even in results stage,
+            since the participants section itself is hidden there (TS-24). */}
+        {participantsError && (
+          <LoadErrorAlert message={participantsError} onRetry={() => loadParticipants(event.id)} />
+        )}
+        {attachmentsError && (
+          <LoadErrorAlert message={attachmentsError} onRetry={() => loadAttachments(event.id)} />
+        )}
+
         {/* Participants Section (only show if not in results stage) */}
         {event.stage !== 'results' && (
           <div className="participants-section">
-            <h3>Registered Participants ({participants.filter(p => p.id !== event.creator_id).length})</h3>
+            <h3>
+              {participantsError
+                ? 'Registered Participants'
+                : `Registered Participants (${participants.filter(p => p.id !== event.creator_id).length})`}
+            </h3>
 
-            {participants.filter(p => p.id !== event.creator_id).length === 0 ? (
-              <div className="empty-state">
-                <p>No participants have registered yet.</p>
-                <p>Share the event link to invite participants!</p>
-              </div>
-            ) : (
-              <div className="participants-table">
-                <div className="table-header">
-                  <div className="header-cell">Name</div>
-                  <div className="header-cell">Email</div>
-                  <div className="header-cell">File Status</div>
-                  <div className="header-cell">Voting Status</div>
+            {!participantsError && (
+              participants.filter(p => p.id !== event.creator_id).length === 0 ? (
+                <div className="empty-state">
+                  <p>No participants have registered yet.</p>
+                  <p>Share the event link to invite participants!</p>
                 </div>
+              ) : (
+                <div className="participants-table">
+                  <div className="table-header">
+                    <div className="header-cell">Name</div>
+                    <div className="header-cell">Email</div>
+                    <div className="header-cell">File Status</div>
+                    <div className="header-cell">Voting Status</div>
+                  </div>
 
-                {downloadError && (
-                  <div className="download-error" role="alert">{downloadError}</div>
-                )}
-                <div className="table-body">
-                  {participants
-                    .filter(p => p.id !== event.creator_id)
-                    .map((participant) => {
-                    const participantAttachment = attachments.find(
-                      att => att.participant_id === participant.id
-                    );
-                    const hasVoted = votingStatus[participant.id] === true;
+                  {downloadError && (
+                    <div className="download-error" role="alert">{downloadError}</div>
+                  )}
+                  <div className="table-body">
+                    {participants
+                      .filter(p => p.id !== event.creator_id)
+                      .map((participant) => {
+                      const participantAttachment = attachments.find(
+                        att => att.participant_id === participant.id
+                      );
+                      const hasVoted = votingStatus[participant.id] === true;
 
-                    return (
-                      <div key={participant.id} className="table-row">
-                        <div className="table-cell">{participant.name}</div>
-                        <div className="table-cell">{participant.email}</div>
-                        <div className="table-cell">
-                          {participantAttachment ? (
-                            <button
-                              type="button"
-                              className="link-button-component-button"
-                              onClick={() => handleDownloadAttachment(participantAttachment)}
-                              title={participantAttachment.description
-                                ? `Download ${participantAttachment.original_name} — ${participantAttachment.description}`
-                                : `Download ${participantAttachment.original_name}`}
-                            >
-                              ✓ {participantAttachment.original_name}
-                            </button>
-                          ) : (
-                            <span className="badge badge-warning">⏳ Pending</span>
-                          )}
+                      return (
+                        <div key={participant.id} className="table-row">
+                          <div className="table-cell">{participant.name}</div>
+                          <div className="table-cell">{participant.email}</div>
+                          <div className="table-cell">
+                            {attachmentsError ? (
+                              <span className="meta-value">—</span>
+                            ) : participantAttachment ? (
+                              <button
+                                type="button"
+                                className="link-button-component-button"
+                                onClick={() => handleDownloadAttachment(participantAttachment)}
+                                title={participantAttachment.description
+                                  ? `Download ${participantAttachment.original_name} — ${participantAttachment.description}`
+                                  : `Download ${participantAttachment.original_name}`}
+                              >
+                                ✓ {participantAttachment.original_name}
+                              </button>
+                            ) : (
+                              <span className="badge badge-warning">⏳ Pending</span>
+                            )}
+                          </div>
+                          <div className="table-cell">
+                            {votingStatsError ? (
+                              <span className="meta-value">—</span>
+                            ) : event.stage === 'voting' || event.stage === 'results' ? (
+                              hasVoted
+                                ? <span className="badge badge-success">✓ Voted</span>
+                                : <span className="badge badge-warning">⏳ Not Voted</span>
+                            ) : (
+                              <span className="badge badge-secondary">N/A</span>
+                            )}
+                          </div>
                         </div>
-                        <div className="table-cell">
-                          {event.stage === 'voting' || event.stage === 'results' ? (
-                            hasVoted
-                              ? <span className="badge badge-success">✓ Voted</span>
-                              : <span className="badge badge-warning">⏳ Not Voted</span>
-                          ) : (
-                            <span className="badge badge-secondary">N/A</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )
             )}
           </div>
         )}
