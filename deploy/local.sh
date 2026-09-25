@@ -3,6 +3,7 @@
 # local.sh — levanta todo Telescope en esta máquina.
 #
 #   ./local.sh up      levanta todo
+#   ./local.sh stop    frena los contenedores y conserva los datos
 #   ./local.sh down    baja todo y borra los datos
 #   ./local.sh logs    sigue los logs (opcional: ./local.sh logs api)
 #
@@ -70,6 +71,11 @@ case "${1:-up}" in
     echo "  minio     http://localhost:${MINIO_CONSOLE_PORT:-9001}  (consola)"
     ;;
 
+  stop)
+    # Sin borrar volúmenes: la base y los archivos subidos quedan para el próximo `up`.
+    $COMPOSE stop
+    ;;
+
   down)
     $COMPOSE down -v
     ;;
@@ -79,7 +85,7 @@ case "${1:-up}" in
     ;;
 
   *)
-    echo "uso: ./local.sh [up|down|logs]" >&2
+    echo "uso: ./local.sh [up|stop|down|logs]" >&2
     exit 1
     ;;
 esac

@@ -45,13 +45,19 @@ construye la api y la web, y las deja andando:
 | api | http://localhost:8080 |
 | consola de MinIO | http://localhost:9001 |
 
-Los otros dos comandos:
+Los otros comandos:
 
 ```sh
 ./local.sh logs        # seguir los logs de todo
 ./local.sh logs api    # sólo los de un servicio
+./local.sh stop        # frenar todo, conservando la base y los archivos
 ./local.sh down        # bajar todo y borrar los datos
 ```
+
+**Para cortar el día usá `stop`, no `down`.** `down` borra los volúmenes: se pierden los
+usuarios, eventos y propuestas que hayas cargado, y la base vuelve a arrancar vacía. Después
+de un `stop`, `./local.sh up` levanta todo con los datos como estaban: las migraciones ya
+aplicadas no se repiten y el bucket existente se respeta.
 
 ### Detalles que conviene saber
 
