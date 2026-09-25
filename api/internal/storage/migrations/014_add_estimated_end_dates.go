@@ -48,4 +48,3 @@ func migration014Down(db *gorm.DB) error {
 		DROP COLUMN IF EXISTS voting_estimated_end_date
 	`).Error
 }
-

@@ -40,7 +40,6 @@ func (r *PostgresVoteDraftRepository) Upsert(draft *vote.VoteDraft) error {
 		Columns:   []clause.Column{{Name: "assignment_id"}, {Name: "participant_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"rankings", "updated_at"}),
 	}).Create(draft).Error
-
 	if err != nil {
 		r.log.Error("failed to upsert vote draft",
 			"assignment_id", draft.AssignmentID,
@@ -69,7 +68,6 @@ func (r *PostgresVoteDraftRepository) GetByAssignmentAndParticipant(assignmentID
 	err := r.db.
 		Where("assignment_id = ? AND participant_id = ?", assignmentID, participantID).
 		First(&draft).Error
-
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			r.log.Debug("vote draft not found",

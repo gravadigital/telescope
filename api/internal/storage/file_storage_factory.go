@@ -11,12 +11,12 @@ func NewFileStorage(cfg *config.Config) (FileStorage, error) {
 	switch cfg.Storage.Provider {
 	case "local":
 		return NewLocalStorage(cfg.Storage.LocalPath)
-	
+
 	case "minio":
 		if cfg.Storage.MinIOAccessKey == "" || cfg.Storage.MinIOSecretKey == "" {
 			return nil, fmt.Errorf("MinIO credentials not configured")
 		}
-		
+
 		return NewMinIOStorage(
 			cfg.Storage.MinIOEndpoint,
 			cfg.Storage.MinIOAccessKey,
@@ -25,7 +25,7 @@ func NewFileStorage(cfg *config.Config) (FileStorage, error) {
 			cfg.Storage.MinIORegion,
 			cfg.Storage.MinIOUseSSL,
 		)
-	
+
 	default:
 		return nil, fmt.Errorf("unsupported storage provider: %s (must be 'local' or 'minio')", cfg.Storage.Provider)
 	}

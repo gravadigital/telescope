@@ -50,13 +50,13 @@ func (d *DraftRankings) Scan(value interface{}) error {
 // VoteDraft stores a participant's partial voting selections before final submission.
 // There is at most one draft per (assignment_id, participant_id) pair.
 type VoteDraft struct {
-	ID            uuid.UUID    `json:"id"             gorm:"type:uuid;primaryKey;default:uuid_generate_v4()"`
-	EventID       uuid.UUID    `json:"event_id"       gorm:"type:uuid;not null"`
-	AssignmentID  uuid.UUID    `json:"assignment_id"  gorm:"type:uuid;not null"`
-	ParticipantID uuid.UUID    `json:"participant_id" gorm:"type:uuid;not null"`
+	ID            uuid.UUID     `json:"id"             gorm:"type:uuid;primaryKey;default:uuid_generate_v4()"`
+	EventID       uuid.UUID     `json:"event_id"       gorm:"type:uuid;not null"`
+	AssignmentID  uuid.UUID     `json:"assignment_id"  gorm:"type:uuid;not null"`
+	ParticipantID uuid.UUID     `json:"participant_id" gorm:"type:uuid;not null"`
 	Rankings      DraftRankings `json:"rankings"      gorm:"type:jsonb;not null;default:'[]'"`
-	CreatedAt     time.Time    `json:"created_at"     gorm:"autoCreateTime"`
-	UpdatedAt     time.Time    `json:"updated_at"     gorm:"autoUpdateTime"`
+	CreatedAt     time.Time     `json:"created_at"     gorm:"autoCreateTime"`
+	UpdatedAt     time.Time     `json:"updated_at"     gorm:"autoUpdateTime"`
 }
 
 func (VoteDraft) TableName() string {

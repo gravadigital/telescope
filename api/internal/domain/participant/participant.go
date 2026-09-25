@@ -32,17 +32,17 @@ func (r Role) IsValid() bool {
 
 // User represents a system user (admin or participant)
 type User struct {
-	ID           uuid.UUID `json:"id" gorm:"type:uuid;primaryKey;default:uuid_generate_v4()"`
-	Name         string    `json:"name" gorm:"not null"`
-	LastName     string    `json:"lastname" gorm:"column:lastname"`
-	Email        string    `json:"email" gorm:"uniqueIndex;not null"`
-	PasswordHash *string   `json:"-" gorm:"column:password_hash"`
-	GoogleID                *string    `json:"google_id,omitempty" gorm:"column:google_id;uniqueIndex"`
-	Role                    Role       `json:"role" gorm:"type:varchar(20);not null;default:'participant'"`
-	PasswordResetToken      *string    `json:"-" gorm:"column:password_reset_token;uniqueIndex"`
-	PasswordResetExpiresAt  *time.Time `json:"-" gorm:"column:password_reset_expires_at"`
-	CreatedAt    time.Time `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt    time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	ID                     uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey;default:uuid_generate_v4()"`
+	Name                   string     `json:"name" gorm:"not null"`
+	LastName               string     `json:"lastname" gorm:"column:lastname"`
+	Email                  string     `json:"email" gorm:"uniqueIndex;not null"`
+	PasswordHash           *string    `json:"-" gorm:"column:password_hash"`
+	GoogleID               *string    `json:"google_id,omitempty" gorm:"column:google_id;uniqueIndex"`
+	Role                   Role       `json:"role" gorm:"type:varchar(20);not null;default:'participant'"`
+	PasswordResetToken     *string    `json:"-" gorm:"column:password_reset_token;uniqueIndex"`
+	PasswordResetExpiresAt *time.Time `json:"-" gorm:"column:password_reset_expires_at"`
+	CreatedAt              time.Time  `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt              time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
 }
 
 // TableName overrides the table name used by GORM

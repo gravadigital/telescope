@@ -14,9 +14,9 @@ type fakeAttachment struct {
 	participantID uuid.UUID
 }
 
-func (a *fakeAttachment) GetID() uuid.UUID              { return a.id }
-func (a *fakeAttachment) GetOriginalName() string        { return a.originalName }
-func (a *fakeAttachment) GetParticipantID() uuid.UUID    { return a.participantID }
+func (a *fakeAttachment) GetID() uuid.UUID            { return a.id }
+func (a *fakeAttachment) GetOriginalName() string     { return a.originalName }
+func (a *fakeAttachment) GetParticipantID() uuid.UUID { return a.participantID }
 
 // fakeUser implements common.UserInterface for tests.
 type fakeUser struct {
@@ -24,8 +24,8 @@ type fakeUser struct {
 	name string
 }
 
-func (u *fakeUser) GetID() uuid.UUID   { return u.id }
-func (u *fakeUser) GetName() string    { return u.name }
+func (u *fakeUser) GetID() uuid.UUID { return u.id }
+func (u *fakeUser) GetName() string  { return u.name }
 
 // fakeVoteRepository is an in-memory implementation of VoteRepository.
 type fakeVoteRepository struct {

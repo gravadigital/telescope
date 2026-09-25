@@ -153,7 +153,6 @@ func (o *QueryOptimizer) getSlowQueries(ctx context.Context) ([]SlowQuery, error
 		ORDER BY mean_exec_time DESC 
 		LIMIT 20
 	`).Rows()
-
 	if err != nil {
 		// pg_stat_statements might not be available
 		o.log.Debug("pg_stat_statements not available, skipping slow query analysis")
@@ -196,7 +195,6 @@ func (o *QueryOptimizer) getIndexUsage(ctx context.Context) ([]IndexUsage, error
 		JOIN pg_stat_user_tables put ON pui.relid = put.relid
 		ORDER BY efficiency ASC, index_used DESC
 	`).Rows()
-
 	if err != nil {
 		return usage, err
 	}
@@ -229,7 +227,6 @@ func (o *QueryOptimizer) getTableStats(ctx context.Context) ([]TableStats, error
 		FROM pg_stat_user_tables
 		ORDER BY pg_total_relation_size(relid) DESC
 	`).Rows()
-
 	if err != nil {
 		return stats, err
 	}

@@ -21,7 +21,7 @@ type LocalStorage struct {
 
 // NewLocalStorage creates a new local filesystem storage
 func NewLocalStorage(basePath string) (*LocalStorage, error) {
-	if err := os.MkdirAll(basePath, 0755); err != nil {
+	if err := os.MkdirAll(basePath, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create storage directory: %w", err)
 	}
 
@@ -41,7 +41,7 @@ func (s *LocalStorage) Put(ctx context.Context, key string, reader io.Reader, si
 	fullPath := filepath.Join(s.basePath, key)
 
 	dir := filepath.Dir(fullPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("failed to create directory: %w", err)
 	}
 

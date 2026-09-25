@@ -27,9 +27,9 @@ func init() {
 
 // Claims represents the JWT claims
 type Claims struct {
-	UserID string            `json:"user_id"`
-	Email  string            `json:"email"`
-	Role   participant.Role  `json:"role"`
+	UserID string           `json:"user_id"`
+	Email  string           `json:"email"`
+	Role   participant.Role `json:"role"`
 	jwt.RegisteredClaims
 }
 
@@ -70,7 +70,6 @@ func ValidateToken(tokenString string) (*Claims, error) {
 		}
 		return jwtSecret, nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}
@@ -89,7 +88,7 @@ func JWTAuthMiddleware() gin.HandlerFunc {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			c.JSON(401, gin.H{
-				"error": "UNAUTHORIZED",
+				"error":   "UNAUTHORIZED",
 				"message": "Missing Authorization header",
 			})
 			c.Abort()
@@ -102,7 +101,7 @@ func JWTAuthMiddleware() gin.HandlerFunc {
 			tokenString = authHeader[7:]
 		} else {
 			c.JSON(401, gin.H{
-				"error": "UNAUTHORIZED",
+				"error":   "UNAUTHORIZED",
 				"message": "Invalid Authorization header format. Expected: Bearer <token>",
 			})
 			c.Abort()
@@ -113,7 +112,7 @@ func JWTAuthMiddleware() gin.HandlerFunc {
 		claims, err := ValidateToken(tokenString)
 		if err != nil {
 			c.JSON(401, gin.H{
-				"error": "UNAUTHORIZED",
+				"error":   "UNAUTHORIZED",
 				"message": fmt.Sprintf("Invalid token: %v", err),
 			})
 			c.Abort()

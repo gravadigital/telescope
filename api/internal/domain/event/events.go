@@ -182,6 +182,7 @@ func StageFromString(s string) (Stage, bool) {
 		return StageCreation, false
 	}
 }
+
 // Scan implements the sql.Scanner interface for database deserialization
 func (s *Stage) Scan(value interface{}) error {
 	if value == nil {

@@ -48,12 +48,12 @@ func (vs *VotingService) GenerateAssignments(eventID uuid.UUID, participants []u
 	// Calculate recommended M based on the convergence formula from Merrifield & Saari (2009)
 	// For small numbers of attachments, be more flexible with the recommendation
 	recommendedM := int(math.Ceil(2 * math.Log2(float64(k))))
-	
+
 	// Cap recommended M at maxPossibleM to account for conflict of interest
 	if recommendedM > maxPossibleM {
 		recommendedM = maxPossibleM
 	}
-	
+
 	// For small numbers of attachments (k <= 10), allow more flexibility
 	// The strict recommendation is meant for larger datasets
 	if k <= 10 {
@@ -464,12 +464,12 @@ func (vs *VotingService) ValidateVotingConfiguration(config *VotingConfiguration
 	// Calculate recommended M based on the convergence formula from Merrifield & Saari (2009)
 	// For small numbers of attachments, be more flexible with the recommendation
 	recommendedM := int(math.Ceil(2 * math.Log2(float64(k))))
-	
+
 	// Cap recommended M at maxPossibleM to account for conflict of interest
 	if recommendedM > maxPossibleM {
 		recommendedM = maxPossibleM
 	}
-	
+
 	// For small numbers of attachments (k <= 10), allow more flexibility
 	// The strict recommendation is meant for larger datasets
 	if k <= 10 {

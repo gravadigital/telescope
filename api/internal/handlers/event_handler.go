@@ -200,11 +200,11 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 				"code":    "MAX_PARTICIPANTS_LIMIT_EXCEEDED",
 				"details": "System limit is 100 participants per event",
 			})
-		return
-	}
-	newEvent.MaxParticipants = req.MaxParticipants
-	h.log.Debug("using custom max_participants", "value", *req.MaxParticipants)
-}	// Validate the event domain entity
+			return
+		}
+		newEvent.MaxParticipants = req.MaxParticipants
+		h.log.Debug("using custom max_participants", "value", *req.MaxParticipants)
+	} // Validate the event domain entity
 	if err := newEvent.Validate(); err != nil {
 		h.log.Error("event validation failed", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{
