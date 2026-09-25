@@ -89,12 +89,7 @@ jobs:
           # el merge por un import sin usar.
           CI: false
 
-      # `npm test` NO corre todavía: el Jest que trae react-scripts 5 no resuelve
-      # los `exports` de react-router-dom 7 (condición `module-sync`), así que la
-      # única suite que hay falla al importar App.tsx. Es incompatibilidad de
-      # herramientas, no código roto — el build de arriba pasa.
-      #
-      # Se arregla al migrar de CRA a Vite + Vitest. Cuando eso pase, este paso
-      # vuelve como `npm test` y deja de estar comentado.
-      # - name: Test
-      #   run: npm test
+      # CRA corre Jest en modo watch salvo con CI=true, que Actions ya setea: acá hace
+      # una sola pasada y falla si falla algún test.
+      - name: Test
+        run: npm test
