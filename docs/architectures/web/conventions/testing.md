@@ -2,7 +2,7 @@
 id: testing
 display_name: Testing (Testing Library + Jest vía CRA)
 language: react
-description: CRA's built-in Jest + Testing Library; currently a single smoke test, no real coverage
+description: CRA's built-in Jest + Testing Library; four suites, run in CI
 applies_to: [frontend]
 required_by: []
 package: '@testing-library/react'
@@ -12,19 +12,20 @@ package: '@testing-library/react'
 
 ## Estado actual
 
-**Un test en todo el proyecto**: `src/App.test.tsx`, el smoke test que genera CRA, adaptado
-para buscar el texto "TELESCOPIO".
+Cuatro suites, 15 tests, que corren en CI (`ci.yml`, job `web`) y con `make test`:
 
-```tsx
-test('renders telescopio app', () => {
-  render(<App />);
-  expect(screen.getByText(/TELESCOPIO/i)).toBeInTheDocument();
-});
-```
+| Suite | Qué cubre |
+|---|---|
+| `src/App.test.tsx` | Smoke test: la app renderiza |
+| `src/services/api.test.ts` | Que los servicios relancen el error de red en vez de devolver datos fabricados (story S-001) |
+| `src/components/auth/Auth.test.tsx` | El aviso de API caída |
+| `src/components/auth-form/AuthForm.test.tsx` | Validación del formulario y que un fallo de la API no derive en un login falso |
 
-No hay tests de componentes, de hooks, del cliente de API ni de los flujos. `TESTING.md` en
-la raíz del repositorio **no es una suite automatizada**: es una guía de pruebas manuales
-paso a paso.
+No hay tests de hooks, de `AuthContext`, de `apiRequest` ni de los flujos de votación.
+
+**Jest y react-router 7.** El Jest de `react-scripts` 5 no resuelve los `exports` de
+react-router-dom 7 por sí solo. El `moduleNameMapper` de `package.json` lo resuelve: no lo
+saques, o todas las suites que importan `App` fallan al cargar.
 
 ## Herramientas disponibles
 
@@ -38,8 +39,9 @@ Ya instaladas, listas para usar:
 Jest viene con `react-scripts`. `src/setupTests.ts` ya importa `@testing-library/jest-dom`.
 
 ```bash
-npm test              # watch mode
-CI=true npm test      # una corrida, para CI
+make test             # desde la raíz: api + web, una corrida
+npm test              # desde web/: watch mode
+CI=true npm test      # desde web/: una corrida
 ```
 
 ## Cómo escribir tests acá

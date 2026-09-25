@@ -88,7 +88,7 @@ Relevada del código:
    request (`config/api.ts`).
 9. **Navegación rota**: "About" y "See Demo" del navbar apuntan ambos a `/`
    (`App.tsx:157-158`), sin usar las anclas `#why` y `#demo` que la landing define.
-10. **Casi sin tests.** Solo el `App.test.tsx` que trae CRA.
+10. **Poca cobertura de tests.** Cuatro suites (auth y capa de servicios), que corren en CI. Nada de votación ni de `AuthContext`.
 11. **`target: es5`** en `tsconfig.json`, innecesariamente conservador para React 19.
 
 ## Relevamiento UX

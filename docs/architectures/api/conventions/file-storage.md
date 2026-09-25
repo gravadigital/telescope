@@ -77,5 +77,8 @@ clave que devuelve `Put` se persiste en `attachments.file_path`.
   el backend en vez de delegarlo al object storage.
 - **Si `io.Copy` falla a mitad del stream de descarga**, el `200` ya se envió: la respuesta
   queda truncada y solo se loguea el error (`attachment_handler.go`).
-- **La descarga no tiene autenticación** — ver la deuda técnica en el overview. Es un
-  problema de la ruta, no de esta convención, pero se manifiesta acá.
+- **La descarga no incluye a los evaluadores** — `canDownload` permite al dueño, al autor
+  del evento y a un `admin`, pero no a quien tiene la propuesta asignada. Ver la deuda
+  técnica en el overview.
+- **Al eliminar una propuesta se borra primero el registro y después el archivo.** Si falla
+  el borrado en el storage, la respuesta es igual `200` y el archivo queda huérfano.

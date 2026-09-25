@@ -37,12 +37,14 @@ cmd/api/integration_test.go        # conexión y migraciones, detrás de build t
 **Los tests unitarios no necesitan base de datos ni red.** Corren con `go test ./...` en
 menos de un segundo.
 
+Desde la raíz del repo:
+
 ```bash
-go test ./...                     # unitarios
-go test -tags=integration ./...   # + integración (requiere PostgreSQL)
-make test                         # go test -v ./...
-make test-coverage                # con -race y reporte HTML
+make test               # go vet + go test -race ./... (y los tests de web)
+make test-integration   # levanta la base del stack local y corre -tags=integration
 ```
+
+O desde `api/`, con `go test ./...` directo para los unitarios.
 
 ## Mocks
 
@@ -123,7 +125,8 @@ Dos invariantes que ya están cubiertas y no deben romperse:
 
 Detrás de `//go:build integration`, para que `go test ./...` siga siendo rápido y sin
 dependencias. Hoy cubren conexión y migraciones. La base de prueba se selecciona con
-`TEST_DB_NAME`.
+`TEST_DB_NAME`: `make test-integration` crea `telescope_test` dentro del PostgreSQL del stack
+local y la usa, así nunca corre migraciones sobre la base de desarrollo. No corren en CI.
 
 **Ojo con los triggers**: la base impone reglas propias (ver `database`). Los datos de prueba
 tienen que ser coherentes con la `voting_configuration` del evento, o el `INSERT` falla con un

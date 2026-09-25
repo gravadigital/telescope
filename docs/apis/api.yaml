@@ -230,8 +230,14 @@ paths:
       tags: [Google OAuth]
       summary: Verificar token de Google
       description: |
-        Recibe un **access token** de Google. La respuesta es polimórfica según si el
-        usuario ya existe (devuelve JWT) o no (devuelve el perfil para completar registro).
+        Recibe un **access token** de Google (flujo implicit). La respuesta es polimórfica
+        según si el usuario ya existe (devuelve JWT) o no (devuelve el perfil para completar
+        registro).
+
+        El token se valida contra `tokeninfo` antes de leer el perfil: se rechaza si no fue
+        emitido para `GOOGLE_CLIENT_ID` (`aud`), si el email no está verificado, o si
+        `userinfo` devuelve otro `sub`. Sin `GOOGLE_CLIENT_ID` configurado, el login con
+        Google responde `500`.
       security: []
       requestBody:
         required: true
@@ -274,10 +280,10 @@ paths:
           description: '`INVALID_PAYLOAD`'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '401':
-          description: '`INVALID_GOOGLE_TOKEN`'
+          description: '`INVALID_GOOGLE_TOKEN` — token inválido o vencido, emitido para otro client ID, o email sin verificar'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '500':
-          description: '`GOOGLE_API_ERROR`, `INTERNAL_ERROR`'
+          description: '`GOOGLE_API_ERROR` (Google inaccesible o `GOOGLE_CLIENT_ID` sin configurar), `INTERNAL_ERROR`'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
 
   /api/v1/auth/google/register:
@@ -931,6 +937,10 @@ paths:
               type: object
               required: [file]
               properties:
+                description:
+                  type: string
+                  maxLength: 1000
+                  description: Opcional. Se guarda sin espacios al principio ni al final
                 file:
                   type: string
                   format: binary
@@ -954,6 +964,7 @@ paths:
                       filename: { type: string, description: Nombre original del archivo }
                       size: { type: integer, format: int64 }
                       mime_type: { type: string }
+                      description: { type: string, description: Vacío si no se envió }
                       participant: { type: string, description: Nombre del participante }
                       uploaded_at: { type: string, format: date-time }
                   message: { type: string }
@@ -962,7 +973,7 @@ paths:
           description: |
             `MISSING_PARAMETERS`, `INVALID_EVENT_ID`, `INVALID_PARTICIPANT_ID`,
             `INVALID_EVENT_STAGE` (+ `current_stage`), `NO_FILE`,
-            `FILE_TOO_LARGE` (+ `max_size` string, `received_size` int),
+            `DESCRIPTION_TOO_LONG`, `FILE_TOO_LARGE` (+ `max_size` string, `received_size` int),
             `INVALID_FILE_TYPE` (+ `received_type`, `allowed_types` con descripciones
             legibles y orden no determinístico), `INVALID_FILENAME`
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
@@ -1011,6 +1022,7 @@ paths:
                         original_name: { type: string }
                         file_size: { type: integer, format: int64 }
                         mime_type: { type: string }
+                        description: { type: string, description: Se omite si está vacía }
                         uploaded_at: { type: string, format: date-time }
                         url: { type: string, example: '/api/v1/attachments/3fa85f64-5717-4562-b3fc-2c963f66afa6/download' }
                   count: { type: integer }
@@ -1024,19 +1036,16 @@ paths:
       tags: [Propuestas]
       summary: Descargar una propuesta
       description: |
-        **⚠️ Este endpoint NO tiene autenticación.** Está registrado en el grupo `/api/v1`
-        en vez del grupo que aplica `JWTAuthMiddleware` (`cmd/api/main.go:219`), pese a que
-        el comentario del código dice lo contrario. Cualquiera con el UUID de un attachment
-        puede descargar la propuesta.
+        Pueden descargarla su dueño, el autor del evento o un `admin`. El permiso se verifica
+        en el handler (`canDownload`), no con un middleware de ruta.
+
+        ⚠️ **Los evaluadores no están incluidos**: un participante no puede descargar las
+        propuestas de su propia asignación. Ver D-15 en `docs/prd/requirements.md`.
 
         Si la copia del stream falla a mitad de camino, la respuesta queda truncada con el
         `200` ya enviado.
-      security: []
       parameters:
-        - name: attachment_id
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/AttachmentId'
       responses:
         '200':
           description: |
@@ -1045,8 +1054,49 @@ paths:
           content:
             application/octet-stream:
               schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '403':
+          description: '`FORBIDDEN` — no es el dueño, el autor del evento ni un admin'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '404':
           description: '`ATTACHMENT_NOT_FOUND`, `FILE_NOT_FOUND`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /api/v1/attachments/{attachment_id}:
+    delete:
+      tags: [Propuestas]
+      summary: Eliminar la propia propuesta
+      description: |
+        Solo el dueño de la propuesta, y solo durante la etapa `participation`: permite
+        reemplazarla subiendo otra. Ni el autor del evento ni un `admin` pueden eliminar la
+        propuesta de otro.
+
+        Se borra primero el registro y después el archivo. Si falla el borrado del archivo,
+        la respuesta es igual `200`: el archivo queda huérfano en el storage.
+      parameters:
+        - $ref: '#/components/parameters/AttachmentId'
+      responses:
+        '200':
+          description: Propuesta eliminada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: Attachment deleted successfully }
+                  code: { type: string, example: DELETE_SUCCESS }
+        '400':
+          description: '`INVALID_EVENT_STAGE`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '403':
+          description: '`FORBIDDEN` (no es el dueño), `CREATOR_CANNOT_DELETE`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '404':
+          description: '`ATTACHMENT_NOT_FOUND`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`EVENT_LOOKUP_ERROR`, `DB_DELETE_ERROR`'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
 
   /api/v1/events/{event_id}/voting-config:
@@ -1518,6 +1568,11 @@ components:
       schema: { type: string, format: uuid }
     ParticipantId:
       name: participant_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    AttachmentId:
+      name: attachment_id
       in: path
       required: true
       schema: { type: string, format: uuid }

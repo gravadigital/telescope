@@ -102,8 +102,11 @@ Reglas:
   elimina: hoy es una tercera forma de hacer lo mismo.
 - **No hay estado offline.** Una pérdida de conectividad se ve como un error genérico.
 
-## Endpoint no declarado
+## Descarga de archivos
 
-Falta declarar la descarga de attachments (`GET /api/v1/attachments/{id}/download`), que el
-backend sí expone. Si alguna pantalla necesita ofrecer la descarga, agregá la constante en
-`config/api.ts` y el método en `AttachmentService` en vez de armar la URL a mano.
+La descarga exige token, así que no alcanza con un `<a href>`: el link no manda el header
+`Authorization`. Usá `AttachmentService.downloadAttachment`, que pide el archivo con
+`downloadFile` (`config/api.ts`) y dispara la descarga desde un blob.
+
+**Excepción a corregir:** `RankingVotePanel` todavía abre la descarga con un `<a href>` y la
+URL `http://localhost:8080` fija. Ver D-15 en `docs/prd/requirements.md`.

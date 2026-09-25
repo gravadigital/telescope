@@ -37,7 +37,7 @@ Todas custom, en [`conventions/`](./conventions/).
 | [`styling`](./conventions/styling.md) | CSS plano por componente, tokens en `:root`, glassmorphism oscuro, **desktop-first** |
 | [`forms`](./conventions/forms.md) | Controlados con un `formData`, validación nativa de HTML + manual |
 | [`error-handling`](./conventions/error-handling.md) | `try/catch` con estado local. **Sin error boundaries**; el `code` del backend se descarta |
-| [`testing`](./conventions/testing.md) | Testing Library + Jest vía CRA. Hoy: un solo smoke test |
+| [`testing`](./conventions/testing.md) | Testing Library + Jest vía CRA. Cuatro suites, corren en CI |
 
 ## No aplican
 

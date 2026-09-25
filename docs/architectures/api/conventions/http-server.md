@@ -98,8 +98,9 @@ Middlewares de permisos disponibles (`internal/middleware/auth/permissions.go`):
 | `RequireParticipantOrOwner(repo)` | El propio participante, el autor del evento, o un `admin` |
 
 > **Cuidado al agregar rutas.** Un endpoint declarado en `api.Group("/api/v1")` en vez de
-> en el grupo que tiene `.Use(auth.JWTAuthMiddleware())` queda **público**. Así quedó
-> expuesto `/attachments/:attachment_id/download`. Verificá en qué grupo estás registrando.
+> en el grupo que tiene `.Use(auth.JWTAuthMiddleware())` queda **público**. Así estuvo
+> expuesto `/attachments/:attachment_id/download`, hoy en su propio grupo `attachments`
+> con JWT. Verificá en qué grupo estás registrando.
 
 ## Respuestas
 

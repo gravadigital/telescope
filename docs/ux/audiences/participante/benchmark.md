@@ -141,9 +141,10 @@ Derivadas de lo anterior. Cada una es una **hipótesis a validar**, no una concl
 
 **E-06 es el hallazgo más importante de este benchmark.** En toda referencia de revisión por pares,
 el revisor **lee** lo que evalúa. En Telescopio, la pantalla de ranking presenta las propuestas
-asignadas para ordenarlas, pero el frontend **no declara el endpoint de descarga**
-(`GET /api/v1/attachments/{id}/download`), que el backend sí expone. Si el participante no puede
-abrir los archivos, está ordenando nombres de archivo. Ver pregunta abierta #5 del PRD.
+asignadas para ordenarlas, pero **el participante no puede abrirlas**: la descarga
+(`GET /api/v1/attachments/{id}/download`) exige un permiso que el evaluador no tiene, y el panel
+la abre con un link sin token (D-15). El participante está ordenando nombres de archivo. Ver
+pregunta abierta #5 del PRD.
 
 ---
 

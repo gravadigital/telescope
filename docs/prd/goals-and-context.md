@@ -150,16 +150,14 @@ existente es:
 - **`api`** — Backend Go/Gin con 30 endpoints, PostgreSQL, y el algoritmo de
   votación implementado en `internal/domain/vote/voting_service.go`.
 - **`web`** — SPA React con 6 rutas, única interfaz del producto.
-- **PostgreSQL `telescopio_db`** — 9 tablas, 20 migraciones versionadas. **Una parte
+- **PostgreSQL `telescopio_db`** — 9 tablas, 21 migraciones versionadas. **Una parte
   sustancial de las reglas de negocio vive en triggers plpgsql**, no en Go.
 - **Google OAuth** — Login alternativo al de email/password.
 - **SMTP** — Notificaciones de cambio de etapa, cancelación y reset de contraseña.
-- **MinIO** — Storage de propuestas en despliegue. Verificado: `deploy/docker-compose.yml:56`
-  y `deploy/.env.dist:24` fijan `STORAGE_PROVIDER=minio`, y existe un
-  `deploy/verify-minio-production.sh`. El filesystem local queda como alternativa de
-  desarrollo. **Atención a una inconsistencia**: el default del código Go es `local`
-  (`internal/config/config.go:86`) mientras que `api/README.md:90` documenta `minio` como
-  default — quien levante el servicio sin el compose obtiene filesystem local sin saberlo.
+- **MinIO** — Storage de propuestas. El stack local (`deploy/docker-compose.yml`) y el
+  `Makefile` fijan `STORAGE_PROVIDER=minio`; el filesystem local queda como alternativa.
+  **Atención**: el default del código Go es `local` (`internal/config/config.go:86`), así que
+  quien corra la api sin el compose ni el `Makefile` obtiene filesystem local sin saberlo.
 
 ### Decisiones ya Tomadas
 
@@ -237,8 +235,9 @@ Esto no es una lista de deseos: es lo que el código **no** hace, verificado.
   `is_quality_vote` existen en la base y nunca se escriben.
 - **Matching por expertise.** `expertise_match_score` y las columnas
   `use_expertise_matching` / `enable_co_idetection` existen en la base y el dominio no las lee.
-- **Descarga de propuestas desde la interfaz.** El endpoint existe (y hoy, sin autenticación)
-  pero el frontend no lo consume.
+- **Descarga de propuestas por los evaluadores.** La descarga exige autenticación y la ofrece
+  la pantalla del organizador, pero un evaluador no puede abrir las propuestas que tiene
+  asignadas (D-15).
 
 ### Restricciones
 
@@ -281,7 +280,7 @@ Estado tras la validación con el responsable del producto (2026-09-18).
 | 2 | ¿El rol global `organizer` se usa? | **No.** Quedó desplazado: cualquiera puede crear eventos y participar en otros. Todo `users.role` es deuda |
 | 3 | ¿Quién define los parámetros del algoritmo? | **El sistema calcula y recomienda una base; el organizador la puede editar** |
 | 5 | ¿El rol `admin` se opera por base, o falta pantalla? | Pregunta mal planteada de mi parte. La administración *de un evento* la ejerce su creador y ya funciona. El `admin` **global** de `users.role` es otra cosa y es deuda a eliminar |
-| 6 | ¿`STORAGE_PROVIDER` en producción? | **`minio`.** Verificado en `deploy/docker-compose.yml:56`, `deploy/.env.dist:24` y `deploy/verify-minio-production.sh` |
+| 6 | ¿`STORAGE_PROVIDER` en producción? | **`minio`.** Es lo que usan el stack local y las imágenes publicadas; el compose de servidor vive en el repo de deploy |
 | 7 | ¿Dispositivo prioritario? | **Responsive es importante.** Los gaps de mobile son defectos a corregir |
 
 ### Pendientes

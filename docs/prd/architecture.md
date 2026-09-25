@@ -187,7 +187,7 @@ mantiene el código compacto y sin capa de mapeo.
 
 ### PostgreSQL `telescopio_db`
 
-9 tablas, 3 tipos enumerados, 20 migraciones versionadas en Go con `Up`/`Down`, ejecutadas al
+9 tablas, 3 tipos enumerados, 21 migraciones versionadas en Go con `Up`/`Down`, ejecutadas al
 arrancar. Hay un CLI (`cmd/migrate`) con flag `-rollback`.
 
 | Tabla | Contenido |
@@ -243,8 +243,8 @@ handlers no saben cuál está activa.
 
 `attachments.file_path` es la **clave en el storage**, no una ruta del filesystem.
 
-⚠️ El default del código Go es `local` mientras `api/README.md` documenta `minio`: levantar el
-servicio sin el compose da filesystem local sin aviso.
+⚠️ El default del código Go es `local`: correr la api sin el compose ni el `Makefile` da
+filesystem local sin aviso.
 
 ### Persistencia en el cliente
 
@@ -294,8 +294,11 @@ verificaciones sobre cualquier evento** y solo es alcanzable escribiendo en la b
 ### Seguridad de la API
 
 - Los endpoints protegidos van dentro del grupo que aplica `JWTAuthMiddleware`.
-- ⚠️ **`GET /api/v1/attachments/{id}/download` está registrado fuera de ese grupo**: cualquiera
-  con el UUID descarga la propuesta (D-02, crítico).
+- La descarga de propuestas (`GET /api/v1/attachments/{id}/download`) está en su propio grupo
+  con JWT, y el handler solo la permite al dueño, al autor del evento o a un `admin`. Hasta el
+  commit `625b6f4` estaba fuera del grupo y era pública (D-02, resuelto).
+- ⚠️ **Los evaluadores no están entre quienes pueden descargar**, así que no pueden abrir las
+  propuestas que tienen asignadas (D-15).
 - ⚠️ **`GET /api/v1/users/{user_id}` no verifica ownership**: cualquier autenticado lee cualquier
   usuario (D-03).
 - **No hay rate limiting** ni protección contra fuerza bruta.
@@ -313,8 +316,9 @@ violar: si alguien evalúa su propia propuesta, el resultado pierde toda legitim
 
 ### Despliegue
 
-Docker Compose (`deploy/docker-compose.yml`), con `STORAGE_PROVIDER=minio` fijo y un script
-`deploy/verify-minio-production.sh` para verificar la conexión al bucket.
+Imágenes publicadas en Docker Hub (`gravadigital/telescope-api` y `gravadigital/telescope-web`)
+por el CI. El compose de servidor vive en el repositorio de deploy; en este repo,
+`deploy/docker-compose.yml` es solo el stack local, con `STORAGE_PROVIDER=minio`.
 
 Componentes a desplegar:
 

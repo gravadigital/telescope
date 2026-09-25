@@ -97,11 +97,11 @@ no conocen cuál está activo. Ver la convención custom `file-storage`.
 
 Relevada del código, para que no se confunda con decisión de diseño:
 
-1. **`GET /api/v1/attachments/:attachment_id/download` no tiene autenticación.** Está
-   registrado en el grupo `/api/v1` en vez del grupo `events`, que es el que aplica
-   `JWTAuthMiddleware` (`cmd/api/main.go:219`). El comentario del código dice
-   "Available to authenticated users", pero en los hechos cualquiera con el UUID de un
-   attachment descarga la propuesta. **Es una exposición de datos, no un detalle.**
+1. **Los evaluadores no pueden descargar las propuestas que tienen asignadas.** La descarga
+   exige autenticación y `canDownload` (`attachment_handler.go`) solo la permite al dueño,
+   al autor del evento o a un `admin`: el participante al que se le asignó la propuesta no
+   está incluido. Además, el panel de ranking del frontend la abre con un `<a href>` sin
+   token. **Bloquea el flujo central** — ver D-15 en `docs/prd/requirements.md`.
 2. **`GET /events/:event_id/distributed-results` muta estado**: recalcula el MBC y hace
    upsert en `voting_results`. Un GET no idempotente.
 3. **Cuatro formatos de error distintos** conviviendo — ver la convención custom
@@ -114,7 +114,7 @@ Relevada del código, para que no se confunda con decisión de diseño:
    una consulta de participantes por evento.
 7. **Handlers implementados sin rutas**: `UpdateEvent`/`DeleteEvent` (devuelven 501),
    `GetVotingConfiguration`, `UpdateVotingConfiguration`, `DeleteVotingConfiguration`,
-   `PreviewVotingConfiguration`, `GetAttachment`, `DeleteAttachment`, `RemoveParticipant`.
+   `PreviewVotingConfiguration`, `GetAttachment`, `RemoveParticipant`.
 8. **Código sin `gofmt`**: hay bloques con indentación rota que hacen difícil leer el
    control de flujo (por ejemplo `event_handler.go:196-207`, cuya lógica es correcta pero
    parece rota). `_base` exige `gofumpt`.
