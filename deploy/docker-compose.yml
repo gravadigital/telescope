@@ -57,6 +57,11 @@ services:
   # Crea el bucket y termina. La api NO lo crea —firma contra un bucket que da por
   # existente—, así que sin esto la primera subida falla con NoSuchBucket. Con
   # --ignore-existing es seguro correrlo en cada `up`.
+  #
+  # Que minio esté healthy no garantiza que este contenedor ya lo resuelva por nombre:
+  # el DNS interno de Docker puede tardar en registrarlo, y un único intento fallaba con
+  # "lookup minio ... server misbehaving". Por eso reintenta hasta un minuto, y si se
+  # rinde, el último intento sin silenciar muestra el error real.
   minio-init:
     image: pgsty/mc:RELEASE.2026-09-16T00-00-00Z
     container_name: telescope-local-minio-init
@@ -67,6 +72,11 @@ services:
       MINIO_BUCKET: ${MINIO_BUCKET:-telescope}
     entrypoint: >
       sh -c '
+      for i in $$(seq 1 30); do
+        mc alias set local http://minio:9000 "$$MINIO_USER" "$$MINIO_PASSWORD" >/dev/null 2>&1 && break;
+        echo "esperando a minio ($$i/30)...";
+        sleep 2;
+      done;
       mc alias set local http://minio:9000 "$$MINIO_USER" "$$MINIO_PASSWORD" &&
       mc mb --ignore-existing "local/$$MINIO_BUCKET"
       '
