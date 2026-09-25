@@ -20,7 +20,7 @@ type GoogleAuthHandler struct {
 	log      *log.Logger
 
 	// verifyToken validates a Google access token and returns the caller's
-	// profile. Defaults to the real network call (verifyGoogleAccessToken);
+	// profile. Defaults to the real network call (googleAccessTokenVerifier);
 	// swappable in tests to avoid hitting Google's API.
 	verifyToken func(accessToken string) (*GoogleProfile, error)
 }
@@ -31,7 +31,7 @@ func NewGoogleAuthHandler(userRepo postgres.UserRepository, cfg *config.Config) 
 		userRepo:    userRepo,
 		cfg:         cfg,
 		log:         logger.Handler("google_auth"),
-		verifyToken: verifyGoogleAccessToken,
+		verifyToken: newGoogleAccessTokenVerifier(cfg.Google.ClientID).verify,
 	}
 }
 
@@ -47,7 +47,7 @@ type RegisterGoogleUserRequest struct {
 }
 
 // VerifyGoogleToken handles POST /api/v1/auth/google/verify.
-// It validates the Google id_token and determines if the user is new or existing.
+// It validates the Google access token and determines if the user is new or existing.
 func (h *GoogleAuthHandler) VerifyGoogleToken(c *gin.Context) {
 	h.log.Debug("received google token verification request")
 

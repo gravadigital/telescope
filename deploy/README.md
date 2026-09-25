@@ -115,5 +115,5 @@ docker compose pull && docker compose up -d
 | `POSTGRES_PASSWORD` | el default es de desarrollo |
 | `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | ídem |
 | `DOMAIN` | lo usan el ingress y los links de los mails |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | sólo si se usa login con Google |
+| `GOOGLE_CLIENT_ID` | sólo si se usa login con Google |
 | `SMTP_*` | sólo si `EMAIL_ENABLED=true` |
