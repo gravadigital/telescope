@@ -83,6 +83,13 @@ Para correr un servidor contra él, su compose (en el repo de deploy) tiene que 
   restos de cuando eran repositorios separados. La licencia pasa a la raíz.
 - **CI**: los tests de web vuelven a correr.
 
+### Corregido
+
+- **`make up` fallaba en `go mod download`** en máquinas con una copia vieja de
+  `golang:1.26-alpine` (Go 1.26.5 contra el 1.26.6 que pide `go.mod`). Las imágenes base
+  quedan fijadas: `golang:1.26.6-alpine` y `node:22-alpine`, alineadas con `go.mod` y
+  `.nvmrc`.
+
 ### Seguridad
 
 - **Login con Google**: la api rechaza access tokens emitidos para otras apps y cuentas
@@ -90,6 +97,6 @@ Para correr un servidor contra él, su compose (en el repo de deploy) tiene que 
 
 ### Conocido
 
-- La suite de `web` no corre todavía: el Jest que trae `react-scripts` 5 no resuelve
-  los `exports` de `react-router-dom` 7. El build sí pasa. Se destraba al migrar a
-  Vite + Vitest.
+- **Los evaluadores no pueden abrir las propuestas que tienen asignadas** (D-15): la
+  descarga no los incluye entre quienes tienen permiso, y el panel de ranking la abre sin
+  token.

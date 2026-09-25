@@ -105,6 +105,19 @@ In the web, query by what the user sees (`getByRole`, `getByText`), not by CSS c
 
 If you are planning something large, open an issue first so we can agree on the approach.
 
+## Upgrading Go or Node
+
+The Docker images pin their base versions, so the build does not depend on what each
+machine has cached:
+
+- **Go:** the `go` directive in `api/go.mod` and the `FROM golang:X.Y.Z-alpine` in
+  `api/Dockerfile` must match. The official image runs with `GOTOOLCHAIN=local`, so an image
+  older than `go.mod` fails at `go mod download`.
+- **Node:** `web/.nvmrc` (what CI uses) and the `FROM node:N-alpine` in
+  `web/docker/Dockerfile` must share the major version.
+
+Change both in the same commit.
+
 ## Releases
 
 One version for the whole repository. `scripts/set-version.sh` sets it everywhere, and pushing

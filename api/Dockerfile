@@ -1,5 +1,9 @@
 # Build stage
-FROM golang:1.26-alpine AS builder
+# Versión exacta, igual a la directiva `go` de go.mod. La imagen oficial trae
+# GOTOOLCHAIN=local: si su Go es más viejo que el que pide go.mod, `go mod download`
+# aborta. Con el tag móvil (1.26-alpine) eso dependía de qué copia hubiera en la caché
+# de cada máquina. Al subir la versión en go.mod, subila también acá.
+FROM golang:1.26.6-alpine AS builder
 
 # Install git and ca-certificates (needed for downloading dependencies)
 RUN apk update && apk add --no-cache git ca-certificates tzdata && update-ca-certificates

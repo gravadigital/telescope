@@ -1,5 +1,6 @@
 # Build stage
-FROM node:20-alpine AS builder
+# Misma versión mayor que web/.nvmrc, que es la que usa el CI.
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
