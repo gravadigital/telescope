@@ -156,8 +156,9 @@ verificar que `telescopio-postgres` figure como `healthy` en `docker compose ps`
 
 **Los tokens dejan de funcionar** — pasa al cambiar `JWT_SECRET`: cerrar sesión y volver a entrar.
 
-**`pull access denied for minio/minio`** — MinIO ya no publica esa imagen en Docker Hub;
-el compose usa `quay.io/minio/minio`, el mirror oficial.
+**`pull access denied` / `unauthorized` al bajar MinIO** — MinIO dejó de publicar imágenes
+tanto en Docker Hub como en quay.io; los compose usan `pgsty/minio` y `pgsty/mc`, builds
+comunitarios del mismo código, con tag fijo.
 
 **Empezar de cero** — `docker compose down -v && docker compose up -d --build`
 (borra la base y los archivos subidos).

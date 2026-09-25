@@ -100,7 +100,8 @@ services:
       - telescope-api
 
   telescope-minio:
-    image: quay.io/minio/minio:latest
+    # MinIO dejó de publicar imágenes (Docker Hub y quay.io); pgsty mantiene builds del mismo código.
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
     container_name: telescope-${ENVIRONMENT}-minio
     restart: always
     command: server /data --console-address ":9001"
@@ -124,7 +125,7 @@ services:
   # Crea el bucket y termina. La api NO lo crea —firma contra un bucket que da por
   # existente—, así que sin esto la primera subida falla con NoSuchBucket.
   telescope-minio-init:
-    image: quay.io/minio/mc:latest
+    image: pgsty/mc:RELEASE.2026-09-16T00-00-00Z
     container_name: telescope-${ENVIRONMENT}-minio-init
     restart: "no"
     depends_on:

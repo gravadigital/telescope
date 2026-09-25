@@ -29,7 +29,8 @@ services:
       retries: 10
 
   minio:
-    image: quay.io/minio/minio:latest
+    # MinIO dejó de publicar imágenes (Docker Hub y quay.io); pgsty mantiene builds del mismo código.
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
     container_name: telescope-local-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
