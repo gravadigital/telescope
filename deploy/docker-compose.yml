@@ -1,157 +1,154 @@
-# Producción: baja las imágenes publicadas del registry. La versión de cada una sale de
-# API_VERSION / WEB_VERSION en .env — ver la política de versionado en CHANGELOG.md.
+# Levanta Telescope completo en esta máquina, construyendo desde el repo:
 #
-# Para desarrollo usá docker-compose.local.yml, que construye desde el repo.
-name: telescope
-
-networks:
-  telescope-database:
-    name: "telescope-${ENVIRONMENT}-database"
-  ingress-network:
-    external: true
-    name: "${INGRESS_NETWORK}"
+#   docker compose up -d --build
+#
+# No necesita ningún .env: cada variable trae su default acá. Para cambiar algo
+# (el login con Google, un puerto que choca) se crea deploy/.env, que docker compose
+# lee solo. Las variables disponibles están en README.md.
+#
+# Es sólo para desarrollo: los secretos por defecto son públicos y los puertos quedan
+# expuestos en localhost. El deploy a un servidor vive en el repo de deploy.
+name: telescope-local
 
 volumes:
-  telescope-database:
-    name: "telescope-${ENVIRONMENT}-database"
-  telescope-minio:
-    name: "telescope-${ENVIRONMENT}-minio"
+  database:
+  minio:
 
 services:
-  telescope-database:
+  database:
     image: postgres:15-alpine
-    container_name: telescope-${ENVIRONMENT}-database
-    restart: always
+    container_name: telescope-local-database
+    restart: unless-stopped
     environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-telescope_db}
+      POSTGRES_USER: ${POSTGRES_USER:-telescope}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-telescope_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - telescope-database:/var/lib/postgresql/data
-    networks:
-      - telescope-database
+      - database:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      # $$ para que lo expanda el contenedor con sus propias variables, no compose.
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
-  telescope-api:
-    image: gravadigital/telescope-api:${API_VERSION}
-    container_name: telescope-${ENVIRONMENT}-api
-    restart: always
-    environment:
-      - VIRTUAL_HOST=api.${DOMAIN}
-      - VIRTUAL_PORT=8080
-      - LETSENCRYPT_HOST=api.${DOMAIN}
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=5432
-      - DB_USER=${POSTGRES_USER}
-      - DB_PASSWORD=${POSTGRES_PASSWORD}
-      - DB_NAME=${POSTGRES_DB}
-      - DB_SSLMODE=${DB_SSLMODE}
-      - PORT=8080
-      - GIN_MODE=${GIN_MODE}
-      - MAX_FILE_SIZE=${MAX_FILE_SIZE}
-      - JWT_SECRET=${JWT_SECRET}
-      - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS}
-      - CORS_ALLOW_METHODS=${CORS_ALLOW_METHODS}
-      - CORS_ALLOW_HEADERS=${CORS_ALLOW_HEADERS}
-      - FRONTEND_URL=https://${DOMAIN}
-      - STORAGE_PROVIDER=${STORAGE_PROVIDER}
-      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
-      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
-      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
-      - MINIO_BUCKET=${MINIO_BUCKET}
-      - MINIO_USE_SSL=${MINIO_USE_SSL}
-      - MINIO_REGION=${MINIO_REGION}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - EMAIL_ENABLED=${EMAIL_ENABLED}
-      - SMTP_HOST=${SMTP_HOST}
-      - SMTP_PORT=${SMTP_PORT}
-      - SMTP_USER=${SMTP_USER}
-      - SMTP_PASSWORD=${SMTP_PASSWORD}
-      - SMTP_SECURE=${SMTP_SECURE}
-      - EMAIL_FROM=${EMAIL_FROM}
-      - EMAIL_FROM_NAME=${EMAIL_FROM_NAME}
-    networks:
-      - ingress-network
-      - telescope-database
-    depends_on:
-      telescope-database:
-        condition: service_healthy
-      telescope-minio:
-        condition: service_healthy
-
-  # La web NO recibe REACT_APP_* acá: Create React App las congela en el momento del
-  # build, no al arrancar. La URL de la api y el client id de Google entran como
-  # --build-arg cuando el CI construye la imagen (ver .github/workflows/).
-  telescope-web:
-    image: gravadigital/telescope-web:${WEB_VERSION}
-    container_name: telescope-${ENVIRONMENT}-web
-    restart: always
-    environment:
-      - VIRTUAL_HOST=${DOMAIN}
-      - VIRTUAL_PORT=80
-      - LETSENCRYPT_HOST=${DOMAIN}
-    networks:
-      - ingress-network
-    depends_on:
-      - telescope-api
-
-  telescope-minio:
+  minio:
     # MinIO dejó de publicar imágenes (Docker Hub y quay.io); pgsty mantiene builds del mismo código.
     image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
-    container_name: telescope-${ENVIRONMENT}-minio
-    restart: always
+    container_name: telescope-local-minio
+    restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
-      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY}
-      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY}
-      - VIRTUAL_HOST=minio.${DOMAIN}
-      - VIRTUAL_PORT=9001
-      - LETSENCRYPT_HOST=minio.${DOMAIN}
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin123}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
-      - telescope-minio:/data
-    networks:
-      - telescope-database
-      - ingress-network
+      - minio:/data
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   # Crea el bucket y termina. La api NO lo crea —firma contra un bucket que da por
-  # existente—, así que sin esto la primera subida falla con NoSuchBucket.
-  telescope-minio-init:
+  # existente—, así que sin esto la primera subida falla con NoSuchBucket. Con
+  # --ignore-existing es seguro correrlo en cada `up`.
+  minio-init:
     image: pgsty/mc:RELEASE.2026-09-16T00-00-00Z
-    container_name: telescope-${ENVIRONMENT}-minio-init
+    container_name: telescope-local-minio-init
     restart: "no"
-    depends_on:
-      telescope-minio:
-        condition: service_healthy
-    entrypoint: >
-      sh -c "
-      mc alias set local http://telescope-${ENVIRONMENT}-minio:9000 '${MINIO_ACCESS_KEY}' '${MINIO_SECRET_KEY}' &&
-      mc mb --ignore-existing local/'${MINIO_BUCKET}'
-      "
-    networks:
-      - telescope-database
-
-  telescope-pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: telescope-${ENVIRONMENT}-pgadmin
-    restart: always
     environment:
-      - VIRTUAL_HOST=pgadmin.${DOMAIN}
-      - VIRTUAL_PORT=80
-      - LETSENCRYPT_HOST=pgadmin.${DOMAIN}
-      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL}
-      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD}
-      - PGADMIN_CONFIG_SERVER_MODE=False
-    networks:
-      - ingress-network
-      - telescope-database
+      MINIO_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin123}
+      MINIO_BUCKET: ${MINIO_BUCKET:-telescope}
+    entrypoint: >
+      sh -c '
+      mc alias set local http://minio:9000 "$$MINIO_USER" "$$MINIO_PASSWORD" &&
+      mc mb --ignore-existing "local/$$MINIO_BUCKET"
+      '
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ../api
+      dockerfile: Dockerfile
+    container_name: telescope-local-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8080}:8080"
+    environment:
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-telescope}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-telescope_password}
+      DB_NAME: ${POSTGRES_DB:-telescope_db}
+      DB_SSLMODE: disable
+      PORT: 8080
+      GIN_MODE: ${GIN_MODE:-release}
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
+      # Default fijo a propósito: este compose es sólo local y los tokens que firma
+      # sólo valen contra esta misma base. En un servidor, JWT_SECRET se define siempre.
+      JWT_SECRET: ${JWT_SECRET:-telescope-local-dev-secret-no-usar-en-produccion}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-*}
+      FRONTEND_URL: http://localhost:${WEB_PORT:-3000}
+      STORAGE_PROVIDER: minio
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin123}
+      MINIO_BUCKET: ${MINIO_BUCKET:-telescope}
+      MINIO_USE_SSL: "false"
+      MINIO_REGION: us-east-1
+      # Vacío = sólo login con email y contraseña.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      # Con EMAIL_ENABLED=false no se manda ningún mail (recuperación de contraseña,
+      # avisos de cambio de etapa).
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Telescope}
+    depends_on:
+      database:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+  # REACT_APP_* van como build-args, no como environment: CRA las congela al construir.
+  # Por eso se levanta siempre con --build: una imagen vieja seguiría apuntando a la
+  # configuración anterior sin ningún aviso.
+  web:
+    build:
+      context: ../web
+      dockerfile: docker/Dockerfile
+      args:
+        REACT_APP_API_URL: http://localhost:${API_PORT:-8080}
+        REACT_APP_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    container_name: telescope-local-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-3000}:80"
+    depends_on:
+      - api
+
+  # Opcional: docker compose --profile tools up -d pgadmin
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: telescope-local-pgadmin
+    restart: unless-stopped
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
     profiles:
       - tools

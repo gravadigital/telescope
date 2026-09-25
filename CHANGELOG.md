@@ -8,9 +8,7 @@ versionado es [Semantic Versioning](https://semver.org/lang/es/).
 ## Política de versionado
 
 Todo el monorepo comparte **una sola versión**: `api` y `web` se publican juntas y
-llevan siempre el mismo número. Las variables por servicio de `deploy/`
-(`API_VERSION`, `WEB_VERSION`) existen para poder redesplegar uno sin tocar el otro,
-no para versionarlos por separado.
+llevan siempre el mismo número.
 
 Qué significa cada salto:
 
@@ -25,8 +23,7 @@ api y se esperan aditivas.
 
 ### Sacar un release
 
-La versión vive en `VERSION`, en `web/package.json` y en los `*_VERSION` de
-`deploy/.env.dist`. Un script escribe todos:
+La versión vive en `VERSION` y en `web/package.json`. Un script escribe los dos:
 
 ```sh
 scripts/set-version.sh 1.2.3      # sube todo
@@ -56,12 +53,8 @@ de staging; no es un release y no promete estabilidad.
 Cada build publica además un tag inmutable `dev-<sha>`, para que una imagen dev puntual
 siga siendo alcanzable después de que el tag `dev` se movió.
 
-Para correr contra él, poné las versiones por servicio en `dev` en `deploy/.env`:
-
-```
-API_VERSION=dev
-WEB_VERSION=dev
-```
+Para correr un servidor contra él, su compose (en el repo de deploy) tiene que bajar
+`gravadigital/telescope-{api,web}:dev`.
 
 ---
 
@@ -75,6 +68,25 @@ WEB_VERSION=dev
 - **CI en GitHub Actions**: `ci.yml` (suite en cada PR), `dev-images.yml` (imágenes
   `dev` en cada push a la rama) y `release.yml` (imágenes inmutables por tag).
 - **Versionado único** del monorepo, con `scripts/set-version.sh` como única puerta.
+
+### Cambiado
+
+- **`deploy/` es sólo para levantarlo local**, sin `.env`: cada variable trae su default,
+  incluido un `JWT_SECRET` de desarrollo, y el bucket de MinIO lo crea el propio compose.
+  Se eliminan `local.sh`, `.env.dist` y el compose de servidor, que pasa al repo de deploy.
+- **`Makefile` en la raíz** como único punto de entrada: `make up` / `stop` / `down` /
+  `reset` para el stack en Docker, `make infra` + `make api` + `make web` para correr cada
+  parte a mano, y `make test` / `test-integration`.
+- **`documentation/`** (en inglés): features, instalación, configuración y referencia de la
+  API. `README.md` y `CONTRIBUTING.md` nuevos en la raíz.
+- Se eliminan la documentación, los composes y los scripts propios de `api/` y `web/`,
+  restos de cuando eran repositorios separados. La licencia pasa a la raíz.
+- **CI**: los tests de web vuelven a correr.
+
+### Seguridad
+
+- **Login con Google**: la api rechaza access tokens emitidos para otras apps y cuentas
+  con el email sin verificar.
 
 ### Conocido
 

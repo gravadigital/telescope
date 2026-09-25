@@ -3,7 +3,6 @@ build
 .git
 .gitignore
 README.md
-TESTING.md
 .env
 .env.local
 .env.development.local

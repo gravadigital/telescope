@@ -3,8 +3,8 @@ name: Dev images
 # Cada push a dev republica las dos imágenes bajo el tag `dev`, pisando las anteriores.
 # Ese tag es un puntero móvil a la punta de dev, no un release.
 #
-# Para correr un servidor contra él, apuntá las versiones por servicio al tag:
-# `API_VERSION=dev` (y lo mismo para web) en deploy/.env, que el compose consume.
+# Para correr un servidor contra él, el compose del servidor (en el repo de deploy)
+# tiene que bajar `gravadigital/telescope-{api,web}:dev`.
 #
 # Los releases son otro workflow: release.yml, disparado por tags de versión, es el
 # que publica los tags inmutables 1.2.3 / 1.2 / latest.

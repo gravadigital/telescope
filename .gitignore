@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------------
 # Secretos. Nada de esto se versiona: los .env reales se crean a partir de los
-# .env.example / .env.dist que sí están en el repo.
+# .env.example que sí están en el repo.
 # ---------------------------------------------------------------------------
 .env
 .env.local
@@ -18,6 +18,8 @@ web/coverage/
 api/bin/
 api/migrate
 api/main
+api/coverage.txt
+api/coverage.html
 *.exe
 *.test
 *.out
