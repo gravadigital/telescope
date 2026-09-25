@@ -144,6 +144,12 @@ func GetMigrations() []Migration {
 			Up:   migration021Up,
 			Down: migration021Down,
 		},
+		{
+			ID:   "022",
+			Name: "fix_uuid_comparison_in_triggers",
+			Up:   migration022Up,
+			Down: migration022Down,
+		},
 	}
 }
 
