@@ -86,16 +86,25 @@ distinta de la de los handlers. Ver la convención `error-handling`.
 
 ## Google OAuth
 
-`internal/handlers/google_auth_service.go` verifica el access token contra Google y
-resuelve el perfil. El flujo tiene dos pasos: `verify` informa si el usuario ya existe
+`internal/handlers/google_auth_service.go` valida el access token que obtiene la web (flujo
+*implicit*, sin client secret) con `googleAccessTokenVerifier`, en dos llamadas:
+
+1. `tokeninfo`: rechaza el token si `aud` no es `GOOGLE_CLIENT_ID` o si el email no está
+   verificado. **La primera evita que un token emitido para otra app sirva para entrar acá**;
+   la segunda importa porque `resolveUser` vincula cuentas por email.
+2. `userinfo`: trae el perfil, y lo rechaza si el `sub` no coincide con el de `tokeninfo`.
+
+Sin `GOOGLE_CLIENT_ID`, el login con Google queda deshabilitado (`ErrGoogleAuthNotConfigured`).
+Las llamadas a Google tienen timeout de 10s y las URLs son campos del verificador, así que los
+tests lo prueban contra un servidor falso. El flujo tiene dos pasos: `verify` informa si el usuario ya existe
 (`status: "existing_user"` con JWT, o `status: "new_user"` con el perfil sugerido) y
 `register` crea la cuenta. Un usuario Google se vincula por `google_id` (único).
 
 ## Reglas al agregar endpoints
 
 1. **Verificá en qué grupo registrás la ruta.** Fuera del grupo con
-   `JWTAuthMiddleware()` el endpoint queda público. Así quedó expuesto
-   `/attachments/:attachment_id/download`.
+   `JWTAuthMiddleware()` el endpoint queda público. Así estuvo expuesto
+   `/attachments/:attachment_id/download` hasta que se lo movió a un grupo propio.
 2. **Autenticado no es autorizado.** Si el recurso pertenece a alguien, sumá el middleware
    de permiso. Hoy `GET /users/:user_id` no verifica ownership y cualquier autenticado lee
    cualquier usuario.

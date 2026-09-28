@@ -60,8 +60,9 @@ Seis, declaradas en `src/App.tsx:177-184`:
 
 ## Integración con la API
 
-`src/config/api.ts` centraliza la URL base (`REACT_APP_API_URL`, default
-`http://localhost:8080`) y el catálogo de endpoints. `src/services/api.ts` (872 líneas)
+`src/config/api.ts` centraliza la URL base y el catálogo de endpoints. La URL sale de
+`src/config/runtime.ts`: la escribe el contenedor al arrancar (`API_URL`), o cae a
+`REACT_APP_API_URL` fuera de Docker, con default `http://localhost:8080`. `src/services/api.ts` (872 líneas)
 agrupa las llamadas en servicios por dominio.
 
 El JWT se lee de `localStorage` en cada request. **Manejo global de expiración**: ante un
@@ -88,7 +89,7 @@ Relevada del código:
    request (`config/api.ts`).
 9. **Navegación rota**: "About" y "See Demo" del navbar apuntan ambos a `/`
    (`App.tsx:157-158`), sin usar las anclas `#why` y `#demo` que la landing define.
-10. **Casi sin tests.** Solo el `App.test.tsx` que trae CRA.
+10. **Poca cobertura de tests.** Cuatro suites (auth y capa de servicios), que corren en CI. Nada de votación ni de `AuthContext`.
 11. **`target: es5`** en `tsconfig.json`, innecesariamente conservador para React 19.
 
 ## Relevamiento UX

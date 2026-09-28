@@ -61,7 +61,8 @@ deslogueado de la pantalla en la que estaba.
 
 ## Google OAuth
 
-`GoogleOAuthProvider` envuelve la app (`App.tsx:197`) con `REACT_APP_GOOGLE_CLIENT_ID`.
+`GoogleOAuthProvider` envuelve la app (`App.tsx`) con `RUNTIME_CONFIG.GOOGLE_CLIENT_ID`, que en
+el contenedor sale de `GOOGLE_CLIENT_ID` al arrancar. Vacío oculta el botón de Google.
 
 El flujo tiene dos pasos porque el backend los separa:
 

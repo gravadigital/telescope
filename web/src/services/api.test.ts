@@ -1,5 +1,6 @@
 import { apiRequest } from "../config/api";
 import { EventService, UserService } from "./api";
+import { User } from "../types";
 
 jest.mock("../config/api", () => ({
   ...jest.requireActual("../config/api"),
@@ -72,5 +73,51 @@ describe("UserService.getUserEvents", () => {
     const result = await UserService.getUserEvents("user-1");
 
     expect(result).toEqual([]);
+  });
+});
+
+describe("EventService.getEventParticipants", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("relanza el error de red en vez de devolver [] silencioso (TS-1)", async () => {
+    mockedApiRequest.mockRejectedValueOnce(new Error("Failed to fetch"));
+
+    await expect(EventService.getEventParticipants("ev-1")).rejects.toThrow("Failed to fetch");
+  });
+
+  it("sigue devolviendo [] en lista vacía real (TS-2)", async () => {
+    mockedApiRequest.mockResolvedValueOnce({
+      count: 0,
+      data: { event: { id: "ev-1", name: "E", stage: "participation" }, participants: [] },
+    });
+
+    const result = await EventService.getEventParticipants("ev-1");
+
+    expect(result).toEqual([]);
+  });
+
+  it("mapea el camino feliz sin cambios (TS-3)", async () => {
+    mockedApiRequest.mockResolvedValueOnce({
+      count: 1,
+      data: {
+        participants: [{ id: "u1", name: "Test User", email: "t@t.com", role: "participant" }],
+      },
+    });
+
+    const result = await EventService.getEventParticipants("ev-1");
+
+    const expected: User[] = [
+      {
+        id: "u1",
+        name: "Test User",
+        email: "t@t.com",
+        role: "participant",
+        joinedEventIDs: [],
+        createdEventIDs: [],
+      },
+    ];
+    expect(result).toEqual(expected);
   });
 });

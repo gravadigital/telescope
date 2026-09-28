@@ -24,35 +24,6 @@ const Participants: React.FC<ParticipantsProps> = ({ eventId, eventTitle, onClos
     } catch (err) {
       console.error('Error fetching participants:', err);
       setError('Error loading participants');
-      
-      // Fallback with mock data for demo
-      const mockParticipants: User[] = [
-        {
-          id: 'user_1',
-          name: 'María González',
-          email: 'maria@example.com',
-          role: 'participant',
-          joinedEventIDs: [eventId],
-          createdEventIDs: []
-        },
-        {
-          id: 'user_2',
-          name: 'Carlos Rodríguez',
-          email: 'carlos@example.com',
-          role: 'participant',
-          joinedEventIDs: [eventId],
-          createdEventIDs: []
-        },
-        {
-          id: 'user_3',
-          name: 'Ana López',
-          email: 'ana@example.com',
-          role: 'participant',
-          joinedEventIDs: [eventId],
-          createdEventIDs: []
-        }
-      ];
-      setParticipants(mockParticipants);
     } finally {
       setLoading(false);
     }
@@ -117,7 +88,7 @@ const Participants: React.FC<ParticipantsProps> = ({ eventId, eventTitle, onClos
           </div>
         )}
 
-        {!loading && participants.length > 0 && (
+        {!loading && !error && participants.length > 0 && (
           <div className="participants-content">
             <div className="participants-stats">
               <p>📊 <strong>{participants.length}</strong> participant{participants.length !== 1 ? 's' : ''} registered</p>

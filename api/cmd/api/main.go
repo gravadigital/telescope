@@ -1,7 +1,7 @@
 package main
 
 import (
-	"net/http"
+	"errors"
 	"strings"
 
 	"github.com/gin-contrib/cors"
@@ -84,44 +84,26 @@ func main() {
 	voteDraftRepo := postgres.NewPostgresVoteDraftRepository(db)
 	voteDraftHandler := handlers.NewVoteDraftHandler(voteDraftRepo, voteRepo)
 
-	// Test database connection
-	router.GET("/health", func(c *gin.Context) {
+	router.GET("/health", healthHandler(version, func() error {
 		sqlDB, err := db.DB()
 		if err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{
-				"status":  "error",
-				"service": "telescopio-api",
-				"error":   "database connection failed",
-			})
-			return
+			return errors.New("database connection failed")
 		}
-
 		if err := sqlDB.Ping(); err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{
-				"status":  "error",
-				"service": "telescopio-api",
-				"error":   "database ping failed",
-			})
-			return
+			return errors.New("database ping failed")
 		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"status":   "ok",
-			"service":  "telescopio-api",
-			"version":  "1.0.0",
-			"database": "connected",
-		})
-	})
+		return nil
+	}))
 
 	api := router.Group("/api/v1")
 	{
 		// User management - Public endpoints (no auth required)
 		users := api.Group("/users")
 		{
-			users.POST("", userHandler.CreateUser)                         // Register new user (returns JWT)
-			users.POST("/authenticate", userHandler.AuthenticateUser)      // Login (returns JWT)
-			users.POST("/forgot-password", userHandler.ForgotPassword)     // Request password reset email
-			users.POST("/reset-password", userHandler.ResetPassword)       // Set new password with token
+			users.POST("", userHandler.CreateUser)                     // Register new user (returns JWT)
+			users.POST("/authenticate", userHandler.AuthenticateUser)  // Login (returns JWT)
+			users.POST("/forgot-password", userHandler.ForgotPassword) // Request password reset email
+			users.POST("/reset-password", userHandler.ResetPassword)   // Set new password with token
 		}
 
 		// Google OAuth - Public endpoints (no auth required)
@@ -131,13 +113,13 @@ func main() {
 			googleAuth.POST("/register", googleAuthHandler.RegisterGoogleUser)
 		}
 
-	// Protected user endpoints (require authentication)
-	usersProtected := api.Group("/users")
-	usersProtected.Use(auth.JWTAuthMiddleware())
-	{
-		usersProtected.GET("/:user_id", userHandler.GetUser)
-		usersProtected.GET("/:user_id/events", userHandler.GetUserEvents) // Get events where user participates
-	}
+		// Protected user endpoints (require authentication)
+		usersProtected := api.Group("/users")
+		usersProtected.Use(auth.JWTAuthMiddleware())
+		{
+			usersProtected.GET("/:user_id", userHandler.GetUser)
+			usersProtected.GET("/:user_id/events", userHandler.GetUserEvents) // Get events where user participates
+		}
 
 		// Event management - Public endpoints (no authentication required)
 		eventsPublic := api.Group("/events")

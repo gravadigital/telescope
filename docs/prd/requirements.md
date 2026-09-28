@@ -413,7 +413,7 @@ y porque son el insumo directo de los primeros requerimientos de corrección.
 | ID | Defecto | Severidad | Evidencia |
 |----|---------|-----------|-----------|
 | D-01 | **El fallback demo anula la validación del login.** El `catch` externo de `handleSubmit` crea un usuario ficticio con token `demo-token-{ts}` y lo loguea. Como las validaciones usan `throw`, ese mismo `catch` las captura: enviar con email vacío **deja al usuario logueado** en vez de mostrar el error | Crítica | `web/src/components/auth-form/AuthForm.tsx:132-152` |
-| D-02 | **Descarga de propuestas sin autenticación.** El endpoint está registrado fuera del grupo que aplica `JWTAuthMiddleware`: cualquiera con el UUID descarga la propuesta | Crítica | `api/cmd/api/main.go:219` |
+| D-02 | **Descarga de propuestas sin autenticación.** El endpoint estaba registrado fuera del grupo que aplica `JWTAuthMiddleware`: cualquiera con el UUID descargaba la propuesta | Crítica — **resuelto** en `625b6f4`: grupo propio con JWT y permiso en el handler | `api/cmd/api/main.go`, `attachment_handler.go:canDownload` |
 | D-03 | **Lectura de cualquier usuario sin verificación de ownership.** Cualquier usuario autenticado lee los datos de cualquier otro | Alta | `api/` handler de `GET /api/v1/users/{user_id}` |
 | D-04 | **La fecha del evento se autogenera y el usuario nunca la ve.** Se envía hoy+1día como `start_date`; no hay campo de fecha en el formulario | Alta | `web/src/pages/create-event/CreateEventPage.tsx:43-49` |
 | D-05 | **La misma acción tiene reglas distintas según la pantalla.** `ManageEventPage` valida que haya participantes y que todos hayan votado antes de avanzar; `EventDetailPage` permite el mismo avance **sin ningún chequeo** | Alta | `ManageEventPage.tsx:232-252` vs `EventDetailPage.tsx:284-420` |
@@ -426,6 +426,7 @@ y porque son el insumo directo de los primeros requerimientos de corrección.
 | D-12 | **JWT_SECRET con default hardcodeado.** Si falta la variable, el servicio arranca con un secreto conocido y solo emite un warning | Crítica | `api/internal/middleware/auth/jwt.go:20-26` |
 | D-13 | **Sin rutas protegidas ni ruta 404.** `/events/create` y `/events/:eventId/manage` son alcanzables por URL sin sesión. Una URL desconocida renderiza la navbar sobre contenido vacío | Media | `web/src/App.tsx:177-184` |
 | D-14 | **El health check de `Auth` está hardcodeado en `true`.** El aviso de API no disponible es código inalcanzable | Baja | `web/src/components/auth/Auth.tsx:30-36` |
+| D-15 | **Los evaluadores no pueden abrir las propuestas que tienen que rankear.** `canDownload` permite la descarga al dueño, al autor del evento y a un `admin`, pero no a quien tiene la propuesta en su asignación. Además, `RankingVotePanel` la abre con un `<a href>` sin token y con la URL `http://localhost:8080` fija. Bloquea el flujo de evaluación | Crítica | `api/internal/handlers/attachment_handler.go:canDownload`; `web/src/components/ranking-vote-panel/RankingVotePanel.tsx:242` |
 
 ---
 
@@ -487,7 +488,7 @@ y porque son el insumo directo de los primeros requerimientos de corrección.
 
 | ID | Requerimiento | Estado |
 |----|---------------|--------|
-| NFR-M-01 | Migraciones versionadas con `Up`/`Down`, ejecutadas al arrancar, más un CLI (`cmd/migrate`) con `-rollback` | **Implementado** — 20 migraciones |
+| NFR-M-01 | Migraciones versionadas con `Up`/`Down`, ejecutadas al arrancar, más un CLI (`cmd/migrate`) con `-rollback` | **Implementado** — 21 migraciones |
 | NFR-M-02 | El backend tiene suite de tests unitarios que corre sin base de datos | **Implementado** — ~4.300 líneas, 10 archivos, mocks a mano |
 | NFR-M-03 | Los servicios por dominio del frontend absorben la inconsistencia de envelopes del backend | **Implementado** — `src/services/api.ts` |
 | — | Cobertura de tests del backend | ⚠️ **Parcial** — cubre handlers y el algoritmo; **sin tests de middlewares (JWT y permisos) ni de repositorios** |
@@ -521,7 +522,7 @@ una SPA de CRA. Las 9 convenciones de cada servicio son custom.
 
 ### Datos y almacenamiento
 
-- **PostgreSQL** con extensión `uuid-ossp`. 9 tablas, 3 tipos enumerados, 20 migraciones.
+- **PostgreSQL** con extensión `uuid-ossp`. 9 tablas, 3 tipos enumerados, 21 migraciones.
 - **MinIO** (S3-compatible) para las propuestas en despliegue; filesystem local en desarrollo.
 - **`localStorage`** para la sesión del navegador.
 
@@ -535,10 +536,10 @@ una SPA de CRA. Las 9 convenciones de cada servicio son custom.
 
 ### Restricciones de infraestructura
 
-- Despliegue con Docker Compose (`deploy/docker-compose.yml`), con `STORAGE_PROVIDER=minio`
-  fijo. Hay un `deploy/verify-minio-production.sh` para verificar la conexión.
-- ⚠️ **El default del código Go es `local` mientras el README documenta `minio`**: levantar el
-  servicio sin el compose da filesystem local sin aviso.
+- Despliegue con Docker Compose e imágenes publicadas, con `STORAGE_PROVIDER=minio`. El compose
+  de servidor vive en el repositorio de deploy; `deploy/` en este repo es solo el stack local.
+- ⚠️ **El default del código Go es `local`**: correr la api sin el compose ni el `Makefile` da
+  filesystem local sin aviso.
 - El frontend se sirve como estáticos; toda la ejecución es client-side (sin SSR).
 
 ### Restricciones del modelo matemático
@@ -584,9 +585,9 @@ Heredadas de [goals-and-context.md](./goals-and-context.md):
 
 Nuevas, que surgen de escribir los requerimientos:
 
-3. **¿El límite de tamaño de archivo son 10 MB o 100 MB?** El cliente valida 10, la base
-   admite 100, y **el backend no valida nada**. Hoy el límite real es una validación de
-   frontend que cualquiera puede saltear llamando a la API directamente.
+3. **¿El límite de tamaño de archivo son 10 MB o 100 MB?** El cliente y el backend validan 10
+   (`MAX_FILE_SIZE`), así que ese es el límite efectivo; la base admite 100. Si 10 es el
+   definitivo, el CHECK de la base puede bajarse para que coincida.
 4. **¿Qué pasa si una propuesta no alcanza `min_evaluations_per_file`?** (D-10) El sistema lo
    permite en silencio. ¿Debería avisar al organizador antes de generar las asignaciones?
 5. **¿Debe poder descargarse una propuesta desde la interfaz?** El endpoint existe (sin auth),

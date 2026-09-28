@@ -4,7 +4,7 @@ title: Registro a un evento y carga de propuesta
 type: feature
 status: Active
 created: 2026-09-18
-last_updated: 2026-09-18
+last_updated: 2026-09-25
 stories: []
 ---
 
@@ -13,7 +13,7 @@ stories: []
 **Tipo:** Feature
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-09-18
+**Última actualización:** 2026-09-25
 **Stories:** — (documentado retroactivamente desde el código)
 
 ## Descripción
@@ -150,9 +150,12 @@ sequenceDiagram
 
 Reforzado en el input con `accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.doc,.docx"`.
 
-⚠️ **Esta validación es solo del cliente.** El backend no valida tamaño, y la base admite hasta
-100 MB (`CHECK file_size BETWEEN 1 AND 104857600`). Una llamada directa a la API saltea el límite.
-Ver pregunta abierta #3 en `docs/prd/requirements.md`.
+El backend vuelve a validar las dos cosas: el tamaño contra `MAX_FILE_SIZE` (10 MB por defecto,
+`FILE_TOO_LARGE`) y el tipo contra su propia lista blanca (`INVALID_FILE_TYPE`). La base admite
+hasta 100 MB (`CHECK file_size BETWEEN 1 AND 104857600`), pero no es el límite efectivo.
+
+⚠️ **Las listas de tipos no coinciden**: el cliente acepta WebP y el backend no. Un `.webp` pasa la
+validación del cliente y la api lo rechaza con `INVALID_FILE_TYPE`.
 
 **Ref:** `web/src/pages/event-detail/EventDetailPage.tsx:133-141`
 
@@ -165,7 +168,8 @@ Ver pregunta abierta #3 en `docs/prd/requirements.md`.
 - **Método:** POST
 - **Endpoint:** `/api/v1/events/{event_id}/participant/{participant_id}/attachment`
 - **Auth:** JWT Bearer — solo el propio participante o el autor del evento
-- **Body:** `multipart/form-data` con el campo `file` (binary)
+- **Body:** `multipart/form-data` con el campo `file` (binary) y `description` (opcional,
+  hasta 1000 caracteres; `DESCRIPTION_TOO_LONG` si se excede)
 
 **Response (éxito) — 201:** envelope `data` con `id` (uuid) y `filename`.
 
@@ -173,10 +177,15 @@ Ver pregunta abierta #3 en `docs/prd/requirements.md`.
 - **MinIO:** `PutObject`. La clave resultante se guarda en `attachments.file_path` (**es la clave
   del storage, no una ruta de filesystem**).
 - **`INSERT` sobre `attachments`:** `event_id`, `participant_id`, `filename` (generado),
-  `original_name` (el que subió el usuario), `file_path`, `file_size`, `mime_type`.
+  `original_name` (el que subió el usuario), `file_path`, `file_size`, `mime_type` y
+  `description`.
 
 **Reglas validadas:** solo en etapa `participation`; **una sola propuesta por participante por
 evento**; el creador no puede subir.
+
+**Reemplazo:** durante `participation`, el dueño puede eliminar su propuesta
+(`DELETE /api/v1/attachments/{attachment_id}`) y subir otra. Ni el autor del evento ni un
+`admin` pueden eliminar la de otro.
 
 **Ref:** `docs/apis/api.yaml` → `.../participant/{participant_id}/attachment`
 

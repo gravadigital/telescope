@@ -90,17 +90,7 @@ jobs:
             org.opencontainers.image.title=telescope-${{ matrix.service }}
             org.opencontainers.image.vendor=Grava Digital
 
-      - name: Build args de la web
-        id: webargs
-        if: matrix.service == 'web'
-        run: |
-          {
-            echo 'args<<EOF'
-            echo 'REACT_APP_API_URL=https://api.telescope.grava.io'
-            echo "REACT_APP_GOOGLE_CLIENT_ID=${{ secrets.REACT_APP_GOOGLE_CLIENT_ID }}"
-            echo EOF
-          } >> "$GITHUB_OUTPUT"
-
+      # Sin configuración de ninguna instalación adentro: ver dev-images.yml.
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -109,7 +99,6 @@ jobs:
           push: true
           build-args: |
             VERSION=${{ needs.verify.outputs.version }}
-            ${{ steps.webargs.outputs.args }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.service }}

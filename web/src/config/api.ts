@@ -1,8 +1,9 @@
 import { ApiConfig } from '../types';
+import { RUNTIME_CONFIG } from './runtime';
 
 // Configuración de la API
 export const API_CONFIG: ApiConfig = {
-  BASE_URL: process.env.REACT_APP_API_URL || 'http://localhost:8080',
+  BASE_URL: RUNTIME_CONFIG.API_URL,
   ENDPOINTS: {
     // Usuarios
     USERS: '/api/v1/users',

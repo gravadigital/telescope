@@ -8,6 +8,7 @@ import GoogleLoginButton from "./GoogleLoginButton";
 import UsernameModal from "./UsernameModal";
 import { useAuth } from "../../context/AuthContext";
 import { ApiHealthService, GoogleAuthService } from "../../services/api";
+import { RUNTIME_CONFIG } from "../../config/runtime";
 
 type OAuthState =
   | { phase: 'idle' }
@@ -97,7 +98,7 @@ const Auth: React.FC<AuthProps> = ({ initialMode = "login", onClose }) => {
         <h2>🔭 {isLogin ? "Login" : "Register"}</h2>
       </div>
 
-      {process.env.REACT_APP_GOOGLE_CLIENT_ID && (
+      {RUNTIME_CONFIG.GOOGLE_CLIENT_ID && (
         <>
           <GoogleLoginButton
             onSuccess={handleGoogleSuccess}

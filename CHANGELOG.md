@@ -8,9 +8,7 @@ versionado es [Semantic Versioning](https://semver.org/lang/es/).
 ## Política de versionado
 
 Todo el monorepo comparte **una sola versión**: `api` y `web` se publican juntas y
-llevan siempre el mismo número. Las variables por servicio de `deploy/`
-(`API_VERSION`, `WEB_VERSION`) existen para poder redesplegar uno sin tocar el otro,
-no para versionarlos por separado.
+llevan siempre el mismo número.
 
 Qué significa cada salto:
 
@@ -25,8 +23,7 @@ api y se esperan aditivas.
 
 ### Sacar un release
 
-La versión vive en `VERSION`, en `web/package.json` y en los `*_VERSION` de
-`deploy/.env.dist`. Un script escribe todos:
+La versión vive en `VERSION` y en `web/package.json`. Un script escribe los dos:
 
 ```sh
 scripts/set-version.sh 1.2.3      # sube todo
@@ -56,12 +53,8 @@ de staging; no es un release y no promete estabilidad.
 Cada build publica además un tag inmutable `dev-<sha>`, para que una imagen dev puntual
 siga siendo alcanzable después de que el tag `dev` se movió.
 
-Para correr contra él, poné las versiones por servicio en `dev` en `deploy/.env`:
-
-```
-API_VERSION=dev
-WEB_VERSION=dev
-```
+Para correr un servidor contra él, su compose (en el repo de deploy) tiene que bajar
+`gravadigital/telescope-{api,web}:dev`.
 
 ---
 
@@ -76,8 +69,50 @@ WEB_VERSION=dev
   `dev` en cada push a la rama) y `release.yml` (imágenes inmutables por tag).
 - **Versionado único** del monorepo, con `scripts/set-version.sh` como única puerta.
 
+### Cambiado
+
+- **`deploy/` es sólo para levantarlo local**, sin `.env`: cada variable trae su default,
+  incluido un `JWT_SECRET` de desarrollo, y el bucket de MinIO lo crea el propio compose.
+  Se eliminan `local.sh`, `.env.dist` y el compose de servidor, que pasa al repo de deploy.
+- **`Makefile` en la raíz** como único punto de entrada: `make up` / `stop` / `down` /
+  `reset` para el stack en Docker, `make infra` + `make api` + `make web` para correr cada
+  parte a mano, y `make test` / `test-integration`.
+- **`documentation/`** (en inglés): features, instalación, configuración y referencia de la
+  API. `README.md` y `CONTRIBUTING.md` nuevos en la raíz.
+- Se eliminan la documentación, los composes y los scripts propios de `api/` y `web/`,
+  restos de cuando eran repositorios separados. La licencia pasa a la raíz.
+- **CI**: los tests de web vuelven a correr.
+
+- **La imagen de la web ya no lleva configuración adentro.** La URL de la api y el Client
+  ID de Google se leen al arrancar el contenedor (`API_URL`, `GOOGLE_CLIENT_ID`) y se
+  escriben en `config.js`. La misma imagen publicada sirve para cualquier instalación, y el
+  CI deja de pasar build-args. Se eliminan las URLs `localhost:8080` escritas a mano.
+
+  > ⚠️ **Requiere un cambio en cada servidor antes de actualizar la imagen de la web.** El
+  > servicio web tiene que recibir `API_URL` (la URL pública de la api) y, si se usa login
+  > con Google, `GOOGLE_CLIENT_ID`. Sin `API_URL`, la web apunta a `http://localhost:8080`
+  > y deja de funcionar. En dev: `API_URL=https://api.telescope.dev.grava.io`. El secret
+  > `REACT_APP_GOOGLE_CLIENT_ID` de GitHub deja de usarse.
+
+### Corregido
+
+- **`/health` informaba siempre `"version": "1.0.0"`**, un valor escrito a mano. Ahora
+  devuelve la versión con la que se compiló el binario (`0.2.0`, `dev-<sha>`, o `dev` en
+  un build local), así se puede saber qué versión corre un servidor. El `Dockerfile` pasa
+  a compilar el paquete `./cmd/api` y no sólo `main.go`.
+
+- **`make up` fallaba en `go mod download`** en máquinas con una copia vieja de
+  `golang:1.26-alpine` (Go 1.26.5 contra el 1.26.6 que pide `go.mod`). Las imágenes base
+  quedan fijadas: `golang:1.26.6-alpine` y `node:22-alpine`, alineadas con `go.mod` y
+  `.nvmrc`.
+
+### Seguridad
+
+- **Login con Google**: la api rechaza access tokens emitidos para otras apps y cuentas
+  con el email sin verificar.
+
 ### Conocido
 
-- La suite de `web` no corre todavía: el Jest que trae `react-scripts` 5 no resuelve
-  los `exports` de `react-router-dom` 7. El build sí pasa. Se destraba al migrar a
-  Vite + Vitest.
+- **Los evaluadores no pueden abrir las propuestas que tienen asignadas** (D-15): la
+  descarga no los incluye entre quienes tienen permiso, y el panel de ranking la abre sin
+  token.

@@ -6,7 +6,7 @@
 | **Extensiones** | `uuid-ossp` |
 | **Acceso** | GORM 1.30.2 (`gorm.io/driver/postgres`) |
 | **Servicio propietario** | [`api`](../architectures/api/index.md) |
-| **Migraciones** | 20, versionadas en Go (`internal/storage/migrations/`) |
+| **Migraciones** | 21, versionadas en Go (`internal/storage/migrations/`) |
 
 Todo el estado del producto vive acá. Las claves primarias son UUID generadas por
 `uuid_generate_v4()` o por la aplicación en el hook `BeforeCreate`.
@@ -86,6 +86,7 @@ erDiagram
         varchar file_path "clave en el storage"
         bigint file_size
         varchar mime_type
+        text description "nullable"
         integer vote_count "mantenido por trigger"
         timestamptz uploaded_at
     }
@@ -241,6 +242,7 @@ restricción impuesta por la aplicación.
 | `file_path` | `varchar` | NOT NULL. **Clave en el storage**, no una ruta del filesystem |
 | `file_size` | `bigint` | NOT NULL, CHECK entre 1 y 104857600 (100MB) |
 | `mime_type` | `varchar(100)` | NOT NULL |
+| `description` | `text` | Nullable. Descripción opcional de la propuesta, hasta 1000 caracteres (validado en la api) |
 | `vote_count` | `integer` | Default 0. **Lo mantiene un trigger** |
 | `uploaded_at` | `timestamptz` | |
 
@@ -461,6 +463,7 @@ Migraciones en Go, no en SQL, con `Up` y `Down` registradas en orden en
 | 018 | `add_is_cancelled_to_events` | Cancelación |
 | 019 | `add_password_reset_to_users` | Token de recuperación |
 | 020 | `add_is_paused_to_events` | Pausa |
+| 021 | `add_description_to_attachments` | Descripción opcional de la propuesta |
 
 Notas:
 
@@ -470,5 +473,3 @@ Notas:
   `system_validation` y desactivación temporal del CHECK `future_start_date`.
 - El `Down` de la 017 **no restaura** `password_hash NOT NULL`, deliberadamente, para no
   romper los usuarios OAuth ya creados.
-- Existe un `migrations/003_add_password_hash.sql` suelto en la raíz del repo, fuera del
-  sistema de migraciones de Go. No se ejecuta.
