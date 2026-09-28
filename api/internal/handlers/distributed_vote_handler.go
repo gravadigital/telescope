@@ -168,10 +168,10 @@ func (h *DistributedVoteHandler) CreateVotingConfiguration(c *gin.Context) {
 		return
 	}
 
-	if len(participants) < 2 {
+	if len(participants) < 3 {
 		h.log.Warn("insufficient participants for voting", "event_id", eventID, "participant_count", len(participants))
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":         "At least 2 participants are required for distributed voting",
+			"error":         "At least 3 participants are required for distributed voting",
 			"code":          "INSUFFICIENT_PARTICIPANTS",
 			"current_count": len(participants),
 		})
@@ -415,10 +415,10 @@ func (h *DistributedVoteHandler) GenerateAssignments(c *gin.Context) {
 		return
 	}
 
-	if len(participantUsers) < 2 {
+	if len(participantUsers) < 3 {
 		h.log.Warn("insufficient participants for assignment generation", "event_id", eventID, "participant_count", len(participantUsers))
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":         "At least 2 participants are required for distributed voting",
+			"error":         "At least 3 participants are required for distributed voting",
 			"code":          "INSUFFICIENT_PARTICIPANTS",
 			"current_count": len(participantUsers),
 		})

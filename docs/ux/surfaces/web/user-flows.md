@@ -165,7 +165,7 @@ graph TD
 
 | Situación | Qué ve el organizador | Estado |
 |---|---|---|
-| Sin participantes al avanzar | `Cannot advance: No participants registered yet.` | Bien resuelto **solo desde S-05** |
+| Participantes insuficientes al avanzar a `voting` | `Cannot advance to voting: ... At least 3 participants are required.` | Resuelto desde S-05 y S-04 + backend |
 | Votación incompleta | `Cannot advance: Only {x} of {y} participants have voted.` | Bien resuelto **solo desde S-05** |
 | No es el creador | `You do not have permission to manage this event.` | **El único estado de permiso explícito del producto** |
 | Sin sesión | Redirige a `/events` **sin ningún mensaje** | ⚠️ Deficiente |

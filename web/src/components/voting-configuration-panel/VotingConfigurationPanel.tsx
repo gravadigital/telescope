@@ -69,7 +69,7 @@ const VotingConfigurationPanel: React.FC<VotingConfigurationPanelProps> = ({
     }
   };
 
-  const readyToStart = totalAttachments >= 2 && totalParticipants >= 2;
+  const readyToStart = totalAttachments >= 2 && totalParticipants >= 3;
 
   return (
     <div className="vcp-panel">
@@ -99,7 +99,7 @@ const VotingConfigurationPanel: React.FC<VotingConfigurationPanelProps> = ({
 
       {!readyToStart && (
         <div className="vcp-warning">
-          ⚠️ You need at least 2 submissions and 2 participants to start voting.
+          ⚠️ You need at least 2 submissions and 3 participants to start voting.
         </div>
       )}
 

@@ -383,6 +383,28 @@ func (h *EventHandler) UpdateEventStage(c *gin.Context) {
 	case event.StageVoting:
 		h.log.Debug("moving to voting stage", "event_id", eventID)
 
+		// Validate that there are enough participants for meaningful voting
+		participants, err := h.userRepo.GetEventParticipants(eventID)
+		if err != nil {
+			h.log.Error("failed to get participants", "event_id", eventID, "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to validate participants",
+				"code":  "PARTICIPANTS_ERROR",
+			})
+			return
+		}
+
+		if len(participants) < 3 {
+			h.log.Warn("insufficient participants for voting", "event_id", eventID, "participant_count", len(participants))
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":            "At least 3 participants are required to advance to voting",
+				"code":             "INSUFFICIENT_PARTICIPANTS",
+				"current_count":    len(participants),
+				"required_minimum": 3,
+			})
+			return
+		}
+
 		// Validate that there are enough attachments for voting
 		attachments, err := h.attachmentRepo.GetByEventID(eventID)
 		if err != nil {

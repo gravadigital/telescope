@@ -180,13 +180,64 @@
   margin-top: 2px;
 }
 
+.etl-stage-card-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-bottom: 4px;
+}
+
 .etl-stage-card-name {
-  margin: 0 0 4px 0;
+  margin: 0;
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #a78bfa;
+}
+
+.etl-stage-card-participants-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.etl-stage-card-participants {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  border-radius: var(--radius-full);
+  background: rgba(106, 90, 205, 0.18);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.etl-stage-card-participants strong {
+  color: #fff;
+  font-size: 0.8rem;
+}
+
+.etl-stage-card-view-participants {
+  padding: 3px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.etl-stage-card-view-participants:hover {
+  border-color: var(--color-primary-hover);
+  color: #fff;
 }
 
 .etl-stage-card-detail {

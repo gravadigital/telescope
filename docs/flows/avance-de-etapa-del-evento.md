@@ -75,19 +75,22 @@ sequenceDiagram
 
 **Origen:** `web` · **Destino:** `web` · **Tipo:** Interno
 
-⚠️ **Acá está la inconsistencia D-05.** Las validaciones dependen de la pantalla:
+⚠️ **D-05 (parcialmente resuelta).** Las validaciones de `participation` → `voting` ahora están en
+ambas pantallas y coinciden con el backend; el resto de las transiciones todavía depende de la pantalla.
 
 **Desde `ManageEventPage`** (`:232-252`) — valida antes de llamar a la API:
 
 | Validación | Regla |
 |---|---|
-| Sin participantes | Bloquea si se avanza desde `participation` con `participants.length === 0` → `Cannot advance: No participants registered yet.` |
+| Participantes insuficientes | Bloquea si se avanza de `participation` a `voting` con `participants.length < 3` → `Cannot advance to voting: no participants registered yet.` o `Cannot advance to voting: only {n} participants registered. At least 3 participants are required.` |
 | Votación incompleta | Bloquea si se avanza de `voting` a `results` con `votedCount < totalParticipants` → `Cannot advance: Only {x} of {y} participants have voted.` |
 
 El error se lanza con `throw` y lo captura `StageAdvanceModal`, que lo muestra en su propio bloque.
 
-**Desde `EventDetailPage`** (`:284-420`) — **ninguna validación**. El mismo avance se ejecuta sin
-chequeos.
+**Desde `EventDetailPage`** — valida lo mismo para `participation` → `voting` (contra
+`event.participant_ids`) y también re-lanza el error para que lo muestre `StageAdvanceModal`.
+Para el resto de las transiciones sigue sin chequeos previos: el backend responde con 400 y el
+mensaje se propaga al modal.
 
 **Consecuencia real:** un organizador que avance desde la pantalla de detalle puede cerrar la
 votación con evaluaciones pendientes. Quien no completó recibe `Q_i = 0` y **su propia propuesta
@@ -182,10 +185,11 @@ cancelarse en cualquier etapa.
 
 | Paso | Condición | Respuesta | Qué ve el organizador |
 |---|---|---|---|
-| 1 | Sin participantes (solo desde Manage) | — | `Cannot advance: No participants registered yet.` |
+| 1 | Participantes insuficientes para `voting` | — | `Cannot advance to voting: ... At least 3 participants are required.` |
 | 1 | Votación incompleta (solo desde Manage) | — | `Cannot advance: Only {x} of {y} participants have voted.` |
 | 3 | Salto de etapa o retroceso | 400 | Mensaje del backend |
 | 3 | Falta `estimated_end_date` | 400 | Idem |
+| 3 | Menos de 3 participantes al pasar a `voting` | 400 | `At least 3 participants are required to advance to voting` (`INSUFFICIENT_PARTICIPANTS`) |
 | 3 | Menos de 2 propuestas al pasar a `voting` | 400 | Idem |
 | 3 | No es el autor del evento | 403 | — |
 | 4 | Falla el envío de email | — | ⚠️ **Nada.** Falla en silencio |

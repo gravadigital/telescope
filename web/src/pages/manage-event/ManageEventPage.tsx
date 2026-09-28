@@ -222,9 +222,12 @@ const ManageEventPage: React.FC = () => {
   };
 
   const validateStageAdvance = (currentStage: Event['stage'], targetStage: Event['stage']): string | null => {
-    // Can't advance from participation if no participants
-    if (currentStage === 'participation' && participants.length === 0) {
-      return 'Cannot advance: No participants registered yet.';
+    // Can't advance to voting without enough participants for meaningful voting
+    if (currentStage === 'participation' && targetStage === 'voting' && participants.length < 3) {
+      if (participants.length === 0) {
+        return 'Cannot advance to voting: no participants registered yet.';
+      }
+      return `Cannot advance to voting: only ${participants.length} participant${participants.length > 1 ? 's' : ''} registered. At least 3 participants are required.`;
     }
 
     // Note: We no longer require all participants to submit files before advancing to voting
@@ -393,11 +396,6 @@ const getStageName = (stage: Event['stage']): string => {
             </div>
 
             <div className="meta-item">
-              <span className="meta-label">Participants:</span>
-              <span className="meta-value">{participants.length} / {event.max_participants || 20}</span>
-            </div>
-            
-            <div className="meta-item">
               <span className="meta-label">Files Submitted:</span>
               <span className="meta-value">
                 {new Set(attachments.map(a => a.participant_id)).size} / {participants.length}
@@ -461,6 +459,8 @@ const getStageName = (stage: Event['stage']): string => {
 
           <EventTimeline
             currentStage={event.stage}
+            participantCount={participants.length}
+            maxParticipants={event.max_participants || 20}
             deadlines={{
               participation: event.participation_estimated_end_date,
               voting: event.voting_estimated_end_date,

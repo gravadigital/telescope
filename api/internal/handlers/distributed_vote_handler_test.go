@@ -189,7 +189,7 @@ func TestCreateVotingConfiguration_RejectsInsufficientParticipants(t *testing.T)
 	s := newTestHandlerSet()
 	e := newParticipationEvent()
 	s.eventRepo.addEvent(e)
-	users := addParticipants(s, e.ID, 1) // only 1, need >= 2
+	users := addParticipants(s, e.ID, 2) // only 2, need >= 3
 	addAttachments(s, e.ID, users)
 
 	w := performRequest(t, http.MethodPost, s.handler.CreateVotingConfiguration,
@@ -197,7 +197,9 @@ func TestCreateVotingConfiguration_RejectsInsufficientParticipants(t *testing.T)
 		map[string]interface{}{"attachments_per_evaluator": 2, "min_evaluations_per_file": 1, "adjustment_magnitude": 3})
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Equal(t, "INSUFFICIENT_PARTICIPANTS", jsonBody(t, w)["code"])
+	resp := jsonBody(t, w)
+	assert.Equal(t, "INSUFFICIENT_PARTICIPANTS", resp["code"])
+	assert.Equal(t, float64(2), resp["current_count"])
 }
 
 func TestCreateVotingConfiguration_RejectsMExceedingConflictOfInterestBound(t *testing.T) {

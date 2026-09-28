@@ -98,6 +98,17 @@ const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBack }) =>
 
   const handleStageConfirm = async (targetStage: Event['stage'], estimatedEndDate?: string): Promise<void> => {
     if (!event) return;
+
+    // Same gate as the backend: voting needs at least 3 participants
+    if (targetStage === 'voting' && (event.participant_ids?.length ?? 0) < 3) {
+      const count = event.participant_ids?.length ?? 0;
+      const message = count === 0
+        ? 'Cannot advance to voting: no participants registered yet.'
+        : `Cannot advance to voting: only ${count} participant${count > 1 ? 's' : ''} registered. At least 3 participants are required.`;
+      setError(message);
+      throw new Error(message);
+    }
+
     setStageLoading(true);
     setError('');
     try {
@@ -106,8 +117,11 @@ const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBack }) =>
       setSuccess(`Stage updated to: ${getStageDisplayName(targetStage)}`);
       setShowStageModal(false);
       await fetchEventDetails();
-    } catch {
-      setError('Error updating event stage');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error updating event stage';
+      setError(message);
+      // Rethrow so the stage modal shows the rejection reason to the organizer
+      throw new Error(message);
     } finally {
       setStageLoading(false);
     }
@@ -277,15 +291,6 @@ const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBack }) =>
                 <span className="edp-meta-icon">👤</span>
                 <span>{event.organizer || 'Not specified'}</span>
               </div>
-              <div className="edp-meta-item edp-meta-participants">
-                <span className="edp-meta-icon">👥</span>
-                <span>{event.participant_ids?.length || 0} / {event.max_participants || 20} participants</span>
-                {(event.participant_ids?.length ?? 0) > 0 && (
-                  <button className="edp-participants-toggle" onClick={() => setShowParticipants(v => !v)}>
-                    {showParticipants ? 'Hide' : 'View'}
-                  </button>
-                )}
-              </div>
             </div>
           </div>
         </section>
@@ -298,6 +303,12 @@ const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBack }) =>
         <section className="edp-status">
           <EventTimeline
             currentStage={currentStage}
+            participantCount={event.participant_ids?.length ?? 0}
+            maxParticipants={event.max_participants || 20}
+            onViewParticipants={(event.participant_ids?.length ?? 0) > 0
+              ? () => setShowParticipants(v => !v)
+              : undefined}
+            participantsActionLabel={showParticipants ? 'Hide participants' : 'View participants'}
             deadlines={{
               participation: event.participation_estimated_end_date,
               voting: event.voting_estimated_end_date,
