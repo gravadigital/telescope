@@ -82,13 +82,16 @@ ambas pantallas y coinciden con el backend; el resto de las transiciones todaví
 
 | Validación | Regla |
 |---|---|
-| Participantes insuficientes | Bloquea si se avanza de `participation` a `voting` con `participants.length < 3` → `Cannot advance to voting: no participants registered yet.` o `Cannot advance to voting: only {n} participants registered. At least 3 participants are required.` |
+| Sin participantes | Bloquea si se avanza desde `participation` con `participants.length === 0` → `Cannot advance: No participants registered yet.` |
+| Participantes insuficientes | Bloquea si se avanza de `participation` a `voting` con 1 o 2 participantes → `Cannot advance to voting: only {n} participant(s) registered. At least 3 participants are required.` |
 | Votación incompleta | Bloquea si se avanza de `voting` a `results` con `votedCount < totalParticipants` → `Cannot advance: Only {x} of {y} participants have voted.` |
 
 El error se lanza con `throw` y lo captura `StageAdvanceModal`, que lo muestra en su propio bloque.
 
-**Desde `EventDetailPage`** — valida lo mismo para `participation` → `voting` (contra
+**Desde `EventDetailPage`** — valida el mínimo de 3 para `participation` → `voting` (contra
 `event.participant_ids`) y también re-lanza el error para que lo muestre `StageAdvanceModal`.
+Con 0 participantes el mensaje es `Cannot advance to voting: no participants registered yet.`;
+con 1 o 2, el mismo que en `ManageEventPage`.
 Para el resto de las transiciones sigue sin chequeos previos: el backend responde con 400 y el
 mensaje se propaga al modal.
 
@@ -132,7 +135,11 @@ baja `n` posiciones**: un cierre prematuro penaliza a gente que todavía tenía 
 **Validaciones del backend:**
 - Transiciones válidas: `creation → participation → voting → results`. **Sin retroceso ni saltos.**
 - `estimated_end_date` es **obligatoria** cuando la etapa destino es `participation` o `voting`.
-- **Pasar a `voting` exige al menos 2 propuestas cargadas.**
+- **Pasar a `voting` exige al menos 3 participantes registrados** (`INSUFFICIENT_PARTICIPANTS`)
+  **y al menos 2 propuestas cargadas.**
+- Pasar a `results` calcula y guarda el ranking (`CalculateAndPersistResults`). Si falla, la
+  etapa cambia igual y el error solo se loguea (ver
+  [cálculo y publicación de resultados](calculo-y-publicacion-de-resultados.md)).
 
 **Operación de BD:** `UPDATE` sobre `events` — `stage` y, según la etapa destino,
 `participation_estimated_end_date` o `voting_estimated_end_date`.

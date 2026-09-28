@@ -18,11 +18,11 @@ creation → participation → voting → results
 | `creation` | The organizer sets it up. Nobody else can join yet. |
 | `participation` | People register through the event's shareable link and upload their proposal. |
 | `voting` | The organizer configures the voting and generates the assignments; each participant ranks the proposals they got. |
-| `results` | The ranking is published. |
+| `results` | The ranking is calculated once and published. Anyone with the event link can see it, without an account. |
 
 Only the organizer advances the stage, and each step is irreversible from the interface.
 Entering `participation` or `voting` requires an estimated end date for that stage; entering
-`voting` requires at least two proposals.
+`voting` requires at least three participants and two proposals.
 
 Independently of the stage, an event can be **paused** (nobody can register or upload while
 paused) and **cancelled** (permanent). The estimated end date of a stage can be postponed,

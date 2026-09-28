@@ -673,7 +673,12 @@ paths:
         `creation → participation → voting → results`, sin retroceso ni saltos.
 
         `estimated_end_date` es obligatoria cuando la etapa destino es `participation` o
-        `voting`. Pasar a `voting` exige al menos 2 propuestas cargadas.
+        `voting`. Pasar a `voting` exige al menos 3 participantes registrados y al menos 2
+        propuestas cargadas.
+
+        Pasar a `results` calcula el ranking MBC y lo guarda en `voting_results` para que el GET
+        público de resultados tenga qué servir. Si el cálculo falla (por ejemplo, nadie votó) el
+        cambio de etapa igual se aplica y el error solo queda en el log.
 
         Dispara emails a los participantes en segundo plano.
       parameters:
@@ -724,6 +729,7 @@ paths:
             `MISSING_EVENT_ID`, `INVALID_EVENT_ID`, `INVALID_PAYLOAD`, `INVALID_STAGE`,
             `INVALID_TRANSITION` (+ `current_stage`, `requested_stage`),
             `MISSING_ESTIMATED_DATE`, `INVALID_DATE_FORMAT`, `INVALID_ESTIMATED_DATE`,
+            `INSUFFICIENT_PARTICIPANTS` (+ `current_count`, `required_minimum`),
             `NO_ATTACHMENTS`, `INSUFFICIENT_ATTACHMENTS` (+ `current_count`, `required_minimum`)
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
@@ -732,7 +738,7 @@ paths:
           description: '`EVENT_NOT_FOUND`'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '500':
-          description: '`ATTACHMENTS_ERROR`, `DB_UPDATE_ERROR`, `RETRIEVAL_ERROR`'
+          description: '`PARTICIPANTS_ERROR`, `ATTACHMENTS_ERROR`, `DB_UPDATE_ERROR`, `RETRIEVAL_ERROR`'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
 
   /api/v1/events/{event_id}/estimated-end-date:
@@ -1109,6 +1115,7 @@ paths:
       summary: Configurar los parámetros de votación
       description: |
         Solo el autor del evento, un organizador o un admin. Una sola configuración por evento.
+        Requiere al menos 3 participantes (`INSUFFICIENT_PARTICIPANTS`).
 
         Valida las restricciones matemáticas del algoritmo: `m ≤ k-1` (nadie evalúa lo propio),
         `m ≥ 2·log₂(k)` para convergencia, y cobertura suficiente (`n·m ≥ k·min_evaluations`).
@@ -1196,7 +1203,8 @@ paths:
       tags: [Votación distribuida]
       summary: Generar las asignaciones de evaluación
       description: |
-        Sin body. Solo durante la etapa `voting` y una sola vez por evento.
+        Sin body. Solo durante la etapa `voting` y una sola vez por evento. Requiere al menos 3
+        participantes (`INSUFFICIENT_PARTICIPANTS`).
 
         Ejecuta el algoritmo de asignación: garantiza el mínimo de evaluaciones por propuesta,
         completa hasta `m` por participante y excluye la propuesta propia de cada evaluador.
