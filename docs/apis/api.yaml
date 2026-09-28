@@ -673,7 +673,12 @@ paths:
         `creation → participation → voting → results`, sin retroceso ni saltos.
 
         `estimated_end_date` es obligatoria cuando la etapa destino es `participation` o
-        `voting`. Pasar a `voting` exige al menos 2 propuestas cargadas.
+        `voting`. Pasar a `voting` exige al menos 3 participantes registrados y al menos 2
+        propuestas cargadas.
+
+        Pasar a `results` calcula el ranking MBC y lo guarda en `voting_results` para que el GET
+        público de resultados tenga qué servir. Si el cálculo falla (por ejemplo, nadie votó) el
+        cambio de etapa igual se aplica y el error solo queda en el log.
 
         Dispara emails a los participantes en segundo plano.
       parameters:
@@ -724,6 +729,7 @@ paths:
             `MISSING_EVENT_ID`, `INVALID_EVENT_ID`, `INVALID_PAYLOAD`, `INVALID_STAGE`,
             `INVALID_TRANSITION` (+ `current_stage`, `requested_stage`),
             `MISSING_ESTIMATED_DATE`, `INVALID_DATE_FORMAT`, `INVALID_ESTIMATED_DATE`,
+            `INSUFFICIENT_PARTICIPANTS` (+ `current_count`, `required_minimum`),
             `NO_ATTACHMENTS`, `INSUFFICIENT_ATTACHMENTS` (+ `current_count`, `required_minimum`)
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
@@ -732,7 +738,7 @@ paths:
           description: '`EVENT_NOT_FOUND`'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '500':
-          description: '`ATTACHMENTS_ERROR`, `DB_UPDATE_ERROR`, `RETRIEVAL_ERROR`'
+          description: '`PARTICIPANTS_ERROR`, `ATTACHMENTS_ERROR`, `DB_UPDATE_ERROR`, `RETRIEVAL_ERROR`'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
 
   /api/v1/events/{event_id}/estimated-end-date:
@@ -1109,6 +1115,7 @@ paths:
       summary: Configurar los parámetros de votación
       description: |
         Solo el autor del evento, un organizador o un admin. Una sola configuración por evento.
+        Requiere al menos 3 participantes (`INSUFFICIENT_PARTICIPANTS`).
 
         Valida las restricciones matemáticas del algoritmo: `m ≤ k-1` (nadie evalúa lo propio),
         `m ≥ 2·log₂(k)` para convergencia, y cobertura suficiente (`n·m ≥ k·min_evaluations`).
@@ -1196,7 +1203,8 @@ paths:
       tags: [Votación distribuida]
       summary: Generar las asignaciones de evaluación
       description: |
-        Sin body. Solo durante la etapa `voting` y una sola vez por evento.
+        Sin body. Solo durante la etapa `voting` y una sola vez por evento. Requiere al menos 3
+        participantes (`INSUFFICIENT_PARTICIPANTS`).
 
         Ejecuta el algoritmo de asignación: garantiza el mínimo de evaluaciones por propuesta,
         completa hasta `m` por participante y excluye la propuesta propia de cada evaluador.
@@ -1449,15 +1457,18 @@ paths:
   /api/v1/events/{event_id}/distributed-results:
     get:
       tags: [Votación distribuida]
-      summary: Resultados de la votación distribuida
+      summary: Resultados de la votación distribuida (solo lectura)
       description: |
         Devuelve el ranking global (`global_ranking`, por puntaje MBC) y el ranking ajustado
         por el sistema de incentivos (`adjusted_ranking`), más la calidad de cada evaluador.
 
-        **⚠️ Este GET muta estado:** recalcula el MBC en cada llamada y hace upsert en
-        `voting_results`. No es idempotente.
+        **Solo lectura:** devuelve la fila guardada en `voting_results` (calculada al entrar a
+        la etapa `results`, o por `POST .../distributed-results/recalculate`). No escribe ni
+        recalcula.
 
-        Disponible en las etapas `voting` y `results`. Cualquier usuario autenticado.
+        Disponible en las etapas `voting` y `results`. **Público (sin sesión)**: el detalle
+        del evento y sus resultados son visibles para visitantes anónimos.
+      security: []
       parameters:
         - $ref: '#/components/parameters/EventId'
         - name: include_metrics
@@ -1496,9 +1507,41 @@ paths:
         '400':
           description: '`event_id` ausente o con formato inválido'
           content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
-        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
         '403':
           description: Etapa incorrecta (+ `current_stage`). Semánticamente debería ser 400.
+          content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
+        '404':
+          description: Evento inexistente, o `RESULTS_NOT_CALCULATED` si todavía no se guardó el ranking
+          content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
+
+  /api/v1/events/{event_id}/distributed-results/recalculate:
+    post:
+      tags: [Votación distribuida]
+      summary: Recalcular los resultados de la votación
+      description: |
+        Recalcula el MBC, rellena los nombres de los autores y hace upsert en `voting_results`.
+
+        **⚠️ Muta estado:** no es idempotente (defecto D-11, ahora aislado en este POST).
+
+        Se ejecuta automáticamente cuando el organizador pasa el evento a la etapa `results`,
+        y lo llama el frontend como fallback si un evento llegó a `results` sin ranking
+        guardado. La respuesta tiene el mismo shape que el GET de solo lectura.
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+        - name: include_metrics
+          in: query
+          schema: { type: string, enum: ['true'] }
+          description: Si es exactamente `true`, agrega `data.configuration`
+      responses:
+        '200':
+          description: Resultados recalculados (mismo schema que el GET)
+          content: { application/json: { schema: { type: object } } }
+        '400':
+          description: '`event_id` ausente o con formato inválido'
+          content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '403':
+          description: Etapa incorrecta (+ `current_stage`)
           content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
         '404':
           description: Evento o configuración de votación inexistente
@@ -1517,6 +1560,9 @@ paths:
 
         Los umbrales de calidad usados acá están **hardcodeados** (≥0.7 bueno, ≤0.3 malo) y no
         coinciden con los configurables por evento.
+
+        **Público (sin sesión)**: los visitantes anónimos ven el avance de la votación.
+      security: []
       parameters:
         - $ref: '#/components/parameters/EventId'
       responses:
@@ -1550,7 +1596,6 @@ paths:
         '400':
           description: '`event_id` ausente'
           content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
-        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
         '500':
           description: Fallo al obtener votos o asignaciones
           content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }

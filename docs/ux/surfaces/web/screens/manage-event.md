@@ -118,7 +118,8 @@ Microcopy transcripto **textual**, en inglés.
 o `▶️ Resume this event? ` (con un espacio final sobrante).
 
 ### Validaciones de avance
-- `Cannot advance: No participants registered yet.`
+- `Cannot advance: No participants registered yet.` (0 participantes)
+- `Cannot advance to voting: only {n} participant(s) registered. At least 3 participants are required.` (1 o 2)
 - `Cannot advance: Only {votedCount} of {totalParticipants} participants have voted.`
 
 ### Votación en curso

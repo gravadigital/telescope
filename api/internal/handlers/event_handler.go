@@ -21,16 +21,20 @@ type EventHandler struct {
 	userRepo       postgres.UserRepository
 	attachmentRepo postgres.AttachmentRepository
 	emailService   *email.EmailService
-	config         *config.Config
-	log            *log.Logger
+	// voteHandler recalculates and stores the ranking when the event enters
+	// the results stage; may be nil in tests that never reach that stage.
+	voteHandler *DistributedVoteHandler
+	config      *config.Config
+	log         *log.Logger
 }
 
-func NewEventHandler(eventRepo postgres.EventRepository, userRepo postgres.UserRepository, attachmentRepo postgres.AttachmentRepository, emailService *email.EmailService, cfg *config.Config) *EventHandler {
+func NewEventHandler(eventRepo postgres.EventRepository, userRepo postgres.UserRepository, attachmentRepo postgres.AttachmentRepository, emailService *email.EmailService, voteHandler *DistributedVoteHandler, cfg *config.Config) *EventHandler {
 	return &EventHandler{
 		eventRepo:      eventRepo,
 		userRepo:       userRepo,
 		attachmentRepo: attachmentRepo,
 		emailService:   emailService,
+		voteHandler:    voteHandler,
 		config:         cfg,
 		log:            logger.Handler("event"),
 	}
@@ -200,11 +204,11 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 				"code":    "MAX_PARTICIPANTS_LIMIT_EXCEEDED",
 				"details": "System limit is 100 participants per event",
 			})
-		return
-	}
-	newEvent.MaxParticipants = req.MaxParticipants
-	h.log.Debug("using custom max_participants", "value", *req.MaxParticipants)
-}	// Validate the event domain entity
+			return
+		}
+		newEvent.MaxParticipants = req.MaxParticipants
+		h.log.Debug("using custom max_participants", "value", *req.MaxParticipants)
+	} // Validate the event domain entity
 	if err := newEvent.Validate(); err != nil {
 		h.log.Error("event validation failed", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -383,6 +387,28 @@ func (h *EventHandler) UpdateEventStage(c *gin.Context) {
 	case event.StageVoting:
 		h.log.Debug("moving to voting stage", "event_id", eventID)
 
+		// Validate that there are enough participants for meaningful voting
+		participants, err := h.userRepo.GetEventParticipants(eventID)
+		if err != nil {
+			h.log.Error("failed to get participants", "event_id", eventID, "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to validate participants",
+				"code":  "PARTICIPANTS_ERROR",
+			})
+			return
+		}
+
+		if len(participants) < 3 {
+			h.log.Warn("insufficient participants for voting", "event_id", eventID, "participant_count", len(participants))
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":            "At least 3 participants are required to advance to voting",
+				"code":             "INSUFFICIENT_PARTICIPANTS",
+				"current_count":    len(participants),
+				"required_minimum": 3,
+			})
+			return
+		}
+
 		// Validate that there are enough attachments for voting
 		attachments, err := h.attachmentRepo.GetByEventID(eventID)
 		if err != nil {
@@ -446,6 +472,16 @@ func (h *EventHandler) UpdateEventStage(c *gin.Context) {
 		"event_id", eventID,
 		"old_stage", existingEvent.Stage.String(),
 		"new_stage", updatedEvent.Stage.String())
+
+	// Entering the results stage: calculate and store the ranking once, so the
+	// public read-only endpoint has something to serve to visitors.
+	if updatedEvent.Stage == event.StageResult && h.voteHandler != nil {
+		if err := h.voteHandler.CalculateAndPersistResults(eventID); err != nil {
+			h.log.Warn("failed to calculate results on stage change", "event_id", eventID, "error", err)
+		} else {
+			h.log.Info("voting results calculated and stored", "event_id", eventID)
+		}
+	}
 
 	// Notify participants asynchronously — errors are logged but don't fail the request
 	go func() {

@@ -72,14 +72,14 @@ func main() {
 	emailService := email.NewEmailService(cfg)
 	log.Info("Email service initialized", "enabled", cfg.Email.Enabled)
 
-	eventHandler := handlers.NewEventHandler(eventRepo, userRepo, attachmentRepo, emailService, cfg)
-	attachmentHandler := handlers.NewAttachmentHandler(attachmentRepo, eventRepo, userRepo, fileStorage, cfg)
-	userHandler := handlers.NewUserHandler(userRepo, eventRepo, emailService, cfg)
-	googleAuthHandler := handlers.NewGoogleAuthHandler(userRepo, cfg)
-
 	configRepo := postgres.NewPostgresVotingConfigurationRepository(db)
 	resultsRepo := postgres.NewPostgresVotingResultsRepository(db)
 	distributedVoteHandler := handlers.NewDistributedVoteHandler(voteRepo, eventRepo, attachmentRepo, userRepo, configRepo, resultsRepo, cfg)
+
+	eventHandler := handlers.NewEventHandler(eventRepo, userRepo, attachmentRepo, emailService, distributedVoteHandler, cfg)
+	attachmentHandler := handlers.NewAttachmentHandler(attachmentRepo, eventRepo, userRepo, fileStorage, cfg)
+	userHandler := handlers.NewUserHandler(userRepo, eventRepo, emailService, cfg)
+	googleAuthHandler := handlers.NewGoogleAuthHandler(userRepo, cfg)
 
 	voteDraftRepo := postgres.NewPostgresVoteDraftRepository(db)
 	voteDraftHandler := handlers.NewVoteDraftHandler(voteDraftRepo, voteRepo)
@@ -128,6 +128,12 @@ func main() {
 			eventsPublic.GET("/:event_id", eventHandler.GetEvent)                      // Get event details
 			eventsPublic.GET("/:event_id/share", eventHandler.GetShareableEventInfo)   // Get shareable metadata
 			eventsPublic.POST("/:event_id/register", eventHandler.RegisterParticipant) // Register for event (creates user if doesn't exist)
+
+			// Results are public: visitors can see the final rankings of a
+			// finished event without signing up (U-03 / JTBD-03). Read-only —
+			// never recalculates.
+			eventsPublic.GET("/:event_id/distributed-results", distributedVoteHandler.GetStoredResults)
+			eventsPublic.GET("/:event_id/voting-statistics", distributedVoteHandler.GetVotingStatistics)
 		}
 
 		// Event management - Protected endpoints (require authentication)
@@ -196,11 +202,9 @@ func main() {
 				auth.RequireParticipantOrOwner(eventRepo),
 				voteDraftHandler.GetDraft)
 
-			// Get results - Any authenticated user
-			events.GET("/:event_id/distributed-results", distributedVoteHandler.GetDistributedResults)
-
-			// Get voting statistics - Any authenticated user
-			events.GET("/:event_id/voting-statistics", distributedVoteHandler.GetVotingStatistics)
+			// Recalculate results - authenticated: recomputes the MBC ranking
+			// and overwrites the stored copy (the public GET never writes)
+			events.POST("/:event_id/distributed-results/recalculate", distributedVoteHandler.GetDistributedResults)
 		}
 
 		// Attachment download/delete - ownership checked in the handler

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DistributedVotingService, AttachmentService, VoteDraftService, DraftRanking } from '../../services/api';
-import { Assignment, Attachment } from '../../types';
+import { Assignment, Attachment, VotingStatistics } from '../../types';
 import { API_CONFIG } from '../../config/api';
 import './RankingVotePanel.css';
 
@@ -25,6 +25,7 @@ const RankingVotePanel: React.FC<RankingVotePanelProps> = ({
   const [success, setSuccess] = useState<string>('');
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [attachments, setAttachments] = useState<AttachmentWithRank[]>([]);
+  const [stats, setStats] = useState<VotingStatistics | null>(null);
 
   type DraftStatus = 'idle' | 'saving' | 'saved' | 'error';
   const [draftStatus, setDraftStatus] = useState<DraftStatus>('idle');
@@ -33,6 +34,7 @@ const RankingVotePanel: React.FC<RankingVotePanelProps> = ({
 
   useEffect(() => {
     loadAssignment();
+    loadStats();
     return () => {
       if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
       if (draftResetRef.current) clearTimeout(draftResetRef.current);
@@ -91,6 +93,37 @@ const RankingVotePanel: React.FC<RankingVotePanelProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadStats = async (): Promise<void> => {
+    try {
+      const statistics = await DistributedVotingService.getVotingStatistics(eventId);
+      setStats(statistics);
+    } catch {
+      // Silent: the progress counter is supplementary data
+    }
+  };
+
+  const renderProgress = (): React.ReactNode => {
+    if (!stats || stats.total_assignments <= 0) return null;
+    const percent = Math.round(stats.completion_rate * 100);
+    return (
+      <div className="rvp-progress">
+        <div className="rvp-progress-label">
+          <span>🗳️</span>
+          <span>
+            <strong>{stats.completed_assignments} of {stats.total_assignments}</strong> participants have voted
+          </span>
+          <span className="rvp-progress-percent">{percent}%</span>
+        </div>
+        <div className="rvp-progress-bar">
+          <div
+            className={`rvp-progress-fill${stats.completion_rate >= 1 ? ' rvp-progress-fill--done' : ''}`}
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      </div>
+    );
   };
 
   const handleRankChange = (attachmentId: string, rank: number): void => {
@@ -160,7 +193,8 @@ const RankingVotePanel: React.FC<RankingVotePanelProps> = ({
       
       // Reload the assignment to get the updated is_completed status
       await loadAssignment();
-      
+      loadStats();
+
       onVotesSubmitted();
     } catch (err: any) {
       console.error('❌ Submit error:', err);
@@ -201,6 +235,7 @@ const RankingVotePanel: React.FC<RankingVotePanelProps> = ({
         <div className="completed-assignment">
           <h3>✅ Assignment Completed</h3>
           <p>You have already submitted your rankings for this event.</p>
+          {renderProgress()}
           {assignment.quality_score !== null && assignment.quality_score !== undefined && (
             <p className="quality-score">
               Your quality score: <strong>{(assignment.quality_score * 100).toFixed(1)}%</strong>
@@ -214,6 +249,7 @@ const RankingVotePanel: React.FC<RankingVotePanelProps> = ({
   return (
     <div className="ranking-vote-panel">
       <h3>🎯 Rank your assigned submissions</h3>
+      {renderProgress()}
       <p className="instructions">
         You have been assigned {attachments.length} submission{attachments.length !== 1 ? 's' : ''} to review.
         Rank them from best (1) to worst ({attachments.length}) — each must have a unique position.

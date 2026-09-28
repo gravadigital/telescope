@@ -68,6 +68,11 @@ Para correr un servidor contra él, su compose (en el repo de deploy) tiene que 
 - **CI en GitHub Actions**: `ci.yml` (suite en cada PR), `dev-images.yml` (imágenes
   `dev` en cada push a la rama) y `release.yml` (imágenes inmutables por tag).
 - **Versionado único** del monorepo, con `scripts/set-version.sh` como única puerta.
+- **Resultados públicos** (REQ-002): los resultados y el avance de la votación se ven sin
+  sesión. Nuevo `POST /events/{id}/distributed-results/recalculate` (autenticado) para
+  recalcular el ranking a pedido.
+- **Progreso de la votación** en el panel de ranking (`{x} of {y} participants have voted`) y
+  contador de participantes en la tarjeta de la etapa activa.
 
 ### Cambiado
 
@@ -82,6 +87,12 @@ Para correr un servidor contra él, su compose (en el repo de deploy) tiene que 
 - Se eliminan la documentación, los composes y los scripts propios de `api/` y `web/`,
   restos de cuando eran repositorios separados. La licencia pasa a la raíz.
 - **CI**: los tests de web vuelven a correr.
+- **Pasar a votación exige al menos 3 participantes** (antes 2), en el cambio de etapa, en la
+  configuración de la votación y en la generación de asignaciones. Las dos pantallas del
+  organizador validan lo mismo que el backend.
+- **`GET /events/{id}/distributed-results` es público y de solo lectura.** El ranking se
+  calcula una vez, al pasar el evento a `results`; si no hay ranking guardado responde 404
+  `RESULTS_NOT_CALCULATED`. `GET /events/{id}/voting-statistics` también pasa a ser público.
 
 - **La imagen de la web ya no lleva configuración adentro.** La URL de la api y el Client
   ID de Google se leen al arrancar el contenedor (`API_URL`, `GOOGLE_CLIENT_ID`) y se
@@ -95,6 +106,14 @@ Para correr un servidor contra él, su compose (en el repo de deploy) tiene que 
   > `REACT_APP_GOOGLE_CLIENT_ID` de GitHub deja de usarse.
 
 ### Corregido
+
+- **Abrir los resultados recalculaba el ranking cada vez** (D-11): el GET hacía upsert en
+  `voting_results` en cada llamada. Ahora sólo lee.
+- **Recargar la pantalla de gestión mandaba al organizador a `/events`**: no esperaba a que
+  se restaurara la sesión.
+- **Un avance de etapa rechazado desde el detalle del evento decía sólo `Error updating
+  event stage`**. Ahora el modal muestra el motivo real.
+- **Modal de participantes en mobile**: los emails largos desbordaban la tarjeta.
 
 - **`/health` informaba siempre `"version": "1.0.0"`**, un valor escrito a mano. Ahora
   devuelve la versión con la que se compiló el binario (`0.2.0`, `dev-<sha>`, o `dev` en

@@ -22,6 +22,54 @@
   line-height: 1.6;
 }
 
+/* Voting progress --------------------------------------------------------- */
+
+.rvp-progress {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md) var(--spacing-lg);
+  margin: var(--spacing-md) 0 var(--spacing-lg);
+}
+
+.rvp-progress-label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--text-sm);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.rvp-progress-label strong {
+  color: #ffffff;
+}
+
+.rvp-progress-percent {
+  margin-left: auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #4ade80;
+}
+
+.rvp-progress-bar {
+  margin-top: var(--spacing-sm);
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.rvp-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6a5acd, #8b7cf6);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.rvp-progress-fill--done {
+  background: #4ade80;
+}
+
 /* Quality explanation ---------------------------------------------------- */
 
 .rvp-quality-note {

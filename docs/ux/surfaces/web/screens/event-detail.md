@@ -49,9 +49,9 @@ Estado normal:
 | Bloque | Tipo | Contenido |
 |---|---|---|
 | Barra de navegación | navegación | `<nav>` con el botón de volver |
-| Presentación del evento | encabezado | Título y `ShareButton` en la misma fila; descripción; fila de metadatos con organizador y contador de participantes con su toggle |
+| Presentación del evento | encabezado | Título y `ShareButton` en la misma fila; descripción; fila de metadatos con el organizador |
 | Modal de participantes | overlay | Condicional |
-| Estado del evento | panel | `EventTimeline` (stepper de 4 pasos + tarjeta de la etapa activa) y, condicional, el aviso de pausa |
+| Estado del evento | panel | `EventTimeline` (stepper de 4 pasos + tarjeta de la etapa activa, que incluye el contador de participantes y el botón para ver la lista) y, condicional, el aviso de pausa |
 | Mensajes de feedback | banners | Dos condicionales: éxito y error |
 | **Zona de acción de la etapa** | contenedor variable | **Un único contenedor cuyo contenido cambia por completo según etapa y rol.** Ver abajo |
 | Modal de avance de etapa | overlay | Condicional |
@@ -103,8 +103,10 @@ Microcopy transcripto **textual**, en inglés.
 
 ### Presentación
 - Organizador dinámico con fallback literal `Not specified`
-- Contador: `{n} / {max} participants`
-- Toggle: `Hide` / `View`
+
+### Tarjeta de la etapa activa (`EventTimeline`)
+- Contador: `👥 {n} / {max} participants` (también en `ManageEventPage`)
+- Botón `View participants` / `Hide participants`, solo si hay al menos un participante
 
 ### Estado
 - `This event is currently paused` con icono `⏸`
@@ -117,7 +119,11 @@ Microcopy transcripto **textual**, en inglés.
 - `✅ Your rankings have been submitted successfully!`
 
 ### Feedback de error
-`Error updating event stage` · `Failed to register for the event. Please try again.` ·
+El avance de etapa muestra el motivo real, en el banner y en `StageAdvanceModal`: el mensaje del
+backend o, antes de llamarlo, `Cannot advance to voting: no participants registered yet.` /
+`Cannot advance to voting: only {n} participant(s) registered. At least 3 participants are required.`
+(`Error updating event stage` queda solo como fallback) ·
+`Failed to register for the event. Please try again.` ·
 `File cannot exceed 10MB` ·
 `File type not allowed. Use: JPEG, PNG, GIF, WebP, PDF, TXT, DOC, DOCX` · `Upload failed: {msg}`
 
@@ -132,6 +138,8 @@ Microcopy transcripto **textual**, en inglés.
 | Requisitos | `Accepted: JPEG, PNG, GIF, WebP, PDF, TXT, DOC, DOCX · Max 10 MB` |
 | Evento pausado | `⏸ Registration and file submissions are not available while the event is paused.` |
 | Votación configurada | `✅ Voting is underway`; `Reviewers have been assigned their submissions and can now submit their rankings.`; `Once everyone has voted, advance to "Results" to publish the final ranking.` |
+| Panel de ranking | Barra de progreso `🗳️ {completadas} of {total} participants have voted` + `{n}%`, antes y después de enviar el ranking. Si fallan las estadísticas, la barra no aparece |
+| `results`, con o sin sesión | Panel de resultados. Un visitante sin sesión ve el ranking guardado; si todavía no hay uno, `No results available yet.` |
 
 ### Modal de confirmación de subida
 `Confirm upload`; `Are you sure you want to upload this file?`; nombre y tamaño dinámicos;
@@ -172,9 +180,9 @@ Microcopy transcripto **textual**, en inglés.
   limpia el input y refetchea.
 - **Avance de etapa:** abre `StageAdvanceModal` y al confirmar actualiza.
 
-> ⚠️ **Inconsistencia funcional entre pantallas:** acá el avance de etapa **no tiene ninguna
-> validación previa**, mientras que `ManageEventPage` sí valida que haya participantes y que todos
-> hayan votado. La misma acción tiene reglas distintas según desde dónde se ejecute.
+> ⚠️ **Inconsistencia funcional entre pantallas (parcial, D-05):** acá el avance a `voting` ya
+> valida el mínimo de 3 participantes, igual que `ManageEventPage` y el backend (REQ-002). El avance
+> a `results` sigue sin validar que todos hayan votado, cosa que `ManageEventPage` sí hace.
 
 ## Accesibilidad
 

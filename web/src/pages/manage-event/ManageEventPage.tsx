@@ -45,7 +45,7 @@ const LoadErrorAlert: React.FC<{ message: string; onRetry: () => Promise<void> }
 const ManageEventPage: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
 
   const [event, setEvent] = useState<Event | null>(null);
   const [participants, setParticipants] = useState<User[]>([]);
@@ -66,6 +66,10 @@ const ManageEventPage: React.FC = () => {
   const [editingStage, setEditingStage] = useState<'participation' | 'voting' | null>(null);
 
   useEffect(() => {
+    // The session is restored from localStorage in an AuthContext effect, so
+    // on the first render after a refresh isAuthenticated is still false.
+    if (authLoading) return;
+
     if (!isAuthenticated) {
       navigate('/events');
       return;
@@ -75,7 +79,7 @@ const ManageEventPage: React.FC = () => {
       loadEventData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventId, isAuthenticated, navigate]);
+  }, [eventId, authLoading, isAuthenticated, navigate]);
 
   const loadParticipants = async (id: string): Promise<void> => {
     setParticipantsError('');
@@ -277,6 +281,11 @@ const ManageEventPage: React.FC = () => {
     // Can't advance from participation if no participants
     if (currentStage === 'participation' && participants.length === 0) {
       return 'Cannot advance: No participants registered yet.';
+    }
+
+    // Can't advance to voting without enough participants for meaningful voting
+    if (currentStage === 'participation' && targetStage === 'voting' && participants.length < 3) {
+      return `Cannot advance to voting: only ${participants.length} participant${participants.length > 1 ? 's' : ''} registered. At least 3 participants are required.`;
     }
 
     // Note: We no longer require all participants to submit files before advancing to voting
@@ -517,6 +526,8 @@ const getStageName = (stage: Event['stage']): string => {
 
           <EventTimeline
             currentStage={event.stage}
+            participantCount={participants.length}
+            maxParticipants={event.max_participants || 20}
             deadlines={{
               participation: event.participation_estimated_end_date,
               voting: event.voting_estimated_end_date,

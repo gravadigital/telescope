@@ -207,7 +207,7 @@ para abrir la recepción de propuestas y la evaluación cuando corresponda.
 | C-10 | Crear evento | U-02 Participante autenticado | Evento | CREATE | `name` (string, req, 3..200), `description` (text, req, 10..2000), `organizer` (string, opt, max 200), `max_participants` (int, opt, 1..100, default 20) | Cualquier usuario autenticado puede crear. Etapa inicial `creation`. El creador queda como `creator` en Participación. Se genera `shareable_link` = `/events/{id}`. ⚠️ Ver defecto D-04 |
 | C-11 | Listar eventos | U-03 Visitante | Evento | READ | filtros client-side: todos / propios / suscripciones | Listado público. Los tabs de filtrado solo aparecen con sesión |
 | C-12 | Ver detalle del evento | U-03 Visitante | Evento | READ | `event_id` (uuid) | Público. **El creador es redirigido a `/events/{id}/manage`** comparando `creator_id === user.id` |
-| C-13 | Avanzar de etapa | U-01 Organizador | Evento | UPDATE | `stage` (enum), `estimated_end_date` (date, req en el modal) | Transiciones: `creation→participation→voting→results`. **Sin retroceso ni saltos**, validado en el dominio. Dispara email a los participantes. ⚠️ Ver defecto D-05 |
+| C-13 | Avanzar de etapa | U-01 Organizador | Evento | UPDATE | `stage` (enum), `estimated_end_date` (date, req en el modal) | Transiciones: `creation→participation→voting→results`. **Sin retroceso ni saltos**, validado en el dominio. Pasar a `voting` exige **al menos 3 participantes** y 2 propuestas (REQ-002). Pasar a `results` calcula y guarda el ranking. Dispara email a los participantes. ⚠️ Ver defecto D-05 |
 | C-14 | Posponer deadline de etapa | U-01 Organizador | Evento | UPDATE | `participation_estimated_end_date` o `voting_estimated_end_date` (date) | **Solo se puede posponer, no adelantar** — regla activa en el backend. ⚠️ Ver defecto D-06 |
 | C-15 | Pausar / reanudar evento | U-01 Organizador | Evento | UPDATE | `is_paused` (bool) | Independiente de la etapa. Con el evento pausado no se puede registrar ni subir propuestas |
 | C-16 | Cancelar evento | U-01 Organizador | Evento | UPDATE | `is_cancelled` (bool) | Independiente de la etapa. Dispara email de cancelación |
@@ -309,7 +309,7 @@ para obtener un ranking confiable sin un comité que no tengo.
 | C-31 | Calcular resultados | U-01 Organizador | ResultadoVotacion | READ | `event_id` | MBC: `(1/(m(m−1)))·Σ(m − R_i(f_j))`, normalizado a [0,1]. Desempate por cantidad de votos, luego por UUID (orden determinístico). ⚠️ Ver defecto D-11 |
 | C-32 | Calcular calidad de evaluadores | — | Asignación | UPDATE (auto) | `quality_score` | `Q_i = 1 − (2/(m(m−1)))·Σ\|R_i(f_j) − RelativeRank_G(f_j, A(p_i))\|`, recortado a [0,1]. **Quien no completó su asignación recibe `Q_i = 0`** |
 | C-33 | Aplicar incentivos | — | ResultadoVotacion | UPDATE (auto) | `adjusted_ranking` | La propuesta de un evaluador con `Q_i ≥ good` sube `n` posiciones; con `Q_i ≤ bad` baja `n`. Es el mecanismo que hace que convenga evaluar en serio |
-| C-34 | Ver estadísticas de votación | U-01 Organizador | ResultadoVotacion | READ | `event_id` | Cuántos votaron sobre el total. Alimenta la validación de avance a `results` |
+| C-34 | Ver estadísticas de votación | U-01 Organizador, U-02 Participante, U-03 Visitante | ResultadoVotacion | READ | `event_id` | Cuántos votaron sobre el total. Alimenta la validación de avance a `results` y la barra de progreso del panel de ranking. **Público, sin sesión** (REQ-002): incluye quién votó (`participant_voting_status`), decisión aceptada |
 
 **Criterios de Aceptación:**
 
@@ -356,7 +356,7 @@ para saber cómo quedó mi propuesta.
 
 | ID | Capacidad | Actor | Entidad | Operación | Campos Clave | Reglas de Negocio |
 |----|-----------|-------|---------|-----------|--------------|-------------------|
-| C-35 | Ver resultados del evento | U-02 Participante | ResultadoVotacion | READ | `event_id` | Solo en etapa `results`. Cada fila: `filename`, `participant_name`, `mbc_score`, `global_rank`, `adjusted_rank`, `vote_count`, `average_rank`. ⚠️ **No está definido cuál de los dos rankings es el oficial** |
+| C-35 | Ver resultados del evento | U-02 Participante, U-03 Visitante | ResultadoVotacion | READ | `event_id` | Solo en etapa `results`. **Público, sin sesión y de solo lectura** (REQ-002): sirve el ranking guardado al entrar a `results`, con la calidad de cada evaluador (`participant_qualities`), decisión aceptada. Cada fila: `filename`, `participant_name`, `mbc_score`, `global_rank`, `adjusted_rank`, `vote_count`, `average_rank`. ⚠️ **No está definido cuál de los dos rankings es el oficial** |
 
 **Criterios de Aceptación:**
 
@@ -416,13 +416,13 @@ y porque son el insumo directo de los primeros requerimientos de corrección.
 | D-02 | **Descarga de propuestas sin autenticación.** El endpoint estaba registrado fuera del grupo que aplica `JWTAuthMiddleware`: cualquiera con el UUID descargaba la propuesta | Crítica — **resuelto** en `625b6f4`: grupo propio con JWT y permiso en el handler | `api/cmd/api/main.go`, `attachment_handler.go:canDownload` |
 | D-03 | **Lectura de cualquier usuario sin verificación de ownership.** Cualquier usuario autenticado lee los datos de cualquier otro | Alta | `api/` handler de `GET /api/v1/users/{user_id}` |
 | D-04 | **La fecha del evento se autogenera y el usuario nunca la ve.** Se envía hoy+1día como `start_date`; no hay campo de fecha en el formulario | Alta | `web/src/pages/create-event/CreateEventPage.tsx:43-49` |
-| D-05 | **La misma acción tiene reglas distintas según la pantalla.** `ManageEventPage` valida que haya participantes y que todos hayan votado antes de avanzar; `EventDetailPage` permite el mismo avance **sin ningún chequeo** | Alta | `ManageEventPage.tsx:232-252` vs `EventDetailPage.tsx:284-420` |
+| D-05 | **La misma acción tiene reglas distintas según la pantalla.** `ManageEventPage` valida que haya participantes y que todos hayan votado antes de avanzar; `EventDetailPage` permite el mismo avance **sin ningún chequeo**. **Parcialmente corregido 2026-09-28 (REQ-002):** el mínimo de 3 participantes para `voting` se valida en las dos pantallas y en el backend; el de "todos votaron" sigue solo en `ManageEventPage` | Alta | `ManageEventPage.tsx:232-252` vs `EventDetailPage.tsx:284-420` |
 | D-06 | **La regla "solo posponer" no se valida en el cliente.** El hint la anuncia, pero el `min` del input solo impide fechas pasadas, no anteriores al deadline actual | Media | `ManageEventPage.tsx:641`, `:674` |
 | D-07 | **Copiar el link puede fallar en silencio.** `navigator.clipboard` exige contexto seguro; si falla solo hace `console.error` y el usuario no ve nada | Media | `web/src/components/ShareButton.tsx:47-50` |
 | D-08 | **Fallos de API presentados como ausencia de datos.** Participantes, adjuntos y estadísticas fallan solo a consola: si la API de participantes cae, la pantalla dice `No participants have registered yet.` **como si no hubiera ninguno**, y el organizador decide sobre esa base. `Participants` además **rellena la lista con tres personas inventadas** | Crítica | `ManageEventPage.tsx:74-77`, `:92-96`, `:116-120`; `Participants.tsx:24-56` |
 | D-09 | **La fórmula del recomendado está implementada dos veces**, en el front (para sugerir) y en el back (para validar y rechazar). Si una cambia y la otra no, el organizador ve un valor recomendado que el backend rechaza | Media | `VotingConfigurationPanel.tsx:25-31` vs `voting_service.go:48-68` |
 | D-10 | **Una propuesta puede quedar por debajo de `min_evaluations_per_file`.** La fase 1 respeta el tope `m` por participante y saltea a quien ya llegó, así que la cobertura mínima cede si no hay evaluadores elegibles. Es un trade-off deliberado: excederlo haría fallar el trigger | Media (documentado) | `voting_service.go` fase 1 |
-| D-11 | **`GET /distributed-results` muta estado.** Recalcula el MBC y hace upsert en `voting_results` en cada llamada: un GET con efectos de escritura | Media | `api/` handler de `distributed-results` |
+| ~~D-11~~ | **`GET /distributed-results` muta estado** (recalculaba el MBC en cada llamada) — **CORREGIDO 2026-09-28:** el GET público es de solo lectura (`GetStoredResults`); el cálculo ocurre una vez al entrar a la etapa `results` y en `POST .../distributed-results/recalculate` (autenticado) | ~~Media~~ **Corregido** | `api/internal/handlers/distributed_vote_handler.go` |
 | D-12 | **JWT_SECRET con default hardcodeado.** Si falta la variable, el servicio arranca con un secreto conocido y solo emite un warning | Crítica | `api/internal/middleware/auth/jwt.go:20-26` |
 | D-13 | **Sin rutas protegidas ni ruta 404.** `/events/create` y `/events/:eventId/manage` son alcanzables por URL sin sesión. Una URL desconocida renderiza la navbar sobre contenido vacío | Media | `web/src/App.tsx:177-184` |
 | D-14 | **El health check de `Auth` está hardcodeado en `true`.** El aviso de API no disponible es código inalcanzable | Baja | `web/src/components/auth/Auth.tsx:30-36` |
@@ -442,7 +442,7 @@ y porque son el insumo directo de los primeros requerimientos de corrección.
 | ID | Requerimiento | Estado |
 |----|---------------|--------|
 | NFR-P-01 | El pool de conexiones a PostgreSQL admite hasta 100 conexiones concurrentes | **Implementado** — configurado en el arranque |
-| NFR-P-02 | El cálculo de resultados es `O(n·m)` sobre votos y se ejecuta bajo demanda, no en background | **Implementado**, con la salvedad de D-11: se recalcula en cada GET |
+| NFR-P-02 | El cálculo de resultados es `O(n·m)` sobre votos y se ejecuta bajo demanda, no en background | **Implementado** — se ejecuta al pasar a la etapa `results` y en `POST .../recalculate`; el GET público solo lee (D-11 corregido) |
 | NFR-P-03 | El frontend no cachea ni deduplica requests: cada pantalla pide sus datos al montar | **Limitación conocida** — sin librería de estado de servidor. `/events` además dispara **dos** fetches al montar por dos `useEffect` superpuestos |
 | — | Tiempos de respuesta objetivo | **No definido.** No hay SLO, ni métricas, ni instrumentación |
 | — | Volumen máximo soportado (participantes, propuestas por evento) | **No definido.** Los únicos topes son `max_participants ≤ 100` por evento y `m ≤ 50`. No hay pruebas de carga |

@@ -14,6 +14,7 @@ import (
 	"github.com/gravadigital/telescopio-api/internal/domain/attachment"
 	"github.com/gravadigital/telescopio-api/internal/domain/event"
 	"github.com/gravadigital/telescopio-api/internal/domain/participant"
+	"github.com/gravadigital/telescopio-api/internal/domain/vote"
 	"github.com/gravadigital/telescopio-api/internal/email"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,12 +36,25 @@ func newTestEventHandlerSet() *testEventHandlerSet {
 	}
 	// Email disabled by default config, so goroutine-fired notifications are
 	// no-ops and won't panic or block on a real SMTP connection.
-	s.handler = NewEventHandler(s.eventRepo, s.userRepo, s.attachmentRepo, email.NewEmailService(&config.Config{}), &config.Config{})
+	s.handler = NewEventHandler(s.eventRepo, s.userRepo, s.attachmentRepo, email.NewEmailService(&config.Config{}), nil, &config.Config{})
 	return s
 }
 
 func dateStr(t time.Time) string {
 	return t.Format("2006-01-02")
+}
+
+// setEventParticipantCount seeds n participants for an event so stage-advance
+// validation tests can exercise the minimum-participants rule without
+// building full registration flows.
+func setEventParticipantCount(s *testEventHandlerSet, eventID string, n int) {
+	roles := make([]*participant.UserWithEventRole, 0, n)
+	for i := 0; i < n; i++ {
+		u := participant.NewParticipant("P", "articipant", uuid.NewString()+"@example.com")
+		s.userRepo.addUser(u)
+		roles = append(roles, &participant.UserWithEventRole{User: *u, EventRole: "participant"})
+	}
+	s.userRepo.setEventParticipants(eventID, roles)
 }
 
 // performAuthedRequest is like performRequest but also injects a "user_id"
@@ -287,6 +301,7 @@ func TestUpdateEventStage_RejectsVotingWithoutAttachments(t *testing.T) {
 	e := event.NewEvent("Event", "desc", uuid.New(), time.Now(), time.Now().AddDate(0, 0, 5), "org")
 	e.Stage = event.StageParticipation
 	s.eventRepo.addEvent(e)
+	setEventParticipantCount(s, e.ID.String(), 3)
 
 	body := map[string]interface{}{"stage": "voting", "estimated_end_date": dateStr(time.Now().AddDate(0, 0, 3))}
 	w := performAuthedRequest(t, http.MethodPatch, s.handler.UpdateEventStage,
@@ -296,11 +311,72 @@ func TestUpdateEventStage_RejectsVotingWithoutAttachments(t *testing.T) {
 	assert.Equal(t, "NO_ATTACHMENTS", jsonBody(t, w)["code"])
 }
 
+func TestUpdateEventStage_RejectsVotingWithSingleParticipant(t *testing.T) {
+	s := newTestEventHandlerSet()
+	e := event.NewEvent("Event", "desc", uuid.New(), time.Now(), time.Now().AddDate(0, 0, 5), "org")
+	e.Stage = event.StageParticipation
+	s.eventRepo.addEvent(e)
+	setEventParticipantCount(s, e.ID.String(), 1)
+
+	body := map[string]interface{}{"stage": "voting", "estimated_end_date": dateStr(time.Now().AddDate(0, 0, 3))}
+	w := performAuthedRequest(t, http.MethodPatch, s.handler.UpdateEventStage,
+		gin.Params{{Key: "event_id", Value: e.ID.String()}}, "", body)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	resp := jsonBody(t, w)
+	assert.Equal(t, "INSUFFICIENT_PARTICIPANTS", resp["code"])
+	assert.Equal(t, float64(1), resp["current_count"])
+	assert.Equal(t, float64(3), resp["required_minimum"])
+	assert.Contains(t, resp["error"], "At least 3 participants")
+}
+
+// The voting minimum is 3 participants, so two registered participants are
+// still rejected even with attachments already uploaded.
+func TestUpdateEventStage_RejectsVotingWithTwoParticipants(t *testing.T) {
+	s := newTestEventHandlerSet()
+	e := event.NewEvent("Event", "desc", uuid.New(), time.Now(), time.Now().AddDate(0, 0, 5), "org")
+	e.Stage = event.StageParticipation
+	s.eventRepo.addEvent(e)
+	setEventParticipantCount(s, e.ID.String(), 2)
+	s.attachmentRepo.addAttachment(attachmentFor(e.ID, uuid.New()))
+	s.attachmentRepo.addAttachment(attachmentFor(e.ID, uuid.New()))
+
+	body := map[string]interface{}{"stage": "voting", "estimated_end_date": dateStr(time.Now().AddDate(0, 0, 3))}
+	w := performAuthedRequest(t, http.MethodPatch, s.handler.UpdateEventStage,
+		gin.Params{{Key: "event_id", Value: e.ID.String()}}, "", body)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	resp := jsonBody(t, w)
+	assert.Equal(t, "INSUFFICIENT_PARTICIPANTS", resp["code"])
+	assert.Equal(t, float64(2), resp["current_count"])
+	assert.Equal(t, float64(3), resp["required_minimum"])
+}
+
+func TestUpdateEventStage_RejectsVotingWithoutParticipants(t *testing.T) {
+	s := newTestEventHandlerSet()
+	e := event.NewEvent("Event", "desc", uuid.New(), time.Now(), time.Now().AddDate(0, 0, 5), "org")
+	e.Stage = event.StageParticipation
+	s.eventRepo.addEvent(e)
+	setEventParticipantCount(s, e.ID.String(), 0)
+	s.attachmentRepo.addAttachment(attachmentFor(e.ID, uuid.New()))
+	s.attachmentRepo.addAttachment(attachmentFor(e.ID, uuid.New()))
+
+	body := map[string]interface{}{"stage": "voting", "estimated_end_date": dateStr(time.Now().AddDate(0, 0, 3))}
+	w := performAuthedRequest(t, http.MethodPatch, s.handler.UpdateEventStage,
+		gin.Params{{Key: "event_id", Value: e.ID.String()}}, "", body)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	resp := jsonBody(t, w)
+	assert.Equal(t, "INSUFFICIENT_PARTICIPANTS", resp["code"])
+	assert.Equal(t, float64(0), resp["current_count"])
+}
+
 func TestUpdateEventStage_RejectsVotingWithSingleAttachment(t *testing.T) {
 	s := newTestEventHandlerSet()
 	e := event.NewEvent("Event", "desc", uuid.New(), time.Now(), time.Now().AddDate(0, 0, 5), "org")
 	e.Stage = event.StageParticipation
 	s.eventRepo.addEvent(e)
+	setEventParticipantCount(s, e.ID.String(), 3)
 	a := attachmentFor(e.ID, uuid.New())
 	s.attachmentRepo.addAttachment(a)
 
@@ -319,7 +395,7 @@ func TestUpdateEventStage_AllowsVotingWithTwoAttachments(t *testing.T) {
 	s.eventRepo.addEvent(e)
 	s.attachmentRepo.addAttachment(attachmentFor(e.ID, uuid.New()))
 	s.attachmentRepo.addAttachment(attachmentFor(e.ID, uuid.New()))
-	s.userRepo.setEventParticipants(e.ID.String(), nil)
+	setEventParticipantCount(s, e.ID.String(), 3)
 
 	body := map[string]interface{}{"stage": "voting", "estimated_end_date": dateStr(time.Now().AddDate(0, 0, 3))}
 	w := performAuthedRequest(t, http.MethodPatch, s.handler.UpdateEventStage,
@@ -799,4 +875,59 @@ func TestGetAllEvents_PaginatesResults(t *testing.T) {
 
 func attachmentFor(eventID, participantID uuid.UUID) *attachment.Attachment {
 	return attachment.NewAttachment(eventID, participantID, "f.jpg", "photo.jpg", "/tmp/f.jpg", "image/jpeg", 1024, "")
+}
+
+// ---------------------------------------------------------------------------
+// UpdateEventStage → results: the stage change must calculate and store the
+// ranking, because the public GET that serves visitors is read-only.
+// ---------------------------------------------------------------------------
+
+func TestUpdateEventStage_CalculatesAndStoresResultsOnTransition(t *testing.T) {
+	s := newTestEventHandlerSet()
+
+	configRepo := newMockVotingConfigurationRepository()
+	resultsRepo := newMockVotingResultsRepository()
+	voteRepo := newMockVoteRepository()
+	s.handler.voteHandler = NewDistributedVoteHandler(
+		voteRepo, s.eventRepo, s.attachmentRepo, s.userRepo, configRepo, resultsRepo,
+		&config.Config{},
+	)
+
+	e := event.NewEvent("Event", "desc", uuid.New(), time.Now(), time.Now().AddDate(0, 0, 5), "org")
+	e.Stage = event.StageVoting
+	s.eventRepo.addEvent(e)
+
+	// Three participants with a file each, plus the voting configuration
+	users := make([]*participant.User, 3)
+	roles := make([]*participant.UserWithEventRole, 3)
+	for i := range users {
+		u := participant.NewParticipant("P", "articipant", uuid.NewString()+"@example.com")
+		s.userRepo.addUser(u)
+		users[i] = u
+		roles[i] = &participant.UserWithEventRole{User: *u, EventRole: "participant"}
+		s.attachmentRepo.addAttachment(attachmentFor(e.ID, u.ID))
+	}
+	s.userRepo.setEventParticipants(e.ID.String(), roles)
+	configRepo.byEvent[e.ID.String()] = &vote.VotingConfiguration{
+		ID: uuid.New(), EventID: e.ID, AttachmentsPerEvaluator: 2,
+		QualityGoodThreshold: 0.6, QualityBadThreshold: 0.3, AdjustmentMagnitude: 3, MinEvaluationsPerFile: 1,
+	}
+	// At least one vote: with zero votes there is no ranking to store.
+	attachments := s.attachmentRepo.byEvent[e.ID.String()]
+	voteRepo.votes = append(voteRepo.votes, &vote.Vote{
+		ID: uuid.New(), EventID: e.ID, VoterID: users[0].ID,
+		AttachmentID: attachments[1].ID, RankPosition: 1,
+	})
+
+	w := performAuthedRequest(t, http.MethodPatch, s.handler.UpdateEventStage,
+		gin.Params{{Key: "event_id", Value: e.ID.String()}},
+		"org-1",
+		map[string]interface{}{"stage": "results"})
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	stored, err := resultsRepo.GetByEventID(e.ID.String())
+	require.NoError(t, err)
+	require.NotNil(t, stored, "entering the results stage must leave a stored ranking behind")
+	assert.NotEmpty(t, stored.GlobalRanking)
 }

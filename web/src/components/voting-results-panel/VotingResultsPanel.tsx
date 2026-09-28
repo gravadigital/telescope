@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DistributedVotingService } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { VotingResults, VotingStatistics } from '../../types';
 import './VotingResultsPanel.css';
 
@@ -8,6 +9,7 @@ interface VotingResultsPanelProps {
 }
 
 const VotingResultsPanel: React.FC<VotingResultsPanelProps> = ({ eventId }) => {
+  const { isAuthenticated } = useAuth();
   const [loading, setLoading] = useState<boolean>(true);
   const [results, setResults] = useState<VotingResults | null>(null);
   const [statistics, setStatistics] = useState<VotingStatistics | null>(null);
@@ -18,17 +20,48 @@ const VotingResultsPanel: React.FC<VotingResultsPanelProps> = ({ eventId }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
+  const fetchResults = async (): Promise<{ resultsData: VotingResults; statsData: VotingStatistics }> => {
+    const [resultsData, statsData] = await Promise.all([
+      DistributedVotingService.getDistributedResults(eventId),
+      DistributedVotingService.getVotingStatistics(eventId),
+    ]);
+    return { resultsData, statsData };
+  };
+
   const loadResults = async (): Promise<void> => {
     setLoading(true);
     setError('');
     try {
-      const [resultsData, statsData] = await Promise.all([
-        DistributedVotingService.getDistributedResults(eventId),
-        DistributedVotingService.getVotingStatistics(eventId),
-      ]);
+      const { resultsData, statsData } = await fetchResults();
       setResults(resultsData);
       setStatistics(statsData);
     } catch (err: any) {
+      // Events that entered the results stage before results were stored ask
+      // an authenticated user to calculate them once, then retry. If there is
+      // still nothing to show (nobody voted, or a visitor has no session) the
+      // panel falls back to its empty state instead of an error.
+      if (String(err?.message || '').includes('RESULTS_NOT_CALCULATED')) {
+        // Recalculating requires a session: a visitor would get a 401, so it
+        // goes straight to the empty state.
+        if (!isAuthenticated) {
+          setResults(null);
+          return;
+        }
+        try {
+          await DistributedVotingService.recalculateDistributedResults(eventId);
+          const { resultsData, statsData } = await fetchResults();
+          setResults(resultsData);
+          setStatistics(statsData);
+          return;
+        } catch (retryErr: any) {
+          if (String(retryErr?.message || '').includes('RESULTS_NOT_CALCULATED')) {
+            setResults(null);
+            return;
+          }
+          setError(`Failed to load voting results: ${retryErr?.message || 'Unknown error'}`);
+          return;
+        }
+      }
       setError(`Failed to load voting results: ${err?.message || 'Unknown error'}`);
     } finally {
       setLoading(false);

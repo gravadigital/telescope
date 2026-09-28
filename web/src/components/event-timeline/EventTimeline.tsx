@@ -91,11 +91,23 @@ export interface EventTimelineDeadlines {
 
 interface EventTimelineProps {
   currentStage: Event['stage'];
+  participantCount: number;
+  maxParticipants: number;
   deadlines?: EventTimelineDeadlines;
   compact?: boolean;
+  onViewParticipants?: () => void;
+  participantsActionLabel?: string;
 }
 
-const EventTimeline: React.FC<EventTimelineProps> = ({ currentStage, deadlines, compact = false }) => {
+const EventTimeline: React.FC<EventTimelineProps> = ({
+  currentStage,
+  participantCount,
+  maxParticipants,
+  deadlines,
+  compact = false,
+  onViewParticipants,
+  participantsActionLabel = 'View participants',
+}) => {
   const activeConfig = STAGES.find(s => s.key === currentStage)!;
   const nextConfig   = STAGES[STAGE_ORDER.indexOf(currentStage) + 1] ?? null;
 
@@ -149,9 +161,27 @@ const EventTimeline: React.FC<EventTimelineProps> = ({ currentStage, deadlines, 
           <div className="etl-stage-card-header">
             <span className="etl-stage-card-icon">{activeConfig.icon}</span>
             <div>
-              <p className="etl-stage-card-name">{activeConfig.label} stage</p>
+              <div className="etl-stage-card-heading">
+                <p className="etl-stage-card-name">{activeConfig.label} stage</p>
+              </div>
               <p className="etl-stage-card-detail">{activeConfig.detail}</p>
             </div>
+          </div>
+
+          <div className="etl-stage-card-participants-row">
+            <span className="etl-stage-card-participants">
+              <span aria-hidden="true">👥</span>
+              <span><strong>{participantCount} / {maxParticipants}</strong> participants</span>
+            </span>
+            {onViewParticipants && (
+              <button
+                type="button"
+                className="etl-stage-card-view-participants"
+                onClick={onViewParticipants}
+              >
+                {participantsActionLabel}
+              </button>
+            )}
           </div>
 
           {activeConfig.nextHint && nextConfig && (

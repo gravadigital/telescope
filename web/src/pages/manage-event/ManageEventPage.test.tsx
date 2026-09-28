@@ -62,6 +62,14 @@ const p2 = {
   joinedEventIDs: ['ev-1'],
   createdEventIDs: [],
 };
+const p3 = {
+  id: 'u3',
+  name: 'Third User',
+  email: 'th@t.com',
+  role: 'participant' as const,
+  joinedEventIDs: ['ev-1'],
+  createdEventIDs: [],
+};
 
 const attachment1 = {
   id: 'a1',
@@ -331,13 +339,13 @@ describe('ManageEventPage', () => {
 
   it('avance normal sin errores (regresión) (TS-21)', async () => {
     mockedGetEventById.mockResolvedValue(baseEvent as any);
-    mockedGetEventParticipants.mockResolvedValue([p1, p2]);
+    mockedGetEventParticipants.mockResolvedValue([p1, p2, p3]);
     mockedGetEventAttachments.mockResolvedValue([]);
     mockedUpdateEventStage.mockResolvedValueOnce(undefined as any);
 
     renderPage();
 
-    await screen.findByText('Second User');
+    await screen.findByText('Third User');
 
     await userEvent.click(screen.getByRole('button', { name: 'Advance to Voting' }));
     await screen.findByRole('heading', { name: /Advance to Voting\?/ });

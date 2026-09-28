@@ -57,7 +57,7 @@ Authorization: Bearer <token>
 | `GET` | `/events/{event_id}` | public | An event's detail. `include_stats=true` adds counts |
 | `GET` | `/events/{event_id}/share` | public | Metadata for sharing the event link (Open Graph, Twitter) |
 | `POST` | `/events` | any user | Create an event. The creator is taken from the token |
-| `PATCH` | `/events/{event_id}/stage` | owner | Advance to the next stage. Requires `estimated_end_date` when entering `participation` or `voting` |
+| `PATCH` | `/events/{event_id}/stage` | owner | Advance to the next stage. Requires `estimated_end_date` when entering `participation` or `voting`. Entering `voting` needs at least 3 participants and 2 proposals. Entering `results` calculates and stores the ranking |
 | `PATCH` | `/events/{event_id}/estimated-end-date` | owner | Postpone a stage's deadline. It cannot be brought forward |
 | `PATCH` | `/events/{event_id}/pause` | owner | Pause, or resume — it toggles |
 | `PATCH` | `/events/{event_id}/cancel` | owner | Cancel the event. Permanent |
@@ -82,18 +82,19 @@ Authorization: Bearer <token>
 
 | Method | Path | Access | What it does |
 |---|---|---|---|
-| `POST` | `/events/{event_id}/voting-config` | owner or organizer | Set the voting parameters. Once per event; rejected if `m` breaks the model's limits |
-| `POST` | `/events/{event_id}/generate-assignments` | owner or organizer | Hand out the proposals to evaluate. Once per event, during `voting` |
+| `POST` | `/events/{event_id}/voting-config` | owner or organizer | Set the voting parameters. Once per event; needs at least 3 participants; rejected if `m` breaks the model's limits |
+| `POST` | `/events/{event_id}/generate-assignments` | owner or organizer | Hand out the proposals to evaluate. Once per event, during `voting`; needs at least 3 participants |
 | `GET` | `/events/{event_id}/participants/{participant_id}/assignment` | self or owner | The proposals a participant has to rank |
 | `PUT` | `/events/{event_id}/participants/{participant_id}/vote-draft` | self or owner | Save a partial ranking. Not validated; overwritten on each save |
 | `GET` | `/events/{event_id}/participants/{participant_id}/vote-draft` | self or owner | The saved draft. `404 DRAFT_NOT_FOUND` when there is none yet |
 | `POST` | `/events/{event_id}/participants/{participant_id}/ranking-votes` | self or owner | Submit the final ranking: ranks consecutive from 1, no duplicates. **Final** |
-| `GET` | `/events/{event_id}/distributed-results` | any user | The global and adjusted rankings, and each evaluator's quality. During `voting` and `results` |
-| `GET` | `/events/{event_id}/voting-statistics` | any user | Voting progress: who has submitted, completion rate |
+| `GET` | `/events/{event_id}/distributed-results` | public | The stored global and adjusted rankings, and each evaluator's quality. During `voting` and `results`. `404 RESULTS_NOT_CALCULATED` when nothing is stored yet |
+| `POST` | `/events/{event_id}/distributed-results/recalculate` | any user | Recalculate the ranking and store it. Same response as the `GET` |
+| `GET` | `/events/{event_id}/voting-statistics` | public | Voting progress: who has submitted, completion rate |
 
-> `GET /distributed-results` **recalculates and stores the results on every call**: it is not a
-> read-only `GET`. Calling it repeatedly is harmless — the calculation is deterministic — but it
-> is not free.
+> The ranking is calculated once, when the event enters `results`, and `GET /distributed-results`
+> only reads it. Both `GET`s are public, so anyone with the event link sees who has voted and each
+> evaluator's quality.
 
 ## Errors
 

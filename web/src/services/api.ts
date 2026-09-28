@@ -634,6 +634,7 @@ export const DistributedVotingService = {
 
   /**
    * Obtener resultados calculados con Modified Borda Count
+   * (lectura pura, no recalcula; público aunque no haya sesión)
    */
   async getDistributedResults(eventId: string): Promise<VotingResults> {
     try {
@@ -646,6 +647,18 @@ export const DistributedVotingService = {
       console.error('Failed to get distributed results:', error);
       throw error;
     }
+  },
+
+  /**
+   * Recalcular y guardar resultados (requiere sesión). Solo como fallback para
+   * eventos que entraron a la etapa results sin resultados guardados.
+   */
+  async recalculateDistributedResults(eventId: string): Promise<VotingResults> {
+    const response = await apiRequest<{ data: VotingResults }>(
+      `${API_CONFIG.ENDPOINTS.DISTRIBUTED_RESULTS(eventId)}/recalculate`,
+      { method: 'POST' }
+    );
+    return response.data;
   },
 
   /**

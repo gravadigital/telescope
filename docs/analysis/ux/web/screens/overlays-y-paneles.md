@@ -313,7 +313,7 @@ de requisitos no cumplidos (`:100-104`); formulario con un campo principal más 
 **Microcopy** — `Start voting phase` (`:78`); subtítulo
 `Each participant will be assigned a set of submissions to review and rank. The system distributes the workload automatically to avoid conflicts of interest.`
 (`:79-82`); etiquetas del resumen `Submissions`, `Reviewers`, `Files per reviewer`; aviso
-`⚠️ You need at least 2 submissions and 2 participants to start voting.` (`:102`).
+`⚠️ You need at least 2 submissions and 3 participants to start voting.` (`:102`).
 
 Campos y sus hints:
 
