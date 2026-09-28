@@ -45,7 +45,7 @@ const LoadErrorAlert: React.FC<{ message: string; onRetry: () => Promise<void> }
 const ManageEventPage: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
 
   const [event, setEvent] = useState<Event | null>(null);
   const [participants, setParticipants] = useState<User[]>([]);
@@ -66,6 +66,10 @@ const ManageEventPage: React.FC = () => {
   const [editingStage, setEditingStage] = useState<'participation' | 'voting' | null>(null);
 
   useEffect(() => {
+    // The session is restored from localStorage in an AuthContext effect, so
+    // on the first render after a refresh isAuthenticated is still false.
+    if (authLoading) return;
+
     if (!isAuthenticated) {
       navigate('/events');
       return;
@@ -75,7 +79,7 @@ const ManageEventPage: React.FC = () => {
       loadEventData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventId, isAuthenticated, navigate]);
+  }, [eventId, authLoading, isAuthenticated, navigate]);
 
   const loadParticipants = async (id: string): Promise<void> => {
     setParticipantsError('');

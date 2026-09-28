@@ -37,21 +37,22 @@ la pregunta abierta #1 del PRD.
 
 ```mermaid
 sequenceDiagram
-    participant U as Participante / Organizador
+    participant U as Organizador / Visitante anónimo
     participant WEB as web
     participant API as api
     participant DB as PostgreSQL
 
-    U->>WEB: abre el evento en etapa results
-    WEB->>API: GET /api/v1/events/{event_id}/distributed-results
-
-    Note over API: ⚠️ este GET muta estado
+    Note over API: el organizador pasa el evento a la etapa results
     API->>DB: SELECT votes, assignments, attachments
     API->>API: 1. MBC por propuesta → ranking global G
     API->>API: 2. Q_i por evaluador (desviación del consenso)
     API->>API: 3. incentivos → ranking ajustado G'
     API->>DB: UPDATE assignments.quality_score
-    API->>DB: UPSERT voting_results
+    API->>DB: UPSERT voting_results (una sola vez)
+
+    U->>WEB: abre el evento en etapa results (con o sin sesión)
+    WEB->>API: GET /api/v1/events/{event_id}/distributed-results
+    API->>DB: SELECT voting_results — solo lectura
     API-->>WEB: 200 { data: { global_ranking, adjusted_ranking, participant_qualities } }
     WEB-->>U: panel de resultados
 ```
@@ -64,13 +65,19 @@ sequenceDiagram
 
 - **Método:** GET
 - **Endpoint:** `/api/v1/events/{event_id}/distributed-results`
-- **Auth:** JWT Bearer — cualquier usuario autenticado
+- **Auth:** ninguno — endpoint **público y de solo lectura**, para que un visitante anónimo
+  pueda ver los resultados sin registrarse
 - **Query opcional:** `include_metrics=true` agrega `data.configuration`
 - **Disponible en:** etapas `voting` y `results`
 
-⚠️ **Este GET no es idempotente: recalcula el MBC en cada llamada y hace upsert en
-`voting_results`.** Es el defecto D-11. Consecuencia práctica: abrir la pantalla de resultados
-tres veces ejecuta el cálculo completo tres veces y reescribe la fila.
+El ranking se calcula y persiste **una vez**, al pasar el evento a la etapa `results`
+(`UpdateEventStage` → `CalculateAndPersistResults`), o bajo demanda con
+`POST .../distributed-results/recalculate` (requiere sesión). El GET solo hace `SELECT` sobre
+`voting_results` — dejó de recalcular en cada llamada, por lo que ahora es seguro exponerlo
+(D-11 quedó aislado en el POST).
+
+Si no hay fila guardada responde `404 RESULTS_NOT_CALCULATED`; el panel de resultados intenta
+el recálculo autenticado como fallback y, si no hay sesión, muestra el mensaje.
 
 **Ref:** `docs/apis/api.yaml` → `/api/v1/events/{event_id}/distributed-results`
 

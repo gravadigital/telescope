@@ -593,6 +593,104 @@ func TestGetDistributedResults_RejectsMissingConfig(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// GetStoredResults — public read-only view: never recalculates, only serves
+// what CalculateAndPersistResults stored when the event entered results.
+// ---------------------------------------------------------------------------
+
+func newResultsEvent() *event.Event {
+	e := event.NewEvent("Test Event", "desc", uuid.New(), time.Now(), time.Now().Add(48*time.Hour), "org")
+	e.Stage = event.StageResult
+	return e
+}
+
+func TestGetStoredResults_ReturnsStoredRankingWithoutRecalculating(t *testing.T) {
+	s := newTestHandlerSet()
+	e := newResultsEvent()
+	s.eventRepo.addEvent(e)
+	s.resultsRepo.byEvent[e.ID.String()] = &vote.VotingResults{
+		ID:                uuid.New(),
+		EventID:           e.ID,
+		GlobalRanking:     vote.AttachmentResultSlice{{AttachmentID: uuid.New(), Filename: "winner.pdf", MBCScore: 1}},
+		AdjustedRanking:   vote.AttachmentResultSlice{{AttachmentID: uuid.New(), Filename: "winner.pdf", MBCScore: 1}},
+		TotalParticipants: 3,
+		TotalVotes:        3,
+	}
+	// No voting config and no votes on purpose: a read must succeed with just
+	// the stored row.
+
+	w := performRequest(t, http.MethodGet, s.handler.GetStoredResults,
+		gin.Params{{Key: "event_id", Value: e.ID.String()}}, "", nil)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	resp := jsonBody(t, w)
+	data := resp["data"].(map[string]interface{})
+	ranking := data["global_ranking"].([]interface{})
+	require.Len(t, ranking, 1)
+	assert.Equal(t, "winner.pdf", ranking[0].(map[string]interface{})["filename"])
+}
+
+func TestGetStoredResults_NotCalculatedYetReturns404(t *testing.T) {
+	s := newTestHandlerSet()
+	e := newResultsEvent()
+	s.eventRepo.addEvent(e)
+
+	w := performRequest(t, http.MethodGet, s.handler.GetStoredResults,
+		gin.Params{{Key: "event_id", Value: e.ID.String()}}, "", nil)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Equal(t, "RESULTS_NOT_CALCULATED", jsonBody(t, w)["error"])
+}
+
+func TestGetStoredResults_RejectsWrongStage(t *testing.T) {
+	s := newTestHandlerSet()
+	e := newParticipationEvent()
+	s.eventRepo.addEvent(e)
+
+	w := performRequest(t, http.MethodGet, s.handler.GetStoredResults,
+		gin.Params{{Key: "event_id", Value: e.ID.String()}}, "", nil)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+// ---------------------------------------------------------------------------
+// CalculateAndPersistResults — called when the organizer moves the event into
+// the results stage, so the read-only endpoint has a row to serve.
+// ---------------------------------------------------------------------------
+
+func TestCalculateAndPersistResults_StoresRankingForVisitors(t *testing.T) {
+	s := newTestHandlerSet()
+	e := newVotingEvent()
+	s.eventRepo.addEvent(e)
+	users := addParticipants(s, e.ID, 3)
+	attachments := addAttachments(s, e.ID, users)
+	s.configRepo.byEvent[e.ID.String()] = &vote.VotingConfiguration{
+		ID: uuid.New(), EventID: e.ID, AttachmentsPerEvaluator: 2,
+		QualityGoodThreshold: 0.6, QualityBadThreshold: 0.3, AdjustmentMagnitude: 3, MinEvaluationsPerFile: 1,
+	}
+	s.voteRepo.votes = append(s.voteRepo.votes, &vote.Vote{
+		ID: uuid.New(), EventID: e.ID, VoterID: users[0].ID,
+		AttachmentID: attachments[1].ID, RankPosition: 1,
+	})
+
+	require.NoError(t, s.handler.CalculateAndPersistResults(e.ID.String()),
+		"stage change must leave a stored ranking behind")
+
+	stored, err := s.resultsRepo.GetByEventID(e.ID.String())
+	require.NoError(t, err)
+	require.NotNil(t, stored)
+	require.Len(t, stored.GlobalRanking, len(attachments))
+	for _, item := range stored.GlobalRanking {
+		assert.NotEmpty(t, item.ParticipantName, "names must be persisted so the read-only endpoint can show authors")
+	}
+}
+
+func TestCalculateAndPersistResults_RejectsUnknownEvent(t *testing.T) {
+	s := newTestHandlerSet()
+
+	assert.Error(t, s.handler.CalculateAndPersistResults(uuid.NewString()))
+}
+
+// ---------------------------------------------------------------------------
 // GetVotingStatistics
 // ---------------------------------------------------------------------------
 

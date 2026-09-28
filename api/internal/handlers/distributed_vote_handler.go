@@ -216,10 +216,10 @@ func (h *DistributedVoteHandler) CreateVotingConfiguration(c *gin.Context) {
 			"requested_m", req.AttachmentsPerEvaluator,
 			"total_attachments", len(attachments))
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":                    "attachments_per_evaluator cannot exceed total number of attachments",
-			"code":                     "M_EXCEEDS_ATTACHMENTS",
+			"error":                     "attachments_per_evaluator cannot exceed total number of attachments",
+			"code":                      "M_EXCEEDS_ATTACHMENTS",
 			"attachments_per_evaluator": req.AttachmentsPerEvaluator,
-			"total_attachments":        len(attachments),
+			"total_attachments":         len(attachments),
 		})
 		return
 	}
@@ -239,9 +239,9 @@ func (h *DistributedVoteHandler) CreateVotingConfiguration(c *gin.Context) {
 			"details": "Participants cannot evaluate their own submissions (conflict of interest). " +
 				"With " + fmt.Sprintf("%d", len(attachments)) + " total attachments, " +
 				"each participant can evaluate at most " + fmt.Sprintf("%d", maxEvaluablePerParticipant) + " files.",
-			"attachments_per_evaluator":   req.AttachmentsPerEvaluator,
+			"attachments_per_evaluator":     req.AttachmentsPerEvaluator,
 			"max_evaluable_per_participant": maxEvaluablePerParticipant,
-			"total_attachments":            len(attachments),
+			"total_attachments":             len(attachments),
 		})
 		return
 	}
@@ -795,6 +795,142 @@ func (h *DistributedVoteHandler) SubmitRankingVotes(c *gin.Context) {
 }
 
 // GetDistributedResults handles GET /api/events/{event_id}/distributed-results
+// calculateAndPersist computes the MBC ranking, fills in participant names and
+// upserts the row in voting_results. The names are stored together with the
+// ranking, so read-only consumers can serve them straight from the table.
+func (h *DistributedVoteHandler) calculateAndPersist(eventID string, eventUUID uuid.UUID, config *vote.VotingConfiguration) (*vote.VotingResults, error) {
+	results, err := h.votingService.CalculateModifiedBordaCount(eventUUID, config)
+	if err != nil {
+		return nil, err
+	}
+
+	// Populate participant names for each attachment
+	participantNames := make(map[string]string)
+	for i := range results.GlobalRanking {
+		participantID := results.GlobalRanking[i].ParticipantID.String()
+
+		if name, found := participantNames[participantID]; found {
+			results.GlobalRanking[i].ParticipantName = name
+		} else {
+			participant, err := h.userRepo.GetByID(participantID)
+			if err == nil && participant != nil {
+				participantNames[participantID] = participant.Name
+				results.GlobalRanking[i].ParticipantName = participant.Name
+			}
+		}
+	}
+
+	for i := range results.AdjustedRanking {
+		participantID := results.AdjustedRanking[i].ParticipantID.String()
+		if name, found := participantNames[participantID]; found {
+			results.AdjustedRanking[i].ParticipantName = name
+		}
+	}
+
+	// Upsert: results are recalculated whenever they are requested (defect D-11)
+	existingResults, err := h.resultsRepo.GetByEventID(eventID)
+	if err != nil || existingResults == nil {
+		if err := h.resultsRepo.Create(results); err != nil {
+			return nil, fmt.Errorf("failed to save results: %w", err)
+		}
+	} else {
+		results.ID = existingResults.ID
+		if err := h.resultsRepo.Update(results); err != nil {
+			return nil, fmt.Errorf("failed to update results: %w", err)
+		}
+	}
+
+	return results, nil
+}
+
+// CalculateAndPersistResults recalculates and stores the ranking for an event.
+// It is called when the organizer moves the event into the results stage, so
+// anonymous visitors can read the stored results without triggering a
+// recalculation (the public endpoint is read-only).
+func (h *DistributedVoteHandler) CalculateAndPersistResults(eventID string) error {
+	eventUUID, err := uuid.Parse(eventID)
+	if err != nil {
+		return fmt.Errorf("invalid event_id format: %w", err)
+	}
+
+	eventObj, err := h.eventRepo.GetByID(eventID)
+	if err != nil {
+		return fmt.Errorf("event not found: %w", err)
+	}
+	if eventObj.Stage != event.StageVoting && eventObj.Stage != event.StageResult {
+		return fmt.Errorf("results can only be calculated during voting or results stage (current: %s)", eventObj.Stage.String())
+	}
+
+	config, err := h.configRepo.GetByEventID(eventID)
+	if err != nil {
+		return fmt.Errorf("voting configuration not found: %w", err)
+	}
+
+	_, err = h.calculateAndPersist(eventID, eventUUID, config)
+	return err
+}
+
+// GetStoredResults handles GET /api/events/{event_id}/distributed-results
+// Read-only counterpart of GetDistributedResults: it returns the ranking that
+// was stored when the event entered the results stage and never recalculates,
+// which is what makes it safe to expose without authentication.
+func (h *DistributedVoteHandler) GetStoredResults(c *gin.Context) {
+	eventID := c.Param("event_id")
+	if eventID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "event_id is required"})
+		return
+	}
+	if _, err := uuid.Parse(eventID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid event_id format"})
+		return
+	}
+
+	eventObj, err := h.eventRepo.GetByID(eventID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+		return
+	}
+	if eventObj.Stage != event.StageVoting && eventObj.Stage != event.StageResult {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":         "Results can only be viewed during voting or results stage",
+			"current_stage": eventObj.Stage.String(),
+		})
+		return
+	}
+
+	results, err := h.resultsRepo.GetByEventID(eventID)
+	if err != nil || results == nil {
+		// Nothing stored yet: the event entered the results stage before this
+		// calculation existed, or a recalculate is still pending.
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "RESULTS_NOT_CALCULATED",
+			"message": "Results have not been calculated yet for this event",
+		})
+		return
+	}
+
+	resultData := gin.H{
+		"id":                        results.ID.String(),
+		"event_id":                  results.EventID.String(),
+		"global_ranking":            results.GlobalRanking,
+		"adjusted_ranking":          results.AdjustedRanking,
+		"participant_qualities":     results.ParticipantQualities,
+		"total_participants":        results.TotalParticipants,
+		"total_votes":               results.TotalVotes,
+		"attachments_per_evaluator": results.AttachmentsPerEvaluator,
+		"calculated_at":             results.CalculatedAt,
+		"updated_at":                results.UpdatedAt,
+	}
+
+	if c.Query("include_metrics") == "true" {
+		if config, err := h.configRepo.GetByEventID(eventID); err == nil && config != nil {
+			resultData["configuration"] = config
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": resultData})
+}
+
 func (h *DistributedVoteHandler) GetDistributedResults(c *gin.Context) {
 	eventID := c.Param("event_id")
 	if eventID == "" {
@@ -834,66 +970,15 @@ func (h *DistributedVoteHandler) GetDistributedResults(c *gin.Context) {
 		return
 	}
 
-	// Calculate Modified Borda Count results
-	results, err := h.votingService.CalculateModifiedBordaCount(eventUUID, config)
+	// Calculate Modified Borda Count results, fill participant names and upsert
+	results, err := h.calculateAndPersist(eventID, eventUUID, config)
 	if err != nil {
+		h.log.Error("failed to calculate or save voting results", "event_id", eventID, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "Failed to calculate results",
 			"details": err.Error(),
 		})
 		return
-	}
-
-	// Populate participant names for each attachment
-	participantNames := make(map[string]string)
-	for i := range results.GlobalRanking {
-		participantID := results.GlobalRanking[i].ParticipantID.String()
-
-		// Check if we already fetched this participant's name
-		if name, found := participantNames[participantID]; found {
-			results.GlobalRanking[i].ParticipantName = name
-		} else {
-			// Fetch participant info
-			participant, err := h.userRepo.GetByID(participantID)
-			if err == nil && participant != nil {
-				participantNames[participantID] = participant.Name
-				results.GlobalRanking[i].ParticipantName = participant.Name
-			}
-		}
-	}
-
-	// Also populate names in adjusted ranking
-	for i := range results.AdjustedRanking {
-		participantID := results.AdjustedRanking[i].ParticipantID.String()
-		if name, found := participantNames[participantID]; found {
-			results.AdjustedRanking[i].ParticipantName = name
-		}
-	}
-
-	// Save or update results to database (upsert)
-	// Try to get existing results first
-	existingResults, err := h.resultsRepo.GetByEventID(eventID)
-	if err != nil || existingResults == nil {
-		// No existing results, create new
-		if err := h.resultsRepo.Create(results); err != nil {
-			h.log.Error("failed to create voting results", "event_id", eventID, "error", err)
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":   "Failed to save results",
-				"details": err.Error(),
-			})
-			return
-		}
-	} else {
-		// Results exist, update with existing ID
-		results.ID = existingResults.ID
-		if err := h.resultsRepo.Update(results); err != nil {
-			h.log.Error("failed to update voting results", "event_id", eventID, "error", err)
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":   "Failed to update results",
-				"details": err.Error(),
-			})
-			return
-		}
 	}
 
 	// Get additional metrics
@@ -1095,8 +1180,8 @@ func (h *DistributedVoteHandler) UpdateVotingConfiguration(c *gin.Context) {
 	if err == nil && len(existingAssignments) > 0 {
 		h.log.Warn("cannot update config, assignments already generated", "event_id", eventID)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Cannot update voting configuration after assignments have been generated",
-			"code":  "ASSIGNMENTS_EXIST",
+			"error":   "Cannot update voting configuration after assignments have been generated",
+			"code":    "ASSIGNMENTS_EXIST",
 			"details": "Delete existing assignments before updating configuration",
 		})
 		return
@@ -1208,9 +1293,9 @@ func (h *DistributedVoteHandler) DeleteVotingConfiguration(c *gin.Context) {
 			"event_id", eventID,
 			"assignments_count", len(existingAssignments))
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Cannot delete voting configuration after assignments have been generated",
-			"code":  "ASSIGNMENTS_EXIST",
-			"details": fmt.Sprintf("Found %d existing assignments. Delete assignments first if you need to reconfigure.", len(existingAssignments)),
+			"error":             "Cannot delete voting configuration after assignments have been generated",
+			"code":              "ASSIGNMENTS_EXIST",
+			"details":           fmt.Sprintf("Found %d existing assignments. Delete assignments first if you need to reconfigure.", len(existingAssignments)),
 			"assignments_count": len(existingAssignments),
 		})
 		return
@@ -1220,9 +1305,9 @@ func (h *DistributedVoteHandler) DeleteVotingConfiguration(c *gin.Context) {
 	// More flexible than before - was only registration stage
 	if eventObj.Stage != event.StageParticipation && eventObj.Stage != event.StageVoting {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":         "Voting configuration can only be deleted during participation or voting stages (before assignments are generated)",
-			"code":          "INVALID_EVENT_STAGE",
-			"current_stage": eventObj.Stage.String(),
+			"error":          "Voting configuration can only be deleted during participation or voting stages (before assignments are generated)",
+			"code":           "INVALID_EVENT_STAGE",
+			"current_stage":  eventObj.Stage.String(),
 			"allowed_stages": []string{"participation", "voting"},
 		})
 		return
