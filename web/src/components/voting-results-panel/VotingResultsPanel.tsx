@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DistributedVotingService } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { VotingResults, VotingStatistics } from '../../types';
 import './VotingResultsPanel.css';
 
@@ -8,6 +9,7 @@ interface VotingResultsPanelProps {
 }
 
 const VotingResultsPanel: React.FC<VotingResultsPanelProps> = ({ eventId }) => {
+  const { isAuthenticated } = useAuth();
   const [loading, setLoading] = useState<boolean>(true);
   const [results, setResults] = useState<VotingResults | null>(null);
   const [statistics, setStatistics] = useState<VotingStatistics | null>(null);
@@ -39,6 +41,12 @@ const VotingResultsPanel: React.FC<VotingResultsPanelProps> = ({ eventId }) => {
       // still nothing to show (nobody voted, or a visitor has no session) the
       // panel falls back to its empty state instead of an error.
       if (String(err?.message || '').includes('RESULTS_NOT_CALCULATED')) {
+        // Recalculating requires a session: a visitor would get a 401, so it
+        // goes straight to the empty state.
+        if (!isAuthenticated) {
+          setResults(null);
+          return;
+        }
         try {
           await DistributedVotingService.recalculateDistributedResults(eventId);
           const { resultsData, statsData } = await fetchResults();
