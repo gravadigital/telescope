@@ -6,7 +6,7 @@
 | **Extensiones** | `uuid-ossp` |
 | **Acceso** | GORM 1.30.2 (`gorm.io/driver/postgres`) |
 | **Servicio propietario** | [`api`](../architectures/api/index.md) |
-| **Migraciones** | 21, versionadas en Go (`internal/storage/migrations/`) |
+| **Migraciones** | 22 aplicadas + 2 planificadas (023, 024 — REQ-003), versionadas en Go (`internal/storage/migrations/`) |
 
 Todo el estado del producto vive acá. Las claves primarias son UUID generadas por
 `uuid_generate_v4()` o por la aplicación en el hook `BeforeCreate`.
@@ -30,6 +30,8 @@ erDiagram
     events ||--o{ assignments : "distribuye"
     users ||--o{ assignments : "evalúa"
     assignments ||--o{ votes : "produce"
+    users ||--o{ notifications : "recibe"
+    events ||--o{ notifications : "origina"
     users ||--o{ votes : "emite (voter_id)"
     attachments ||--o{ votes : "recibe"
     events ||--o{ votes : "agrupa"
@@ -155,6 +157,17 @@ erDiagram
         timestamptz calculated_at
         timestamptz updated_at
     }
+
+    notifications {
+        uuid id PK
+        uuid recipient_id FK
+        uuid event_id FK
+        notification_type type
+        jsonb data
+        timestamptz read_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
 ```
 
 ---
@@ -166,6 +179,7 @@ erDiagram
 | `event_stage` | `creation`, `participation`, `voting`, `results` | La migración 012 unificó `registration` y `attachment_upload` en `participation` |
 | `user_role` | `admin`, `participant`, `organizer` | Rol **global**. Nullable desde la migración 010 |
 | `event_participant_role` | `creator`, `participant` | Rol **dentro de un evento** |
+| `notification_type` | `stage_changed`, `event_cancelled`, `event_paused`, `deadline_changed`, `participant_registered`, `registration_confirmed`, `ranking_submitted`, `file_reminder`, `vote_reminder` | **Planificado** — migración 024 (S-009) |
 
 El modelo de roles tiene dos niveles: `users.role` para capacidades del sistema y
 `event_participants.role` para quién manda en cada evento. Un usuario puede ser `creator`
@@ -286,6 +300,13 @@ La función de asignación `A: P → 2^F`.
 | `expertise_match_score` | `decimal(3,2)` | Nullable. No se usa |
 | `conflict_of_interest` | `boolean` | Default `false` |
 
+> **Quién recibe asignación (S-006, REQ-003).** Solo los participantes con propuesta: un
+> inscripto sin propuesta no evalúa ni es evaluado. Se resuelve eligiendo los evaluadores en
+> Go; el trigger `validate_assignment_constraints` no cambia. Las asignaciones se insertan en la
+> misma transacción que el paso a `voting` y la configuración. Desde S-007, los votos de una
+> asignación completa se pueden reemplazar durante `voting` (`DELETE` + `INSERT`); los triggers
+> `AFTER DELETE` / `AFTER INSERT` mantienen `is_completed`, `completed_at` y `vote_count`.
+
 ### `votes`
 
 Los rankings individuales `R_i: A(p_i) → {1..m}`.
@@ -332,7 +353,7 @@ Resultados calculados, uno por evento (`event_id` UNIQUE).
 | `participant_qualities` | `jsonb` | Objeto `{uuid_participante: Q_i}` |
 | `adjusted_ranking` | `jsonb` | Array tras aplicar los incentivos |
 | `total_participants` | `integer` | CHECK > 0 |
-| `total_votes` | `integer` | CHECK `>= total_participants` |
+| `total_votes` | `integer` | CHECK `>= total_participants` hoy; **pasa a `>= 0` con la migración 023 (S-006)** para persistir resultados publicados con rankings faltantes |
 | `attachments_per_evaluator` | `integer` | El `m` usado en el cálculo |
 
 Forma de cada elemento de los rankings:
@@ -345,12 +366,74 @@ Forma de cada elemento de los rankings:
 }
 ```
 
+> **Por qué se relaja el CHECK (S-006).** `CalculateAndPersistResults` guarda
+> `total_participants = len(participant_qualities)`. Si se publica con rankings faltantes
+> (permitido desde REQ-003), `total_votes < total_participants`, el upsert falla y el evento
+> queda en `results` sin ranking (el error solo se loguea).
+
 > **Misma divergencia que en `voting_configurations`.** La tabla se crea con columnas
 > adicionales (`statistical_metrics`, `algorithm_used`, `quality_adjustments_applied`,
 > `overall_quality_score`, `good_evaluator_count`, `bad_evaluator_count`,
 > `consensus_strength`) que la entidad de dominio no conoce. Notablemente, el CHECK
 > `valid_evaluator_counts` referencia `good_evaluator_count` y `bad_evaluator_count`:
 > esas columnas quedan en 0 y el CHECK pasa trivialmente.
+
+### `notifications` — planificada (S-009, migración 024)
+
+Avisos in-app por usuario (ADR-009). Se guarda `type` + `data`, no texto: la web compone el
+mensaje en el idioma del usuario con el nombre vigente del evento. Creada con SQL explícito
+(como `vote_drafts`).
+
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| `id` | `uuid` | PK, default `uuid_generate_v4()` |
+| `recipient_id` | `uuid` | NOT NULL, FK → `users.id` ON DELETE CASCADE |
+| `event_id` | `uuid` | NOT NULL, FK → `events.id` ON DELETE CASCADE |
+| `type` | `notification_type` | NOT NULL |
+| `data` | `jsonb` | NOT NULL, default `'{}'` |
+| `read_at` | `timestamptz` | Nullable. `NULL` = sin leer |
+| `created_at` | `timestamptz` | NOT NULL, default `now()` |
+| `updated_at` | `timestamptz` | NOT NULL, default `now()` |
+
+```dbml
+Enum notification_type {
+  stage_changed
+  event_cancelled
+  event_paused
+  deadline_changed
+  participant_registered
+  registration_confirmed
+  ranking_submitted
+  file_reminder
+  vote_reminder
+}
+
+Table notifications {
+  id uuid [pk, default: `uuid_generate_v4()`]
+  recipient_id uuid [not null, ref: > users.id]   // ON DELETE CASCADE
+  event_id uuid [not null, ref: > events.id]      // ON DELETE CASCADE
+  type notification_type [not null]
+  data jsonb [not null, default: '{}']
+  read_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (recipient_id, created_at) [name: 'idx_notifications_recipient_created']   // DESC
+    (recipient_id) [name: 'idx_notifications_unread', note: 'parcial WHERE read_at IS NULL']
+    (recipient_id, event_id, type) [unique, name: 'uq_notifications_registered_unread', note: "parcial WHERE read_at IS NULL AND type = 'participant_registered'"]
+  }
+}
+```
+
+Reglas:
+- `data` por tipo: ver el schema `Notification` en `docs/apis/api.yaml`.
+- **Agregación** de `participant_registered`: `INSERT … ON CONFLICT` sobre el índice único
+  parcial → `data.count` suma y `created_at = now()`. Una vez leída, la próxima inscripción
+  crea una fila nueva.
+- **Retención de 90 días:** toda consulta filtra `created_at >= now() − interval '90 days'`;
+  además `GET /notifications` borra las del destinatario más viejas. Sin scheduler (ADR-003).
+- Solo la lee su destinatario (siempre por el `user_id` del JWT).
 
 ---
 
@@ -464,6 +547,9 @@ Migraciones en Go, no en SQL, con `Up` y `Down` registradas en orden en
 | 019 | `add_password_reset_to_users` | Token de recuperación |
 | 020 | `add_is_paused_to_events` | Pausa |
 | 021 | `add_description_to_attachments` | Descripción opcional de la propuesta |
+| 022 | `fix_uuid_comparison_in_triggers` | Recrea las funciones de validación comparando `uuid` con `uuid` (la 004 comparaba `text` contra `uuid[]` y fallaba todo insert en `assignments` y `votes`) |
+| 023 | `relax_voting_results_vote_count` | **Planificada (S-006).** CHECK `valid_participant_counts` pasa a `total_participants > 0 AND total_votes >= 0`. `Down` restaura el original |
+| 024 | `add_notifications` | **Planificada (S-009).** Enum `notification_type`, tabla `notifications` e índices |
 
 Notas:
 

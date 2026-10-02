@@ -1,88 +1,109 @@
 ---
 component: button
-version: 1.0.0
-last_updated: 2026-09-18
-status: relevado-desde-código
+version: 2.0.0
+status: active
+last_updated: 2026-10-02
+related: [dialog, card, menu]
 ---
 
 # Button
 
-> **Relevado desde el código existente.** `[fuente: código-existente — web/src/styles/global.css]`
+## Propósito
 
-## Qué es
+Dispara una acción. Es el componente `Button` de `src/components/ui/button/` (DA-8): reemplaza el
+sistema de clases `.btn-*` de la v1.0.
 
-⚠️ **No existe como componente React.** Es un **sistema de clases CSS** (`.btn`, `.btn-primary`,
-etc.) definido en `styles/global.css` y aplicado a `<button>` nativos.
+**Cuándo usar:** acciones que cambian estado (inscribirme, enviar, abrir votación), el paso destacado de cada pantalla, acciones de diálogos.
 
-Se documenta acá porque es el elemento interactivo más usado del producto y porque **convertirlo en
-componente es una de las decisiones pendientes de mayor impacto**.
+**Cuándo NO usar:** navegación entre pantallas sin acción → link (`<a>` con `text.action`); acción solo icónica sin texto → `variant="icon"` con `aria-label`.
 
-## Variantes observadas
+## Anatomía
 
-| Clase | Uso |
-|---|---|
-| `.btn` | Base |
-| `.btn-primary` | Acción principal (violeta de marca) |
-| Secundaria | `Cancel`, `Refresh`, `Back` |
-| Peligro | ❌ **No existe.** No hay ninguna acción destructiva con tratamiento visual propio |
+1. **Container** — rectángulo con `radius.control`.
+2. **Label** — verbo + objeto ("Enviar propuesta").
+3. **Icono (opcional)** — antes o después del label (→ en pasos que avanzan).
+4. **Indicador de carga** — reemplaza al icono en `loading`.
 
-`LinkButton` (`components/link-button/LinkButton.tsx`) es un botón con apariencia de link. **Un solo
-uso**, en `Auth`.
+## Variants
 
-## Estados observados
+| Variant | Propósito | Tokens | Ejemplo |
+|---|---|---|---|
+| primary | **El** paso destacado; uno por pantalla | `button.primary.*` | "Abrir inscripción →" |
+| secondary | Acción alternativa (contorno) | `button.secondary.*` | "Cancelar", "Cerrar votación y publicar" mientras falten votos |
+| tertiary | Acción discreta, estilo texto | `button.tertiary.*` | "Pausar evento", "Marcar todo como leído" |
+| on-band | Acción sobre `bg.band` | `button.onBand.*` | "Compartir" en EventHero |
+| icon | Solo ícono (cerrar, ↑ ↓) | `button.icon.*` | "×" de un diálogo |
 
-| Estado | Presente | Detalle |
+`destructive` no existe: el producto no tiene acciones destructivas con tratamiento propio (cancelar evento está fuera de alcance).
+
+## Sizes
+
+| Size | Alto | Padding | Uso |
+|---|---|---|---|
+| sm | 36px | `space.ms` horizontal | Acciones de fila de tabla, chips de acción |
+| md | 40px | 18px horizontal | Default |
+| lg | 46px | `space.lg` horizontal | Paso destacado, CTA de landing; default en mobile para el paso destacado |
+
+En mobile, el botón del paso destacado ocupa el ancho completo.
+
+## States
+
+| State | Descripción | Tokens |
 |---|---|---|
-| Reposo | ✅ | |
-| Hover | ✅ | Vía `--color-primary-hover` y `--shadow-button-hover` |
-| Deshabilitado | ✅ | Ampliamente usado |
-| Cargando | ✅ | **Por cambio de label**, no por spinner estandarizado: `Creating…`, `Updating...`, `Uploading...`, `Registering...` |
-| Foco | ⚠️ **Sin verificar** | No se relevó un estilo de `:focus-visible` explícito |
+| default | Base | `button.{variant}.bg/fg/border` |
+| hover | Puntero encima | `button.primary.bg.hover` — **Pendiente** (el diseño no lo define) |
+| focus | Teclado | `focus.ring` + `border.focus` |
+| active | Presionado | Pendiente, junto con hover |
+| disabled | No interactivo | `bg.disabled` + `text.disabled` |
+| loading | Acción en curso | label de carga ("Enviando…") + indicador; no clickeable |
 
-## Patrón de carga
+## Spacing & sizing rules
 
-El producto resuelve el estado de carga **cambiando el texto del botón**:
-
-| Reposo | Cargando |
-|---|---|
-| `Create Event` | `Creating…` |
-| `Update Deadline` | `Updating...` |
-| `Upload File` | `Uploading...` |
-| `Participate` | `Registering...` |
-
-✅ Es **correcto para accesibilidad**: el cambio de texto se anuncia. ⚠️ Pero es inconsistente en el
-detalle: `Creating…` usa elipsis tipográfica y el resto usa tres puntos.
-
-## Tokens que consume
-
-- `color.brand.primary` / `.hover` / `.dark`
-- `shadow.button` / `.hover`
-- `radius.md`
-- `motion.base`
+- Gap ícono–label: `space.inline.sm`.
+- Entre botones de un grupo: `space.inline.md`; en diálogos, el primario a la derecha (desktop) o arriba (mobile, en alertdialog).
+- Ancho mínimo 88px; el label no se corta: si no entra, el botón crece.
 
 ## Accesibilidad
 
-- ✅ Todos son `<button>` nativos: alcanzables y operables por teclado.
-- ✅ El cambio de label durante la carga es la solución correcta.
-- ⚠️ Varios botones tienen **solo un emoji como contenido accesible**: el `✏️` de editar deadline y
-  el `×` de quitar archivo tienen `title` pero **no `aria-label`**. El `×` se lee como símbolo de
-  multiplicación.
-- ⚠️ Sin `:focus-visible` verificado.
+- **ARIA:** `<button>` nativo. `aria-busy="true"` en loading. `variant="icon"` exige `aria-label` traducido.
+- **Teclado:** Enter y Espacio activan.
+- **Foco:** anillo `focus.ring` siempre visible.
+- **Screen reader:** en loading se anuncia el label de carga.
+- Área táctil ≥ 44×44px en mobile (sm sube a 44px de alto en mobile).
 
-## Do / Don't
+## Guidelines de contenido
 
-*Vacío a propósito.* El código no registra guías de uso. Se van a documentar cuando el componente
-se cree como tal.
+- Verbo en infinitivo o imperativo + objeto, sentence case: "Abrir votación y asignar".
+- El botón de confirmación repite el verbo del título del diálogo, nunca "Confirmar" / "OK" (2b).
+- Máximo ~30 caracteres; los textos vienen del catálogo i18n.
 
-## Deuda conocida
+## Do's & don'ts
 
-1. ⚠️ **No es un componente.** Es CSS disperso: cambiar la apariencia de los botones exige tocar
-   múltiples archivos. **Es el candidato número uno a componentizar.**
-2. ⚠️ **Botones de solo emoji sin `aria-label`.**
-3. ⚠️ **No hay variante destructiva**, pese a que existen acciones destructivas (cancelar evento —
-   que además no tiene control en la interfaz).
-4. ⚠️ **Inconsistencia de elipsis** entre los labels de carga.
+**Do:** un solo primary por pantalla (el paso destacado) · secondary para la opción segura de un diálogo con el mismo peso visual (2f) · mostrar el label de carga.
+
+**Don't:** dos primary juntos · deshabilitar sin explicar por qué (mostrar el motivo cerca) · usar tertiary para la acción principal · usar emojis como ícono.
+
+## API
+
+| Prop | Tipo | Default | Descripción |
+|---|---|---|---|
+| variant | `primary \| secondary \| tertiary \| onBand \| icon` | `primary` | Variant |
+| size | `sm \| md \| lg` | `md` | Tamaño |
+| loading | boolean | false | Estado de carga |
+| loadingLabel | string | — | Label en loading |
+| disabled | boolean | false | Deshabilitado |
+| iconStart / iconEnd | ReactNode | — | Íconos |
+| fullWidth | boolean | false | Ancho completo |
+| type | `button \| submit` | `button` | Tipo nativo |
+| onClick | function | — | Acción |
+
+**Slots:** children = label. **Eventos:** `onClick`.
+
+## Componentes y patterns relacionados
+
+[dialog](./dialog.md) · [card](./card.md) · [menu](./menu.md)
 
 ## Historial
 
-- 2026-09-18 v1.0.0 — Relevado desde el código por `/product-consolidate-services`.
+- 2026-09-18 v1.0.0 — Relevado del sistema de clases `.btn-*` de `global.css`.
+- 2026-10-02 v2.0.0 — **Breaking.** Especificado como componente del rediseño de REQ-003: variants primary / secondary / tertiary / onBand / icon, sizes sm/md/lg, estado loading.

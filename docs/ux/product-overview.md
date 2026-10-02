@@ -103,8 +103,12 @@ JTBD no se parecen — uno conduce un proceso, el otro compite en él.
 
 | Audiencia | Superficie | Para qué la usa | Pantallas principales |
 |---|---|---|---|
-| **organizador** | web | Crear el evento, controlar sus etapas, configurar la votación, ver quién entregó y quién evaluó, publicar resultados | `/events/create`, `/events/:eventId/manage` |
-| **participante** | web | Descubrir eventos, registrarse, entregar su propuesta, evaluar las asignadas, ver el ranking | `/`, `/events`, `/events/:eventId`, `/reset-password` |
+| **organizador** | web | Crear el evento, controlar sus etapas, configurar la votación, ver quién entregó y quién evaluó, recordar a los pendientes, publicar resultados | `/events/create`, `/events/:eventId/manage`, `/my-events`, `/notifications` |
+| **participante** | web | Descubrir eventos, registrarse, entregar su propuesta, evaluar las asignadas, ver el ranking, enterarse de lo que le toca | `/`, `/events`, `/events/:eventId`, `/my-events`, `/notifications`, `/login` y páginas de auth |
+
+> **Actualizado por REQ-003 (2026-10-02).** El rediseño cambia el inventario de pantallas de la
+> superficie `web` (13 pantallas, 9 overlays): ver [`product-map.md`](./surfaces/web/product-map.md).
+> El resto de este documento sigue describiendo el producto relevado del código.
 
 **Un detalle de arquitectura de información que conviene tener presente:** `/events/:eventId` es
 **una URL con dos destinos según quién mire**. El wrapper hace un fetch del evento y, si el usuario

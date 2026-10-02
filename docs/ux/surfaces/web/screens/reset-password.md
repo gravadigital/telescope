@@ -3,114 +3,160 @@ name: reset-password
 surface: web
 route: "/reset-password"
 viewports: [desktop, mobile]
-audiences: [participante]
+audiences: [participante, organizador]
 fidelity: mid
-status: as-is-sin-validar
-version: "1.0"
-date: 2026-09-18
+status: diseñada
+version: "2.0"
+date: 2026-10-02
 ---
 
-# Definir nueva contraseña
+# Pantalla: Definir nueva contraseña (S-06)
 
 ## Identidad
 
-- **Audiencia primaria:** participante
-- **JTBD:** habilitador de todos los JTBD — sin acceso no hay nada. **Para quien entró por un link
-  compartible, esta pantalla no es "recuperar" una contraseña: es la única forma de obtener una**,
-  porque el registro a un evento crea el usuario con `password_hash` nulo.
-- **Viewports:** `desktop`, `mobile` — **con el mismo layout**: es la única pantalla sin media
-  queries propias
-- **Acceso:** público. Requiere `?token=` en la query
-
-> **Transcripta del código existente** (`docs/analysis/ux/web/screens/reset-password.md`).
-> `status: as-is-sin-validar`.
+- **Audiencia primaria (co-primary):** [participante](../../../audiences/participante/research-context.md), [organizador](../../../audiences/organizador/research-context.md).
+- **JTBD / Propósito:** definir la contraseña desde el enlace del email y entrar. Cubre C-06 y REQ-003 RF 10. Derivada de 1b.
+- **Viewports:**
+  - **desktop** — layout dividido igual que S-07.
+  - **mobile** — franja de marca compacta y formulario a ancho completo (la v1.0 no tenía media queries).
 
 ## Entrada y salida
 
-**Se llega desde:** el link del email de recuperación, con el token en la query string.
+**Entradas:**
+- Enlace del email `/reset-password?token=…`.
 
-**Se sale hacia:** `/` por el botón `Go to home`, disponible **solo tras el éxito**.
+**Salidas user-driven:**
+- A S-07 · "Iniciar sesión" tras el éxito.
+- A S-09 · "Pedir un enlace nuevo" con token inválido o vencido.
 
-⚠️ **El estado de token inválido no tiene salida**: la tarjeta muestra el error y no ofrece ningún
-botón ni link.
+**Salidas automáticas:** ninguna.
 
 ## Estructura
 
-Tres renders **mutuamente excluyentes**: nunca coexisten.
-
-| Bloque | Tipo | Contenido |
-|---|---|---|
-| Tarjeta de token inválido | tarjeta | Título + bloque de error. **Sin formulario ni salida** |
-| Tarjeta de confirmación | tarjeta | Título propio + mensaje de éxito + botón de salida |
-| Tarjeta de formulario | formulario | Título + dos campos de contraseña con label y placeholder + error condicional + botón de envío |
-
-**Origen:** `web/src/pages/reset-password/ResetPasswordPage.tsx:45-110`.
-
-Es la pantalla más simple del producto.
+| # | Nombre | Tipo | Variant/Level/State | Categoría | Viewports | Visibilidad | Propósito |
+|---|--------|------|---------------------|-----------|-----------|-------------|-----------|
+| 1 | Panel de marca | section | — | layout | ambos | viewport_overrides: mobile→franja con logo y título | AuthLayout |
+| 2 | Título de marca | heading | h2 | content | ambos | — | Mensaje |
+| 3 | Título | heading | h1 | content | ambos | state_overrides: success→"Contraseña actualizada"; not found→"El enlace no es válido o venció" | Título |
+| 4 | Campo contraseña | text-input | default | input | ambos | hidden_in_states: success, not found | Nueva contraseña |
+| 5 | Campo repetir | text-input | default | input | ambos | hidden_in_states: success, not found | Repetir contraseña |
+| 6 | Error de envío | alert | error | feedback | ambos | visible_only_in_states: error de sistema / sin conexión | Falla |
+| 7 | Botón guardar | button | primary | input | ambos | hidden_in_states: success, not found · state_overrides: loading→disabled | Guardar |
+| 8 | Mensaje de resultado | paragraph | body | content | ambos | visible_only_in_states: success, not found | Qué sigue |
+| 9 | Botón siguiente paso | button | primary | input | ambos | visible_only_in_states: success, not found | Iniciar sesión / Pedir enlace nuevo |
 
 ## Layout por viewport
 
-**desktop** y **mobile** — **idéntico**.
+### desktop · 1200px
+- row `auth`
+  - col 5/12: Panel de marca, Título de marca
+  - col 7/12: Título, Campo contraseña, Campo repetir, Error de envío, Botón guardar, Mensaje de resultado, Botón siguiente paso
 
-Una tarjeta centrada, ancho acotado. **No hay ninguna media query propia en esta pantalla**: el
-layout no cambia en ningún ancho. Hereda solo lo que aporten los estilos globales.
+### mobile · 400px
+- Panel de marca
+- Título de marca
+- Título
+- Campo contraseña
+- Campo repetir
+- Error de envío
+- Botón guardar
+- Mensaje de resultado
+- Botón siguiente paso
 
 ## Contenido
 
-Microcopy transcripto **textual**, en inglés.
+### Panel de marca
+- Texto/label: "TELESCOPIO"
 
-### Tarjeta de formulario
-- Título: `🔭 Reset Password`
-- Label 1: `New password` · Placeholder: `At least 8 characters`
-- Label 2: `Confirm password` · Placeholder: `Repeat your new password`
-- Botón (reposo): `Set new password`
-- Botón (enviando): `Updating...`
+### Título de marca
+- Texto/label: "Un paso más y volvés a tus eventos."
 
-### Tarjeta de token inválido
-- Título: `🔭 Reset Password`
-- Error: `Invalid or missing reset token.`
+### Título
+- Texto/label: "Definí tu nueva contraseña"
 
-### Tarjeta de confirmación
-- Título: `🔭 Password Updated`
-- Mensaje: `Your password has been updated successfully.`
-- Botón: `Go to home`
+### Campo contraseña
+- Texto/label: "Nueva contraseña" · placeholder "Al menos 8 caracteres" · acción "Mostrar" / "Ocultar"
 
-### Mensajes de validación
-- `Password must be at least 8 characters.`
-- `Passwords do not match.`
-- Error de API: `err.message` crudo, o el fallback `Something went wrong. The link may have expired.`
+### Campo repetir
+- Texto/label: "Repetí la contraseña"
+
+### Error de envío
+- Texto/label: "No pudimos guardar la contraseña. Probá de nuevo."
+
+### Botón guardar
+- Texto/label: "Guardar contraseña"
+
+### Mensaje de resultado
+- Texto/label: success "Ya podés iniciar sesión con tu nueva contraseña." · not found "Los enlaces de recuperación vencen en 1 hora y sirven una sola vez. Pedí uno nuevo."
+
+### Botón siguiente paso
+- Texto/label: success "Iniciar sesión" · not found "Pedir un enlace nuevo"
 
 ## Estados
 
-| Estado | Aplica | Detalle |
-|---|---|---|
-| Vacío | **No** — no aplica | Es un formulario |
-| Cargando | **Sí** | El botón cambia a `Updating...` |
-| Error | **Sí** | Dos vías: token inválido (tarjeta completa, excluyente) y error de validación o de API (inline en el formulario) |
-| Éxito | **Sí** | Tarjeta de confirmación completa, excluyente, con salida a `/` |
-| Deshabilitado | **Sí** | El botón durante el envío |
-| Sin permiso | **No** — no aplica | El control de acceso es el token |
-| Parcial | **No** — no aplica | — |
-| Offline | **No** — no implementado (ver `gaps-as-is.md`) | Un fallo de red cae en el error genérico |
+### default
+- Aplica: Sí
+- Mensaje: —
+- Cambios: ninguno.
 
-**Es la pantalla con mejor cobertura de estados del producto**, en proporción a su tamaño.
+### empty
+- Aplica: No.
+
+### loading
+- Aplica: Sí
+- Mensaje: "Guardando…"
+- Cambios: Botón guardar variant=disabled con el texto de carga.
+
+### error de validación
+- Aplica: Sí
+- Mensaje: "Usá al menos 8 caracteres." / "Las contraseñas no coinciden."
+- Cambios: Campo contraseña o Campo repetir state=error con su mensaje.
+
+### error de sistema / sin conexión
+- Aplica: Sí
+- Mensaje: "No pudimos guardar la contraseña. Probá de nuevo."
+- Cambios: Error de envío visible.
+
+### success
+- Aplica: Sí
+- Mensaje: "Contraseña actualizada"
+- Cambios: campos y Botón guardar ocultos; Mensaje de resultado y Botón siguiente paso ("Iniciar sesión") visibles.
+
+### not found
+- Aplica: Sí — token ausente, inválido o vencido.
+- Mensaje: "El enlace no es válido o venció"
+- Cambios: campos ocultos; Botón siguiente paso = "Pedir un enlace nuevo". Ya no es un callejón sin salida.
+
+### estado terminal / readonly
+- Aplica: No.
 
 ## Interacciones
 
-- **Al montar:** lee el `token` de la query (`:9`). Si falta, renderiza la tarjeta de token
-  inválido.
-- **Validación client-side** antes de enviar: longitud ≥ 8 y coincidencia entre los dos campos.
-- **Envío:** llama a la API con token y contraseña nueva. En éxito, reemplaza toda la pantalla por
-  la tarjeta de confirmación.
+**Eventos:**
+- Botón guardar · on submit → guarda la contraseña → success.
+- Botón siguiente paso · on click → success: `/login` · not found: `/forgot-password`.
+
+**Validaciones:**
+- Campo contraseña · < 8 caracteres → "Usá al menos 8 caracteres."
+- Campo repetir · distinto → "Las contraseñas no coinciden."
+
+**Feedback:** el resultado se muestra en la misma pantalla.
 
 ## Accesibilidad
 
-**Observado en el código:**
-- Los dos campos tienen `<label>` visible.
-- ⚠️ El bloque de error no tiene `role="alert"` ni `aria-live`: al aparecer no se anuncia.
-- ⚠️ El emoji `🔭` del título no tiene `aria-hidden`: será leído literalmente.
+- **Orden de foco:** Campo contraseña → "Mostrar" → Campo repetir → Botón guardar.
+- **Landmarks y jerarquía:** igual que S-07. h1 = Título.
+- **Foco y teclado:** en success y not found el foco va al Título.
+- **Propio de esta composición:** el cambio de estado se anuncia en región live.
 
 ## Decisiones y descartes
 
-- Pantalla documentada desde el código existente `[fuente: código-existente]`. No hay registro del
-  rationale original; las decisiones se van a documentar cuando la pantalla se modifique.
+**Decisiones tomadas:**
+- Reescrita por REQ-003 con el layout de 1b (RF 10).
+- El token inválido ofrece "Pedir un enlace nuevo": resuelve el callejón sin salida de la v1.0 (UF-04).
+- Tras el éxito se va a iniciar sesión, no a la home.
+
+**Alternativas descartadas:**
+- Iniciar sesión automáticamente tras guardar: el flujo actual no lo hace y el REQ no lo pide.
+
+**Preguntas abiertas:** ninguna.

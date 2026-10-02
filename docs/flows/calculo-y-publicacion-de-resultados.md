@@ -4,8 +4,8 @@ title: Cálculo y publicación de resultados
 type: feature
 status: Active
 created: 2026-09-18
-last_updated: 2026-09-18
-stories: []
+last_updated: 2026-10-02
+stories: [S-006, S-009, S-015, S-016]
 ---
 
 # Cálculo y publicación de resultados
@@ -13,8 +13,8 @@ stories: []
 **Tipo:** Feature
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-09-18
-**Stories:** — (documentado retroactivamente desde el código)
+**Última actualización:** 2026-10-02
+**Stories:** S-006, S-009, S-015, S-016 (cambios planificados por REQ-003)
 
 ## Descripción
 
@@ -24,6 +24,19 @@ y el ajustado `G'`.
 
 ⚠️ **No está definido cuál de los dos es el ranking oficial del producto.** Ver Feature Group 5 y
 la pregunta abierta #1 del PRD.
+
+## Cambios planificados (REQ-003)
+
+> Diseño aprobado, **pendiente de implementar**. Al implementar, incorporar al paso
+> correspondiente y quitar de acá.
+
+| Paso | Cambio | Story |
+|---|---|---|
+| — | Sin cambio de cálculo | — |
+| Disparador | Se puede publicar con rankings faltantes (confirmación explícita en el diálogo de la gestión); quien no completó queda con `Q_i = 0` | S-016 |
+| 5 | CHECK `valid_participant_counts` relajado a `total_votes >= 0` (migración 023), así el upsert no falla con rankings faltantes | S-006 |
+| 5 | Tras persistir, notificaciones `stage_changed { stage: "results", result_position, result_total }` por inscripto | S-009 |
+| Presentación | Puntaje `mbc_score × 10` con un decimal y separador según idioma; podio (1–3) + lista sobre `adjusted_ranking`; el propio participante resaltado | S-015 |
 
 ## Servicios Involucrados
 

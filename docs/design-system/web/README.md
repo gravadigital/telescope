@@ -1,54 +1,66 @@
 ---
 design_system: web
-version: 1.0.0
-last_updated: 2026-09-18
-status: relevado-desde-código
+version: 2.0.0
+last_updated: 2026-10-02
+status: diseñado
 platform: web
 ---
 
 # Design System — `web`
 
-> **Sembrado desde el código existente** por `/product-consolidate-services` el 2026-09-18.
-> Los valores son los que el CSS implementado usa hoy, no propuestas.
+> **v2.0.0 — lenguaje visual del rediseño (REQ-003).** Reemplaza al DS relevado del código
+> (v1.0.0, glassmorphism oscuro). Fuente: `documentation/Telescopio Rediseño Vistas.html` y las
+> decisiones DA-7 / DA-8 de [REQ-003](../../requests/REQ-003.rediseno-de-vistas-notificaciones-y-multilenguaje.md).
+>
+> ⚠️ **El código desplegado todavía usa la v1.0.** La v2.0.0 se implementa con las stories de
+> fundaciones del front de REQ-003. Hasta entonces, documentación y código no coinciden.
 
-**Plataforma:** `web` · **Viewports:** `desktop`, `mobile` · **Corte estructural:** 768px
+**Plataforma:** `web` · **Viewports:** `mobile` (base), `desktop` (≥ 768px) · **Mobile-first**
 
-## Estado de las piezas
-
-### Fundaciones
+## Fundaciones
 
 | Fundación | Estado | Notas |
 |---|---|---|
-| [grid](./foundations/grid.md) | **Sembrada** | Breakpoints reales. **Desktop-first**, corte único en 768px |
-| [color](./foundations/color.md) | **Sembrada** | Paleta real. Marca: **`#6a5acd`** |
-| [typography](./foundations/typography.md) | **Sembrada** | Stack de sistema, escala de 7 pasos |
-| [spacing](./foundations/spacing.md) | **Sembrada** | Base 4px. **La mejor conservada** |
-| [motion](./foundations/motion.md) | Placeholder | Hay tokens de transición en `spacing.md` |
-| [elevation](./foundations/elevation.md) | Placeholder | Hay tokens de sombra en `spacing.md` |
-| [iconography](./foundations/iconography.md) | Placeholder | ⚠️ El producto usa **emojis** como iconos |
-| [voice-tone](./foundations/voice-tone.md) | Placeholder | Requiere decisión de producto sobre idioma |
+| [color](./foundations/color.md) | **Diseñada** | Bandas oscuras + contenido claro. Acción **`#4B3FA8`**, acento `#6E5BF2`, señal `#35D6F2` |
+| [typography](./foundations/typography.md) | **Diseñada** | Plus Jakarta Sans + JetBrains Mono, escala de 10 pasos |
+| [spacing](./foundations/spacing.md) | **Diseñada** | Base 4px + radios del rediseño |
+| [grid](./foundations/grid.md) | **Diseñada** | Mobile-first, único corte en 768px, contenedor 1200px |
+| [elevation](./foundations/elevation.md) | **Diseñada** | Poca sombra; anillo de foco y backdrop |
+| [motion](./foundations/motion.md) | Placeholder | Tokens de transición en `spacing.md` |
+| [iconography](./foundations/iconography.md) | Placeholder | El rediseño deja de usar emojis como ícono; falta elegir el set |
+| [voice-tone](./foundations/voice-tone.md) | Placeholder | Español rioplatense neutro de género + inglés (REQ-003) |
 
-### Componentes relevados
+## Componentes
 
-Los cuatro son **candidatos**: se repiten y son genéricos, pero **ninguno existe hoy como
-componente** salvo `Modal`.
+Primitivos de `src/components/ui/` (DA-8). Los compuestos de dominio (EventHero, StageTimeline,
+NextStepCard, SortableRankList, NotificationItem, AppHeader, AuthLayout…) **no** son del DS: se
+arman con estos y los especifican los screen.md.
 
-| Componente | ¿Existe en código? | Prioridad de componentizar |
+| Componente | Rol | Pantallas |
 |---|---|---|
-| [modal](./components/modal.md) | ✅ Sí, 4 usos | **Alta** — corregir accesibilidad acá arregla 4 overlays |
-| [button](./components/button.md) | ❌ Sistema de clases CSS | **Alta** — el elemento más usado |
-| [glass-card](./components/glass-card.md) | ❌ Patrón duplicado a mano | **Alta** — es la superficie base de todo |
-| [status-badge](./components/status-badge.md) | ❌ CSS duplicado por archivo | Media |
+| [button](./components/button.md) | Acciones | Todas |
+| [text-field](./components/text-field.md) | Texto, multilínea con contador, búsqueda | Auth, Crear/editar evento, Detalle, Eventos |
+| [dialog](./components/dialog.md) | Overlay modal accesible | O-07, O-08, O-14 a O-19 |
+| [card](./components/card.md) | Superficie (incl. CtaBanner) | Todas |
+| [status-pill](./components/status-pill.md) | Estado de evento, archivo, voto, rol | Todas las de eventos |
+| [data-table](./components/data-table.md) | Tabla con acción única, apilada en mobile | Eventos, Mis eventos, Gestión, Participantes, Resultados |
+| [filter-tabs](./components/filter-tabs.md) | Filtros con conteo | Eventos |
+| [progress-bar](./components/progress-bar.md) | Cupo, rankings enviados | Inicio, Eventos, Gestión |
+| [stat-tile](./components/stat-tile.md) | Métricas | Gestión, Abrir votación |
+| [callout](./components/callout.md) | Avisos y error de bloque con reintento | Detalle, Gestión, diálogos |
+| [empty-state](./components/empty-state.md) | Sin datos + acción | Gestión, Mis eventos, Notificaciones, 404 |
+| [date-quick-picker](./components/date-quick-picker.md) | Fecha con atajos | O-07, O-15, O-16 |
+| [number-stepper](./components/number-stepper.md) | Entero con − / + | Crear evento, O-16, O-18 |
+| [file-dropzone](./components/file-dropzone.md) | Carga de propuesta + FileChip | Detalle |
+| [menu](./components/menu.md) | Menú de usuario, idioma | Header |
 
-## Las tres deudas que atraviesan todo el DS
+## Pendientes conocidos
 
-1. **Fuente de verdad duplicada.** Las 57 variables de `index.css` están repetidas en `global.css`.
-2. **Un tercio de los colores hardcodeado** (350 hex vs 753 `var()`), con una **paleta implícita sin
-   tokens** para textos secundarios.
-3. **Accesibilidad de overlays.** Ningún modal tiene `role="dialog"`, gestión de foco ni cierre por
-   Escape.
+1. **Hover y active** de los botones: el diseño no los define (`bg.action.primary.hover` en Pendiente).
+2. **Fondo suave de error:** el diseño no lo define.
+3. **Set de íconos:** iconography sigue en placeholder.
+4. **"✓ Copiado" blanco sobre verde** no cumple AA (3.5:1); ver `color.md` → Accesibilidad.
 
 ## Cómo se actualiza
 
-`/product-design-system-update`. Cualquier cambio a una fundación sembrada es **breaking**: el
-código ya implementado depende de esos valores.
+`/product-design-system-update`. Ver [`governance.md`](./governance.md).

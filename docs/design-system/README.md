@@ -4,13 +4,10 @@ Raíz del Design System. Una carpeta por superficie, con versionado independient
 
 | Superficie | Plataforma | DS | Estado |
 |---|---|---|---|
-| [web](./web/) | `web` | v1.0.0 | **Sembrado desde el código existente** |
+| [web](./web/) | `web` | v2.0.0 | **Diseñado** — rediseño de REQ-003 (el código todavía usa la v1.0.0) |
 
-> **Este DS es brownfield.** Las fundaciones no son placeholders: contienen los valores que el CSS
-> implementado usa hoy, relevados de `web/src/styles/global.css` e `index.css`.
->
-> Eso significa que **la documentación y el código coinciden** — y que un cambio acá es un cambio
-> al comportamiento de código ya desplegado. Ver `web/governance.md`.
+> La v1.0.0 de `web` se relevó del código desplegado. La v2.0.0 la reemplaza con el lenguaje visual
+> del rediseño de REQ-003, que se implementa con las stories de ese request.
 
 ## Cómo se actualiza
 

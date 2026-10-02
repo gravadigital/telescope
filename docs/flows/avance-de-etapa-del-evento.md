@@ -4,8 +4,8 @@ title: Avance de etapa del evento
 type: event
 status: Active
 created: 2026-09-18
-last_updated: 2026-09-18
-stories: []
+last_updated: 2026-10-02
+stories: [S-006, S-009, S-015, S-016]
 ---
 
 # Avance de etapa del evento
@@ -13,8 +13,8 @@ stories: []
 **Tipo:** Evento
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-09-18
-**Stories:** — (documentado retroactivamente desde el código)
+**Última actualización:** 2026-10-02
+**Stories:** S-006, S-009, S-015, S-016 (cambios planificados por REQ-003)
 
 ## Descripción
 
@@ -25,6 +25,28 @@ Es la acción de control del organizador y el disparador de las notificaciones p
 
 ⚠️ **Este flujo tiene una inconsistencia conocida (D-05): la misma acción se comporta distinto
 según desde qué pantalla se ejecute.** Está documentada en el Paso 1.
+
+## Cambios planificados (REQ-003)
+
+> Diseño aprobado, **pendiente de implementar**. Lo de arriba describe el código actual; al
+> implementar cada story, incorporar estos cambios al paso correspondiente y quitarlos de acá.
+
+| Paso | Cambio | Story |
+|---|---|---|
+| 1 | Se reemplaza la doble validación de `ManageEventPage`/`EventDetailPage` por un único módulo `web/src/domain/stages.ts`, usado **solo desde la gestión**. Se elimina "todos votaron". `EventDetailPage` deja de avanzar etapas. Cierra D-05 | S-015, S-016 |
+| 2 | El modal pasa a `Dialog` + `DateQuickPicker` (atajos 3 días / 1 semana / 2 semanas). Para `voting` el diálogo incluye la configuración (`GET /api/v1/events/{event_id}/voting-config/preview`) | S-016 |
+| 3 | Body con `voting_config` cuando `stage = voting`. Mínimo: **3 participantes con propuesta** (`400 INSUFFICIENT_ATTACHMENTS`, `required_minimum: 3`); se eliminan `INSUFFICIENT_PARTICIPANTS` y la regla de 2 propuestas. `400 MISSING_VOTING_CONFIG`, `400 INVALID_THRESHOLDS`. Etapa + configuración + asignaciones en una transacción; si falla → `500 VOTING_SETUP_ERROR` y el evento sigue en `participation`. Response con `voting: { configuration, assignments_count, total_attachments }` | S-006 |
+| 3 | `voting → results` con rankings faltantes: el resultado se persiste (CHECK relajado, migración 023) | S-006 |
+| 4 | Además del email, notificaciones in-app `stage_changed` (ver [notificaciones-in-app](notificaciones-in-app.md)) | S-009 |
+| Acciones | Cancelar, pausar (solo al pausar) y posponer emiten `event_cancelled`, `event_paused` y `deadline_changed`. "Posponer deadline" también se valida en el cliente (cierra D-06) | S-009, S-016 |
+
+**Tabla de transiciones resultante:**
+
+| Transición | Precondición |
+|---|---|
+| `creation → participation` | `estimated_end_date` requerida. El evento pasa a ser visible (hasta ahí, 404 para quien no es el autor — S-008) |
+| `participation → voting` | `estimated_end_date` + `voting_config` · **≥ 3 participantes con propuesta** |
+| `voting → results` | Confirmación explícita en el diálogo, aun con rankings faltantes |
 
 ## Servicios Involucrados
 

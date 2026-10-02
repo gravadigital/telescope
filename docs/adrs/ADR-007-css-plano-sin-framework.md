@@ -1,6 +1,6 @@
 # ADR-007: CSS plano con variables, sin framework ni librería de componentes
 
-**Estado:** Aceptado (implementado)
+**Estado:** Aceptado (implementado) · **Enmendado** por REQ-003 (2026-10-02, ver [Enmienda](#enmienda-req-003))
 **Fecha:** 2026-09-18 (documentado retroactivamente)
 **Detectado desde:** `web`
 **Tags:** frontend, estilos, design-system
@@ -83,3 +83,29 @@ implícita, factorizar los patrones repetidos— es trabajo del Design System, n
 - Tokens: `web/src/styles/global.css`, `web/src/index.css`
 - Relevamiento completo: `docs/analysis/ux/web/index.md`
 - Design System: `docs/design-system/web/`
+
+## Enmienda (REQ-003)
+
+**Fecha:** 2026-10-02 · **Stories:** S-010 (y todas las de pantalla, S-011 a S-018)
+
+El rediseño de REQ-003 **mantiene la técnica** (CSS plano por componente, tokens en `:root`, sin
+librería de componentes) y corrige la deuda listada arriba:
+
+- **Una sola fuente de tokens:** `web/src/styles/tokens.css`, con los tokens del DS `web` v2.0.0.
+  Se elimina la copia de `index.css`. Las variables viejas quedan en un bloque *legacy* de
+  `global.css` hasta que se reemplace la última pantalla (S-016 / S-017) y entonces se borran.
+- **Sin hex literales** en los componentes nuevos.
+- **Lenguaje visual nuevo:** de glassmorphism oscuro a "bandas oscuras + contenido claro" (paleta
+  `#4B3FA8` / `#6E5BF2`, acento `#35D6F2`). Cambio breaking del DS → `web` v2.0.0.
+- **Breakpoints como escala nombrada** (`--bp-mobile: 768px` documentado; en `@media` se usa el
+  literal) y **mobile-first** en los componentes nuevos.
+- **Componentes en vez de sistemas de clases:** `web/src/components/ui/` con los primitivos del DS
+  (`Button`, `TextField`, `Dialog`, `DataTable`, …) y compuestos de dominio en
+  `web/src/components/{dominio}/`. `Dialog` reemplaza las tres implementaciones de overlay con
+  `role="dialog"`, foco atrapado y Escape (resuelve la deuda de accesibilidad de los overlays).
+- **Prefijo de clase por componente** para evitar colisiones.
+
+*Alternativa considerada:* CSS Modules (la que este ADR señala como mejor). Se descarta **en este
+REQ** para no cambiar la técnica a la vez que el lenguaje visual y todas las pantallas; sigue
+siendo la evolución natural.
+

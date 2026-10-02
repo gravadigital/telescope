@@ -1,6 +1,6 @@
 ---
 created: 2026-09-18
-last_updated: 2026-09-18
+last_updated: 2026-10-02
 status: Draft - Generado desde código existente
 ---
 
@@ -50,6 +50,17 @@ esta sección son el vocabulario único del PRD.
   `future_start_date` es `NOT VALID` (solo aplica a filas nuevas o modificadas).
   ⚠️ **`start_date` se autogenera como hoy+1día sin que el usuario lo vea ni lo elija**
   (`CreateEventPage.tsx:43-49`)
+- **Cambios REQ-003 (diseñados, pendientes de implementación):**
+  - **Visibilidad:** un evento en `creation` no es visible ni accesible para nadie salvo su
+    autor (o un `admin`): no aparece en el listado y su detalle responde como inexistente.
+  - **Edición:** `name`, `description`, `organizer` y `max_participants` se pueden editar solo
+    en `creation` y `participation`, por el autor. `max_participants` ≥ inscriptos actuales.
+    Las fechas (`start_date`/`end_date`) no son editables.
+  - **`participation → voting`:** es una sola operación que incluye la configuración de votación
+    y la generación de asignaciones. Exige **al menos 3 participantes con propuesta** (antes:
+    3 inscriptos + 2 propuestas, REQ-002).
+  - **`voting → results`:** no exige que todos hayan votado; el cliente pide confirmación
+    explícita indicando cuántos rankings faltan.
 
 ### Participación (`event_participants`)
 
@@ -68,6 +79,8 @@ esta sección son el vocabulario único del PRD.
   **mantenido por trigger**)
 - **Relaciones:** belongs_to Evento, belongs_to Usuario (participante), has_many Voto
 - **Reglas:** **Una propuesta por participante por evento**, impuesto por la aplicación.
+  **Cambio REQ-003:** se agrega `image/webp` a la lista blanca del backend, que hoy el cliente
+  acepta y la api rechaza.
   ⚠️ **Discrepancia de límite de tamaño**: la base admite 100 MB, el cliente valida 10 MB
   (`EventDetailPage.tsx:135`). El límite efectivo es el del cliente y **no está validado en el
   backend**. Tipos MIME aceptados (whitelist del cliente): JPEG, PNG, GIF, WebP, PDF, TXT,
@@ -83,6 +96,10 @@ esta sección son el vocabulario único del PRD.
 - **Relaciones:** belongs_to Evento (1:1)
 - **Reglas:** CHECK `valid_quality_thresholds`: `good > bad` **y** la diferencia ≥ 0.1.
   `m` es el único sin default: el frontend lo precarga con el recomendado.
+  **Cambio REQ-003:** como solo evalúan quienes tienen propuesta, `n = k` y la cobertura
+  `n·m ≥ k·min_evaluations_per_file` se reduce a `m ≥ min_evaluations_per_file`. El default de
+  `min_evaluations_per_file` pasa a ser `min(3, m)`; con el default fijo de 3 un evento de 3
+  propuestas (`m ≤ 2`) sería imposible de configurar.
   ⚠️ **Columnas huérfanas**: `use_expertise_matching`, `enable_co_idetection`,
   `randomization_seed`, `assignment_algorithm`, `scoring_algorithm` existen en la base
   (creadas por `migrations/models.go`, con defaults de umbral 0.65/0.35) y **el dominio no las
@@ -100,6 +117,8 @@ esta sección son el vocabulario único del PRD.
 - **Reglas:** La cantidad de `attachment_ids` debe ser **exactamente** `m`, y ninguno puede ser
   del propio participante — ambas **garantizadas por el trigger**
   `validate_assignment_constraints`, además de en Go.
+  **Cambio REQ-003:** solo reciben Asignación los participantes que subieron Propuesta. Un
+  inscripto sin propuesta no evalúa ni es evaluado.
   ⚠️ `assignment_round` siempre vale 1: no hay múltiples rondas.
   ⚠️ `expertise_match_score` existe y nunca se escribe
 
@@ -115,6 +134,10 @@ esta sección son el vocabulario único del PRD.
   `score` es nulo lo calcula como `(m − rank_position + 1) × 100 / m`.
   ⚠️ `confidence`, `evaluation_time_seconds`, `notes` e `is_quality_vote` existen y nunca se
   escriben
+- **Cambio REQ-003:** el ranking enviado se puede **reemplazar** mientras el evento está en
+  `voting` (hoy se rechaza con `VOTES_ALREADY_SUBMITTED`). El reemplazo borra los `m` votos de
+  la asignación e inserta los nuevos en una transacción; los triggers `AFTER DELETE`/`AFTER
+  INSERT` mantienen `is_completed` y `vote_count`, así que la Asignación sigue completa.
 
 ### BorradorVoto (`vote_drafts`)
 
@@ -136,6 +159,28 @@ esta sección son el vocabulario único del PRD.
   `quality_adjustments_applied`, `overall_quality_score`, `good_evaluator_count`,
   `bad_evaluator_count`, `consensus_strength`. El CHECK `valid_evaluator_counts` referencia dos
   de ellas, que quedan en 0 y hacen que el CHECK pase trivialmente
+- **Cambios REQ-003:** sin cambios de cálculo. El puntaje se presenta como `mbc_score × 10`
+  con un decimal (escala 0–10). El CHECK `valid_participant_counts` (`total_votes >=
+  total_participants`) se relaja a `total_votes >= 0`: con la publicación con rankings
+  faltantes el cálculo violaría el CHECK y los resultados no se guardarían.
+
+### Notificación (`notifications`) — nueva, REQ-003
+
+- **Atributos clave:** `recipient_id` (uuid, req, FK → `users`), `event_id` (uuid, req, FK →
+  `events`), `type` (enum `notification_type`: `stage_changed`, `event_cancelled`,
+  `participant_registered`, `registration_confirmed`, `ranking_submitted`, `file_reminder`,
+  `vote_reminder`), `data` (jsonb, req, default `'{}'` — parámetros del mensaje, p. ej.
+  `{stage, can_vote}` o `{count}`), `read_at` (timestamptz, nullable), `created_at`
+  (timestamptz, req)
+- **Relaciones:** belongs_to Usuario (destinatario), belongs_to Evento
+- **Reglas:** solo la ve su destinatario. Se muestra la de los últimos 90 días. Se marca leída
+  una o todas. **El texto no se persiste**: la interfaz es multilenguaje, así que la api guarda
+  `type` + `data` y la web compone título, cuerpo y acción con su catálogo de traducciones (el
+  nombre del evento se toma vigente, no copiado, porque el evento es editable).
+  `participant_registered` se **agrega**: mientras el organizador no la leyó, cada inscripción
+  nueva incrementa `data.count` en la misma notificación ("N personas se inscribieron").
+  Se genera en la misma operación que dispara el email equivalente; si falla, se loguea y la
+  operación principal no falla (mismo criterio que los emails).
 
 ---
 

@@ -4,8 +4,8 @@ title: Configuración de la votación y generación de asignaciones
 type: feature
 status: Active
 created: 2026-09-18
-last_updated: 2026-09-18
-stories: []
+last_updated: 2026-10-02
+stories: [S-006, S-016]
 ---
 
 # Configuración de la votación y generación de asignaciones
@@ -13,8 +13,8 @@ stories: []
 **Tipo:** Feature
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-09-18
-**Stories:** — (documentado retroactivamente desde el código)
+**Última actualización:** 2026-10-02
+**Stories:** S-006, S-016 (cambios planificados por REQ-003)
 
 ## Descripción
 
@@ -24,6 +24,19 @@ generadas las asignaciones, el conjunto de quién evalúa qué queda fijo, y las
 modelo no admiten corrección posterior.
 
 Ocurre durante la etapa `voting`, después de que el organizador la abrió.
+
+## Cambios planificados (REQ-003)
+
+> Diseño aprobado, **pendiente de implementar**. Al implementar, incorporar al paso
+> correspondiente y quitar de acá.
+
+| Paso | Cambio | Story |
+|---|---|---|
+| 1 | El `m` recomendado, mínimo y máximo los calcula **solo la api**: `GET /api/v1/events/{event_id}/voting-config/preview` → `{ participants_count, participants_with_proposal, can_open_voting, min_m, max_m, recommended_m, defaults }`. Se elimina la fórmula del front (cierra D-09) | S-006, S-016 |
+| 2 y 3 | Dejan de ser llamadas separadas: ocurren dentro de `PATCH /api/v1/events/{event_id}/stage` con `voting_config`, en una transacción (`UPDATE events` → `INSERT voting_configurations` → `INSERT assignments`). `POST …/voting-config` y `POST …/generate-assignments` quedan `deprecated` (con la misma regla) | S-006 |
+| 3 | **Evaluadores = participantes con propuesta** (`n = k`): un inscripto sin propuesta no evalúa ni es evaluado | S-006 |
+| 2 | Default de `min_evaluations_per_file` = `min(3, attachments_per_evaluator)` (con `n = k` la cobertura exige `m ≥ min_evaluations_per_file`) | S-006 |
+| Errores | Umbrales inválidos (`good <= bad` o diferencia < 0,1) pasan de 500 (CHECK) a `400 INVALID_THRESHOLDS`, validado en Go | S-006 |
 
 ## Servicios Involucrados
 

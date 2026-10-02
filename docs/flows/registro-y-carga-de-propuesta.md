@@ -4,8 +4,8 @@ title: Registro a un evento y carga de propuesta
 type: feature
 status: Active
 created: 2026-09-18
-last_updated: 2026-09-25
-stories: []
+last_updated: 2026-10-02
+stories: [S-006, S-007, S-008, S-009, S-015]
 ---
 
 # Registro a un evento y carga de propuesta
@@ -13,8 +13,8 @@ stories: []
 **Tipo:** Feature
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-09-25
-**Stories:** — (documentado retroactivamente desde el código)
+**Última actualización:** 2026-10-02
+**Stories:** S-006, S-007, S-008, S-009, S-015 (cambios planificados por REQ-003)
 
 ## Descripción
 
@@ -23,6 +23,19 @@ propuesta queda cargada. Es el mecanismo principal de incorporación de particip
 es **público** y **crea el usuario en el acto** si el email no existe.
 
 Solo ocurre durante la etapa `participation` y con el evento no pausado.
+
+## Cambios planificados (REQ-003)
+
+> Diseño aprobado, **pendiente de implementar**. Al implementar, incorporar al paso
+> correspondiente y quitar de acá.
+
+| Paso | Cambio | Story |
+|---|---|---|
+| 1 | Un evento en `creation` responde `404 EVENT_NOT_FOUND` a quien no es su autor ni admin (autenticación opcional en los endpoints públicos) | S-008 |
+| 2 | Sin sesión, "Inscribirme" lleva a `/login?next=/events/{event_id}`. La inscripción emite `registration_confirmed` (al inscripto) y `participant_registered` agregada (al autor) | S-009, S-015 |
+| 3 | El backend suma `image/webp` (cierra la discrepancia con el cliente). La validación del cliente vive en `web/src/domain/files.ts` | S-006, S-010 |
+| 4 | La confirmación del archivo pasa del modal a la zona de carga (`FileDropzone`); el reemplazo no tiene modal aparte | S-015 |
+| Listado | `GET /api/v1/events/{event_id}/attachments` devuelve solo la propia propuesta a quien no es el organizador (anonimato de la evaluación) | S-007 |
 
 ## Servicios Involucrados
 

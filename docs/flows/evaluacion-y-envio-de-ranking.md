@@ -4,8 +4,8 @@ title: Evaluación por pares y envío del ranking
 type: feature
 status: Active
 created: 2026-09-18
-last_updated: 2026-09-18
-stories: []
+last_updated: 2026-10-02
+stories: [S-007, S-009, S-017]
 ---
 
 # Evaluación por pares y envío del ranking
@@ -13,8 +13,8 @@ stories: []
 **Tipo:** Feature
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-09-18
-**Stories:** — (documentado retroactivamente desde el código)
+**Última actualización:** 2026-10-02
+**Stories:** S-007, S-009, S-017 (cambios planificados por REQ-003)
 
 ## Descripción
 
@@ -23,6 +23,20 @@ ordena, guarda borradores mientras trabaja y finalmente envía el ranking defini
 es irreversible**: una vez enviado, la asignación queda completa y no admite reenvío.
 
 Ocurre durante la etapa `voting`, después de que se generaron las asignaciones.
+
+## Cambios planificados (REQ-003)
+
+> Diseño aprobado, **pendiente de implementar**. Al implementar, incorporar al paso
+> correspondiente y quitar de acá.
+
+| Paso | Cambio | Story |
+|---|---|---|
+| Descripción | El envío deja de ser irreversible mientras dure `voting`. **La evaluación es anónima**: el evaluador nunca ve el autor ni el nombre original de una propuesta | S-007 |
+| 1 | `GET …/assignment` responde en `voting` y `results`, con payload explícito `AnonymousAssignment` (`attachments[{ id, label: "Propuesta N", mime_type, file_size, description }]`), sin `quality_score` ni autoría. Sin asignación → `404 NO_ASSIGNMENT` | S-007 |
+| 1 → 2 (nuevo) | Abrir cada propuesta: `GET /api/v1/attachments/{attachment_id}/download` permitido al evaluador con esa propuesta asignada, en `voting`/`results`, con nombre neutro `propuesta-{n}.{ext}` (cierra D-15). `GET /events/{event_id}/attachments` devuelve solo la propia propuesta a quien no es el organizador | S-007 |
+| 3 | El borrador se guarda también con la asignación completa (se elimina `409 ASSIGNMENT_ALREADY_COMPLETED` durante `voting`). La web lo guarda con debounce desde `SortableRankList` | S-007, S-017 |
+| 4 | Reemplazo transaccional (`DELETE FROM votes WHERE assignment_id` + `INSERT`), response con `replaced: true`; se elimina `409 VOTES_ALREADY_SUBMITTED`. Los triggers mantienen `is_completed` y `vote_count`. Emite `ranking_submitted` | S-007, S-009 |
+| Web | Lista ordenable ↑↓ (posición siempre única) en lugar de selects; solo lectura en `results`; copy del mecanismo real (la propia propuesta sube o baja) | S-017 |
 
 ## Servicios Involucrados
 

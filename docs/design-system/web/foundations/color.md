@@ -1,117 +1,150 @@
 ---
 foundation: color
-version: 1.0.0
-last_updated: 2026-09-18
-status: relevado-desde-código
+version: 2.0.0
+last_updated: 2026-10-02
+status: diseñada
 ---
 
 # Color
 
-> **Sembrado desde el código existente** (`web`), no un placeholder.
-> Los valores son los que el CSS define hoy en `:root`. `[fuente: código-existente]`
+> **v2.0.0 — lenguaje visual del rediseño (REQ-003, DA-7).** Los valores salen del archivo de diseño
+> `documentation/Telescopio Rediseño Vistas.html` (pantallas 1a–2g), contados sobre los estilos de
+> sus 19 pantallas. `[fuente: diseño REQ-003]`
+>
+> Reemplaza la paleta glassmorphism de la v1.0 (relevada del código). Ver la migración en el
+> `CHANGELOG.md`.
 
 ## El lenguaje visual
 
-**Oscuro con glassmorphism.** Fondo con degradado fijo entre tres azules profundos
-(`background-attachment: fixed`), y superficies translúcidas blancas con borde claro encima. No hay
-librería de componentes: todo está construido a mano con CSS plano.
+**Bandas oscuras + contenido claro.** El negro se usa **solo** para identidad y navegación: el
+header, el encabezado de evento (EventHero) y el panel de marca de auth. Todo el contenido vive
+sobre fondo claro, en superficies blancas con borde fino. Cada pantalla tiene **un único** paso
+destacado en el color de acción. `[fuente: diseño — nota "Sistema" del Turno 1]`
 
-## Paleta
+## Paleta (primitivos)
 
-### Brand
+### Marca
 
-| Token | Hex | Variable CSS | Uso |
-|---|---|---|---|
-| `color.brand.primary` | **`#6a5acd`** | `--color-primary` | **El violeta de marca.** Acciones primarias, links |
-| `color.brand.primary.hover` | `#7b68ee` | `--color-primary-hover` | Hover de acción primaria |
-| `color.brand.primary.dark` | `#5a4ab3` | `--color-primary-dark` | Estados presionados |
-| `color.brand.primary.light` | `#9370db` | `--color-primary-light` | Solo en `global.css` |
-| `color.brand.secondary` | `#3b82f6` | `--color-secondary` | Azul de apoyo |
-
-> **`#6a5acd` es el color de marca real del producto.** Es el que consume el generador de
-> wireframes y el que el implementador recibe vía `bg.action.primary`. No sustituirlo por otro.
-
-### Neutral — escala de grises (tipo Tailwind, 10 pasos)
-
-| Token | Variable CSS |
-|---|---|
-| `color.neutral.50` … `color.neutral.900` | `--color-gray-50` … `--color-gray-900` |
-
-### Semántico
-
-| Token | Hex | Variable CSS |
+| Token | Hex | Uso |
 |---|---|---|
-| `color.success` | `#22c55e` | `--color-success` |
-| `color.warning` | `#f59e0b` | `--color-warning` |
-| `color.error` | `#ef4444` | `--color-danger` |
-| `color.info` | `#3b82f6` | `--color-info` — ⚠️ **idéntico a `--color-secondary`** |
+| `color.violet.700` | **`#4B3FA8`** | **Color de acción.** Botón primario, links y acciones sobre fondo claro |
+| `color.violet.500` | `#6E5BF2` | Acento: etapa "ahora", indicador de no leída, foco, acciones sobre banda oscura |
+| `color.violet.200` | `#CFC9F7` | Texto secundario sobre banda oscura |
+| `color.violet.100` | `#EAE7F9` | Fondo suave de acción (chips de etiqueta, anillo de foco) |
+| `color.violet.50` | `#F8F7FF` | Fondo de ítem no leído |
+| `color.cyan.400` | `#35D6F2` | Señal sobre banda oscura: contador de la campana, números destacados, logo |
 
-### Fondo y superficies (el glassmorphism)
+### Neutros
 
-| Token | Valor | Variable CSS |
+| Token | Hex | Uso |
 |---|---|---|
-| `bg.base.primary` | `#1a1a3a` | `--bg-dark-primary` |
-| `bg.base.secondary` | `#2d2d5a` | `--bg-dark-secondary` |
-| `bg.base.tertiary` | `#4a4a8a` | `--bg-dark-tertiary` |
-| `bg.glass` | `rgba(255,255,255,0.05)` | `--glass-bg` |
-| `bg.glass.hover` | `rgba(255,255,255,0.1)` | `--glass-bg-hover` |
-| `border.glass` | `rgba(255,255,255,0.1)` | `--glass-border` |
-| `border.glass.hover` | `rgba(255,255,255,0.2)` | `--glass-border-hover` |
+| `color.black` | `#000000` | Bandas de navegación y encabezado |
+| `color.ink.900` | `#0B1020` | Texto principal sobre claro |
+| `color.ink.800` | `#141A2E` | Superficie elevada dentro de una banda oscura |
+| `color.gray.700` | `#39414D` | Texto de énfasis medio |
+| `color.gray.600` | `#575E6B` | Texto secundario |
+| `color.gray.500` | `#6E7687` | Texto atenuado, metadatos |
+| `color.gray.400` | `#8892A8` | Texto deshabilitado, placeholders |
+| `color.gray.300` | `#D3D9E2` | Borde fuerte, controles deshabilitados |
+| `color.gray.200` | `#E1E5EC` | Borde por defecto, divisores |
+| `color.gray.150` | `#E8ECF2` | Fondo de chip neutro |
+| `color.gray.100` | `#F1F3F6` | Fondo de página (canvas) |
+| `color.gray.50` | `#FAFBFC` | Superficie sutil (filas alternas, tarjetas de podio) |
+| `color.white` | `#FFFFFF` | Superficie |
 
-El `body` usa `linear-gradient(135deg, …)` entre los tres fondos base, con
-`background-attachment: fixed`.
+### Estado
 
-## Tokens semánticos
+| Token | Hex | Uso |
+|---|---|---|
+| `color.green.600` | `#1F9D62` | Éxito sólido ("✓ Copiado", etapa completada) |
+| `color.green.700` | `#16744A` | Texto de éxito sobre fondo suave |
+| `color.green.100` | `#E1F1E8` | Fondo de éxito ("Inscripción abierta", "✓ Enviado") |
+| `color.amber.500` | `#E9A227` | Advertencia sólida |
+| `color.amber.700` | `#8A6212` | Texto de advertencia sobre fondo suave |
+| `color.amber.100` | `#F7EDD6` | Fondo de advertencia ("Falta archivo", "Pendiente") |
+| `color.red.700` | `#B8381F` | Error (texto y borde) |
+
+> ⚠️ **El diseño no define un fondo suave de error.** Se usa `#B8381F` como texto y borde sobre
+> blanco. Si hace falta un fondo, se pide al diseño; no se inventa (regla 13).
+
+## Tokens semánticos de color
+
+Los componentes consumen **estos**, nunca los primitivos. Detalle completo en
+[`tokens/semantic.md`](../tokens/semantic.md).
 
 | Token | Valor | Uso |
 |---|---|---|
-| `bg.surface` | `bg.glass` + `border.glass` | La tarjeta glass: **la superficie base de toda la app** |
-| `bg.action.primary` | `color.brand.primary` | Fondo de botón primario |
-| `text.primary` | `color.neutral.50` (aprox.) | Texto principal sobre fondo oscuro |
-| `text.muted` | ⚠️ **sin token** | Ver deuda #2 |
-| `border.default` | `border.glass` | Bordes de superficie |
+| `bg.canvas` | `color.gray.100` | Fondo de página |
+| `bg.surface` | `color.white` | Tarjetas, diálogos, tablas |
+| `bg.surface.subtle` | `color.gray.50` | Superficie secundaria |
+| `bg.band` | `color.black` | Header, EventHero, panel de marca |
+| `bg.band.raised` | `color.ink.800` | Superficie dentro de una banda |
+| `bg.action.primary` | `color.violet.700` | Botón primario |
+| `bg.action.subtle` | `color.violet.100` | Fondo suave de acción |
+| `bg.accent` | `color.violet.500` | Acento ("ahora", no leída) |
+| `bg.unread` | `color.violet.50` | Ítem no leído |
+| `bg.success` / `bg.success.subtle` | `color.green.600` / `color.green.100` | Éxito |
+| `bg.warning` / `bg.warning.subtle` | `color.amber.500` / `color.amber.100` | Advertencia |
+| `bg.neutral.subtle` | `color.gray.150` | Chip neutro |
+| `bg.disabled` | `color.gray.200` | Control deshabilitado |
+| `text.primary` | `color.ink.900` | Texto principal |
+| `text.secondary` | `color.gray.600` | Texto secundario |
+| `text.muted` | `color.gray.500` | Metadatos |
+| `text.disabled` | `color.gray.400` | Deshabilitado |
+| `text.inverse` | `color.white` | Texto sobre banda |
+| `text.inverse.secondary` | `color.violet.200` | Texto secundario sobre banda |
+| `text.signal` | `color.cyan.400` | Señal sobre banda |
+| `text.action` | `color.violet.700` | Links y botón secundario |
+| `text.success` / `text.warning` / `text.error` | `color.green.700` / `color.amber.700` / `color.red.700` | Estado |
+| `border.default` | `color.gray.200` | Bordes |
+| `border.strong` | `color.gray.300` | Bordes de controles |
+| `border.focus` | `color.violet.500` | Foco |
+| `border.error` | `color.red.700` | Campo inválido |
+
+`color.brand.primary` = **`#4B3FA8`** (`color.violet.700`). Es el valor que lee el generador de
+wireframes.
 
 ## Guidelines
 
 **Do:**
-- Usar `var(--…)` siempre. **Hay token para casi todo lo que hace falta.**
-- Para cualquier superficie nueva, partir del patrón glass: `--glass-bg` + `--glass-border` +
-  `--radius-lg`.
-- Comunicar estado con **texto además de color** — como ya hacen los badges (`✓ Submitted`,
-  `⏳ Pending`).
+- Usar el negro solo en bandas de identidad y navegación (header, EventHero, auth).
+- Un solo elemento en `bg.action.primary` por pantalla: el paso destacado.
+- Comunicar estado con texto además de color ("✓ Enviado", "Pendiente").
+- Usar `text.inverse.secondary` y `text.signal` para jerarquía dentro de una banda.
 
 **Don't:**
-- **No escribir colores hex literales.** Es la deuda #1 de esta fundación.
-- No usar `#3b82f6` a mano: existe como `--color-secondary` y como `--color-info`.
-- No asumir tema claro: **solo dos componentes lo soportan** (ver deuda #3).
-
-## Deuda conocida
-
-1. ⚠️ **Un tercio de los colores está hardcodeado.** 753 usos de `var(--…)` contra **350 hex
-   literales**. El más repetido es `#ffffff` (29 veces). `#3b82f6` aparece 9 veces a mano pese a
-   tener dos tokens.
-2. ⚠️ **Hay una segunda paleta implícita, sin tokens.** Grises y pasteles usados para textos
-   secundarios y estados suaves que **no tienen equivalente en la escala**: `#fca5a5` (13),
-   `#e2e8f0` (12), `#94a3b8` (12), `#86efac` (11), `#cbd5e1` (10). **Darles token es el trabajo más
-   valioso de esta fundación**, porque hoy `text.muted` no tiene valor asignable.
-3. ⚠️ **Tema claro a medias.** Solo `Auth.css` y `Modal.css` responden a
-   `prefers-color-scheme: light`. El resto de la aplicación queda oscura, así que el modo claro
-   está roto por diseño.
-4. ⚠️ **Fuente de verdad duplicada.** Las 57 variables de `index.css` están **repetidas** en
-   `global.css` (que define 79 en total). Los valores coinciden, así que hoy no hay diferencia
-   visible — pero son dos lugares donde cambiar un token.
-5. ⚠️ **`--color-info` y `--color-secondary` tienen el mismo valor.** O son el mismo rol y sobra
-   uno, o son roles distintos y deberían diferenciarse.
+- No escribir hex literales en componentes (deuda #1 de la v1.0, RF 7).
+- No poner contenido largo sobre `bg.band`: la banda es identidad, no lectura.
+- No usar `bg.accent` como botón primario sobre fondo claro: el primario es `bg.action.primary`.
+- No usar el cian sobre fondo claro (contraste insuficiente).
 
 ## Accesibilidad
 
-⚠️ **Sin verificar.** No hay auditoría de contraste. Sobre un fondo oscuro con superficies
-translúcidas al 5% de opacidad, el contraste de texto secundario es el riesgo principal — y es
-exactamente donde vive la paleta sin tokens de la deuda #2.
+Contrastes calculados sobre los pares que el diseño usa:
 
-**Objetivo WCAG: no definido.** Ver Feature Group 4 del PRD.
+| Par | Ratio | WCAG AA texto normal (4.5:1) |
+|---|---|---|
+| `text.primary` sobre `bg.surface` | 18.9:1 | ✓ |
+| `text.secondary` sobre `bg.surface` | 6.5:1 | ✓ |
+| `text.muted` sobre `bg.surface` | 4.56:1 | ✓ (justo) |
+| `text.muted` sobre `bg.canvas` | 4.1:1 | ✗ — en el canvas usar `text.secondary` |
+| blanco sobre `bg.action.primary` | 8.2:1 | ✓ |
+| blanco sobre `bg.accent` | 4.7:1 | ✓ |
+| blanco sobre `bg.success` | 3.5:1 | ✗ — **el "✓ Copiado" del diseño no cumple**; usar texto `font.weight.bold` ≥ 18.66px o `text.success` sobre `bg.success.subtle` |
+| `text.success` sobre `bg.success.subtle` | 4.9:1 | ✓ |
+| `text.warning` sobre `bg.warning.subtle` | 4.7:1 | ✓ |
+| `text.error` sobre `bg.surface` | 5.8:1 | ✓ |
+| `text.inverse.secondary` sobre `bg.band` | 13.4:1 | ✓ |
+| `text.signal` sobre `bg.band` | 12.1:1 | ✓ |
+| `text.disabled` sobre `bg.surface` | 3.1:1 | ✗ — aceptable solo en controles deshabilitados (WCAG los exime) |
+
+**Objetivo:** WCAG 2.1 AA (REQ-003 FG-4). Ratios calculados con la fórmula de luminancia relativa
+de WCAG 2.1.
 
 ## Historial
 
 - 2026-09-18 v1.0.0 — Sembrado desde `web/src/styles/global.css` y `web/src/index.css` por
-  `/product-consolidate-services`.
+  `/product-consolidate-services` (glassmorphism oscuro, marca `#6a5acd`).
+- 2026-10-02 v2.0.0 — **Breaking.** Paleta del rediseño de REQ-003: bandas oscuras + contenido
+  claro, acción `#4B3FA8`, acento `#6E5BF2`, señal `#35D6F2`. Se eliminan los tokens glass y los
+  fondos degradados.

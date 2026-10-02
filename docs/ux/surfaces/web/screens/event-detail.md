@@ -5,203 +5,376 @@ route: "/events/:eventId"
 viewports: [desktop, mobile]
 audiences: [participante]
 fidelity: mid
-status: as-is-sin-validar
-version: "1.0"
-date: 2026-09-18
+status: diseñada
+version: "2.0"
+date: 2026-10-02
 ---
 
-# Detalle del evento (vista del participante)
+# Pantalla: Detalle del evento (S-04)
 
 ## Identidad
 
-- **Audiencia primaria:** participante
-- **JTBD:** JTBD-01 (entregar), JTBD-02 (evaluar) y JTBD-03 (ver resultados). **Las tres pasan por
-  esta pantalla**
-- **Viewports:** `desktop` (base), `mobile` (≤768px)
-- **Acceso:** público. Las acciones exigen sesión y registro
-
-> **El creador del evento nunca ve esta pantalla.** `EventDetailPageWrapper` hace un fetch propio y,
-> si `event.creator_id === user.id`, redirige a `/events/:id/manage` con `replace: true`.
-
-> **Transcripta del código existente** (`docs/analysis/ux/web/screens/event-detail.md`).
-> `status: as-is-sin-validar`.
+- **Audiencia primaria:** [participante](../../../audiences/participante/research-context.md) — también visitante sin sesión.
+- **JTBD / Propósito:** saber en qué etapa está el evento y hacer lo único que me toca ahora: inscribirme, subir mi propuesta, ordenar mis asignadas o ver el resultado. Las tres JTBD del participante pasan por acá. Cubre REQ-003 RF 18–21, 30–32 (diseños 1e, 1f, 1i, 2g).
+- **Viewports:**
+  - **desktop** — encabezado oscuro a todo el ancho; debajo, contenido principal (8/12) y columna lateral de detalles (4/12).
+  - **mobile** — todo apilado: "Tu próximo paso" va primero, detalles y "Después" al final. La línea de etapas muestra solo la etapa actual con "N de 4".
+- **Acceso:** público. El autor del evento es redirigido a S-05 (se mantiene).
 
 ## Entrada y salida
 
-**Se llega desde:** el link compartible del evento, el botón contextual del listado, o por URL.
+**Entradas:**
+- Link compartido, S-01, S-02 (acción de fila o pendiente), S-11, O-13 / S-12 (acción de una notificación).
 
-**Se sale hacia:** `/events` por `← Back to Events`. El organizador es redirigido a `/manage` antes
-de ver nada.
+**Salidas user-driven:**
+- A S-02 · "← Eventos".
+- A S-07 · "Inscribirme al evento" sin sesión (`/login?next=/events/{id}`).
+- A O-14 · "Compartir".
+- A O-08 · "ver" en Participantes.
+- A S-02 · "Ver eventos" en el banner de resultados. A S-08 · "Crear cuenta" (visitante).
+
+**Salidas automáticas:**
+- A S-05 si quien mira es el autor.
+- A S-13 si el evento no existe o está en Creación y quien mira no es el autor.
 
 ## Estructura
 
-Estados excluyentes previos (retornos tempranos):
-
-| Bloque | Tipo | Contenido |
-|---|---|---|
-| Carga del wrapper | estado excluyente | `<p>Loading...</p>` con **estilos inline**. No usa las clases de carga del resto de la app |
-| Evento sin id | estado excluyente | `<div>Event not found</div>` **sin estilo ni layout** |
-| Carga de la página | estado excluyente | Spinner + título |
-| Fallo de carga | estado excluyente | Botón de retorno + tarjeta de error con dos vías de recuperación |
-
-Estado normal:
-
-| Bloque | Tipo | Contenido |
-|---|---|---|
-| Barra de navegación | navegación | `<nav>` con el botón de volver |
-| Presentación del evento | encabezado | Título y `ShareButton` en la misma fila; descripción; fila de metadatos con el organizador |
-| Modal de participantes | overlay | Condicional |
-| Estado del evento | panel | `EventTimeline` (stepper de 4 pasos + tarjeta de la etapa activa, que incluye el contador de participantes y el botón para ver la lista) y, condicional, el aviso de pausa |
-| Mensajes de feedback | banners | Dos condicionales: éxito y error |
-| **Zona de acción de la etapa** | contenedor variable | **Un único contenedor cuyo contenido cambia por completo según etapa y rol.** Ver abajo |
-| Modal de avance de etapa | overlay | Condicional |
-| Modal de confirmación de subida | overlay | Ficha del archivo + dos botones |
-
-**La zona de acción es deliberadamente un solo bloque:** el código la estructura como una única
-`<section className="edp-action">` con `min-height: 80px`, y su contenido es mutuamente excluyente.
-Puede mostrar: el botón de avance del organizador, el aviso de evento en preparación, el bloque de
-participación (registro o carga con preview), el panel de configuración de votación, el aviso de
-votación en curso, el panel de ranking o el panel de resultados.
-
-**Origen:** `web/src/pages/event-detail/EventDetailPage.tsx:226-450`, `App.tsx:70-119`.
+| # | Nombre | Tipo | Variant/Level/State | Categoría | Viewports | Visibilidad | Propósito |
+|---|--------|------|---------------------|-----------|-----------|-------------|-----------|
+| 1 | header | header | — | layout | ambos | — | AppHeader |
+| 2 | Volver | link | — | navigation | ambos | — | ← Eventos |
+| 3 | Estado del evento | badge | — | content | ambos | — | StatusPill: etapa + cierre o situación personal |
+| 4 | Título del evento | heading | h1 | content | ambos | — | Nombre |
+| 5 | Meta del evento | label | — | content | ambos | — | Organiza · participantes · fecha |
+| 6 | Botón compartir | button | secondary | input | ambos | — | Abre O-14 |
+| 7 | Línea de etapas | progress-bar | — | feedback | ambos | viewport_overrides: mobile→solo etapa actual "N de 4" | StageTimeline con "ahora" |
+| 8 | Eyebrow próximo paso | label | — | content | ambos | hidden_in_states: resultados | "TU PRÓXIMO PASO" |
+| 9 | Título próximo paso | heading | h2 | content | ambos | — | Lo que toca ahora |
+| 10 | Texto próximo paso | paragraph | body | content | ambos | — | Explicación breve |
+| 11 | Requisitos | chips | — | content | ambos | visible_only_in_states: default | Formato · tamaño · cierre |
+| 12 | Botón inscribirme | button | primary | input | ambos | visible_only_in_states: default | Inscripción |
+| 13 | Zona de carga | section | — | input | ambos | visible_only_in_states: subir propuesta, error de validación | FileDropzone |
+| 14 | Archivo elegido | card | — | content | ambos | visible_only_in_states: archivo elegido, propuesta enviada | FileChip: tipo, nombre, tamaño, Cambiar |
+| 15 | Campo comentario | textarea | default | input | ambos | visible_only_in_states: archivo elegido | Comentario opcional con contador |
+| 16 | Botón enviar propuesta | button | primary | input | ambos | visible_only_in_states: subir propuesta, archivo elegido, error de validación · state_overrides: subir propuesta→disabled | Enviar |
+| 17 | Ayuda envío | paragraph | caption | content | ambos | visible_only_in_states: subir propuesta, archivo elegido | Hint del botón |
+| 18 | Lista de ranking | list | — | input | ambos | visible_only_in_states: votar, ranking enviado, resultados | SortableRankList |
+| 19 | Botón enviar ranking | button | primary | input | ambos | visible_only_in_states: votar, ranking enviado · state_overrides: ranking enviado→"Reenviar mi ranking", secondary | Enviar / reenviar |
+| 20 | Ayuda ranking | paragraph | caption | content | ambos | visible_only_in_states: votar, ranking enviado | Se puede modificar hasta el cierre |
+| 21 | Cómo cuenta tu voto | alert | info | feedback | ambos | visible_only_in_states: votar, ranking enviado | InfoCallout del mecanismo real |
+| 22 | Aviso del paso | alert | warning | feedback | ambos | visible_only_in_states: pausado, cupo completo, sin propuesta en votación | Por qué no hay acción |
+| 23 | Mensaje de acción | alert | error | feedback | ambos | visible_only_in_states: error de sistema / sin conexión | Falla de una acción |
+| 24 | Podio | card-list | — | content | ambos | visible_only_in_states: resultados | Top 3 |
+| 25 | Ranking completo | table | — | content | ambos | visible_only_in_states: resultados | Posición · participante · propuesta · puntaje |
+| 26 | Nota del puntaje | paragraph | caption | content | ambos | visible_only_in_states: resultados | Cómo se calcula |
+| 27 | Tu progreso | list | — | content | ambos | visible_only_in_states: subir propuesta, archivo elegido, propuesta enviada, votar, ranking enviado | ProgressChecklist |
+| 28 | Sobre el evento | paragraph | body | content | ambos | — | Descripción |
+| 29 | Detalles | list | — | content | ambos | — | Organiza · cierre · participantes "ver" |
+| 30 | Después | alert | info | feedback | ambos | hidden_in_states: resultados | Qué pasa en la próxima etapa |
+| 31 | Banner otros eventos | card | — | content | ambos | visible_only_in_states: resultados | CtaBanner: eventos abiertos |
+| 32 | CTA ver eventos | button | primary | input | ambos | visible_only_in_states: resultados | Ir a S-02 |
+| 33 | footer | footer | — | layout | ambos | — | Pie |
 
 ## Layout por viewport
 
-**desktop** (base)
-- Presentación con título y botón de compartir en fila; metadatos en fila.
-- La zona de acción ocupa el ancho del contenedor.
+### desktop · 1200px
+- Volver
+- row `hero`
+  - col 9/12: Estado del evento, Título del evento, Meta del evento
+  - col 3/12: Botón compartir
+- Línea de etapas
+- row `cuerpo`
+  - col 8/12: Eyebrow próximo paso, Título próximo paso, Texto próximo paso, Requisitos, Botón inscribirme, Zona de carga, Archivo elegido, Campo comentario, Botón enviar propuesta, Ayuda envío, Lista de ranking, Botón enviar ranking, Ayuda ranking, Aviso del paso, Mensaje de acción, Podio, Ranking completo, Nota del puntaje, Sobre el evento
+  - col 4/12: Tu progreso, Cómo cuenta tu voto, Detalles, Después
+- row `banner`
+  - col 9/12: Banner otros eventos
+  - col 3/12: CTA ver eventos
 
-**mobile** (≤768px, `EventDetailPage.css:1443-1472`)
-- Padding de `.edp-presentation` a `--spacing-lg`.
-- Título de 2.2rem → **1.6rem**.
-- **`.edp-meta-row` pasa a columna**: organizador y participantes se apilan.
-- Padding de `.edp-status` y `.edp-action` reducidos.
-- `.edp-action-advance` pasa a `justify-content: stretch`: **el botón de avance ocupa todo el
-  ancho**.
-- `.header-badges` a columna; `.stage-advance-btn` a `width:100%`.
-
-El `EventTimeline` embebido tiene su **propio corte a 600px**, donde **oculta descripciones y
-deadlines** (`EventTimeline.css:239-259`).
-
-> ⚠️ **CSS muerto verificado.** Los bloques a 1024px, 768px (`:630-710`) y 480px apuntan a clases
-> del layout anterior (`.event-title-row`, `.stats-grid`, `.tabs`, `.info-grid`, `.stat-card`,
-> `.participant-card`) que **el JSX actual ya no usa** — ahora usa el prefijo `.edp-*`.
-> **Consecuencia real: el bloque EDP actual no tiene reglas a 480px**, así que entre 480px y 0 no
-> cambia nada respecto de 768px.
+### mobile · 400px
+- Volver
+- Estado del evento
+- Título del evento
+- Meta del evento
+- Botón compartir
+- Línea de etapas
+- Eyebrow próximo paso
+- Título próximo paso
+- Texto próximo paso
+- Requisitos
+- Botón inscribirme
+- Zona de carga
+- Archivo elegido
+- Campo comentario
+- Botón enviar propuesta
+- Ayuda envío
+- Lista de ranking
+- Botón enviar ranking
+- Ayuda ranking
+- Aviso del paso
+- Mensaje de acción
+- Podio
+- Ranking completo
+- Nota del puntaje
+- Tu progreso
+- Cómo cuenta tu voto
+- Sobre el evento
+- Detalles
+- Después
+- Banner otros eventos
+- CTA ver eventos
 
 ## Contenido
 
-Microcopy transcripto **textual**, en inglés.
+### header
+- Texto/label: "TELESCOPIO | Inicio · Eventos · Cómo funciona | campana · menú de usuario" (sin sesión: "ES/EN · Iniciar sesión · Crear cuenta")
 
-### Estados de carga y error
-- Wrapper: `Event not found` · `Loading...`
-- Carga: `Loading event details...`
-- Error: `← Back to Events`; `⚠️ Unable to Load Event`; el mensaje de `error` o el literal
-  `Event not found`; botones `← Back to Events List` y `🔄 Try Again`
-- Mensajes de `error` posibles: `Unable to connect to the server. Using cached data if available.` ·
-  `Event with ID "{eventId}" was not found.` · `Failed to load event details: {mensaje}.`
+### Volver
+- Texto/label: "← Eventos"
 
-### Presentación
-- Organizador dinámico con fallback literal `Not specified`
+### Estado del evento
+- Texto/label según situación: "Inscripción abierta · cierra en {n} días" · "Inscripto · falta tu archivo" · "Propuesta enviada" · "Te toca votar · cierra en {n} días" · "Ranking enviado" · "Votación en curso" · "Finalizado · resultados publicados" · "Evento pausado" · "Cancelado"
 
-### Tarjeta de la etapa activa (`EventTimeline`)
-- Contador: `👥 {n} / {max} participants` (también en `ManageEventPage`)
-- Botón `View participants` / `Hide participants`, solo si hay al menos un participante
+### Título del evento
+- Texto/label: nombre del evento
 
-### Estado
-- `This event is currently paused` con icono `⏸`
+### Meta del evento
+- Texto/label: "Organiza {organizador} · {n} de {cupo} participantes" (en resultados: "· finalizó el {fecha}")
 
-### Feedback de éxito (cinco mensajes)
-- `Stage updated to: {etapa}`
-- `Successfully registered! You can now upload your file.`
-- `File uploaded successfully!`
-- `✅ Voting configuration completed! Participants can now submit their rankings.`
-- `✅ Your rankings have been submitted successfully!`
+### Botón compartir
+- Texto/label: "Compartir"
+- Icono: share
 
-### Feedback de error
-El avance de etapa muestra el motivo real, en el banner y en `StageAdvanceModal`: el mensaje del
-backend o, antes de llamarlo, `Cannot advance to voting: no participants registered yet.` /
-`Cannot advance to voting: only {n} participant(s) registered. At least 3 participants are required.`
-(`Error updating event stage` queda solo como fallback) ·
-`Failed to register for the event. Please try again.` ·
-`File cannot exceed 10MB` ·
-`File type not allowed. Use: JPEG, PNG, GIF, WebP, PDF, TXT, DOC, DOCX` · `Upload failed: {msg}`
+### Línea de etapas
+- Texto/label: "✓ Creación — Evento configurado · Participación · ahora — Inscribite y subí tu archivo · Votación — Evaluás a otros participantes · Resultados — Ranking final"
+- Annotation: etapas completadas con ✓, la actual con "ahora" y su cierre ("Cierra {fecha}"). En mobile: "Participación · ahora · etapa 2 de 4".
 
-### Zona de acción, según etapa y rol
-| Situación | Textos |
-|---|---|
-| Organizador | `⏳ Updating...` o `▶️ Advance to {Stage}` |
-| `creation`, no organizador | `🔭` + `This event is being set up. Come back when it opens for participation.` |
-| `participation`, no registrado | `📝 Event Participation`; `Register to participate and upload your file.`; botón `Registering...` / `Participate` |
-| Ya subió archivo | `✅` + `Submission received` + `You've already uploaded your file. Only one submission is allowed per participant.` |
-| Puede subir | Badge `✅ Registered` + `Upload your submission for this event.`; botón `Uploading...` / `Upload File`; botón `×` con `title="Remove selected file"` |
-| Requisitos | `Accepted: JPEG, PNG, GIF, WebP, PDF, TXT, DOC, DOCX · Max 10 MB` |
-| Evento pausado | `⏸ Registration and file submissions are not available while the event is paused.` |
-| Votación configurada | `✅ Voting is underway`; `Reviewers have been assigned their submissions and can now submit their rankings.`; `Once everyone has voted, advance to "Results" to publish the final ranking.` |
-| Panel de ranking | Barra de progreso `🗳️ {completadas} of {total} participants have voted` + `{n}%`, antes y después de enviar el ranking. Si fallan las estadísticas, la barra no aparece |
-| `results`, con o sin sesión | Panel de resultados. Un visitante sin sesión ve el ranking guardado; si todavía no hay uno, `No results available yet.` |
+### Eyebrow próximo paso
+- Texto/label: "TU PRÓXIMO PASO"
 
-### Modal de confirmación de subida
-`Confirm upload`; `Are you sure you want to upload this file?`; nombre y tamaño dinámicos;
-`Cancel` y `Upload`.
+### Título próximo paso
+- Texto/label: default "Inscribite para participar" · subir propuesta "Subí tu propuesta" · propuesta enviada "Tu propuesta está enviada" · votar "Ordená las {n} propuestas" · ranking enviado "Tu ranking está enviado" · pausado "El evento está pausado" · cupo completo "El cupo está completo" · sin propuesta en votación "No participás de esta votación" · votación sin inscripción "La votación está en curso" · resultados "Así votó la comunidad"
 
-### Nombres de etapa
-`Creation` · `Participation` · `Voting` · **`Results`** (acá sí `Results`, a diferencia de
-`Completed` en el listado).
+### Texto próximo paso
+- Texto/label: default "Después de inscribirte vas a poder subir tu propuesta. Podés reemplazarla hasta el cierre." · subir propuesta "Podés reemplazarla las veces que quieras hasta el {fecha de cierre}." · propuesta enviada "Podés reemplazarla hasta el {fecha de cierre}." · votar "Arriba la que te parece mejor. Abrí cada archivo antes de decidir." · ranking enviado "Podés modificarlo y reenviarlo hasta el cierre de la votación." · pausado "Por ahora no se puede inscribir ni subir propuestas. El organizador va a reanudar el evento." · cupo completo "No quedan lugares en este evento." · sin propuesta en votación "No subiste una propuesta durante la inscripción, así que no evaluás ni sos evaluado en este evento." · votación sin inscripción "Los participantes están evaluando las propuestas. Los resultados se publican al cerrar la votación." · resultados "{n} participantes · {m} evaluaciones"
+
+### Requisitos
+- Texto/label: "Imagen o documento · Máx. 10 MB · Cierre: {fecha}"
+
+### Botón inscribirme
+- Texto/label: "Inscribirme al evento"
+- Annotation: sin sesión lleva a `/login?next=/events/{id}`.
+
+### Zona de carga
+- Texto/label: "Arrastrá tu archivo acá o elegilo desde tu equipo" · "JPG, PNG, GIF, WebP, PDF, TXT, DOC, DOCX · hasta 10 MB"
+- Icono: upload
+- Annotation: valida tipo y tamaño al elegir; el motivo de rechazo se muestra dentro de la zona.
+
+### Archivo elegido
+- Texto/label: "{TIPO} · {nombre} · {tamaño} · listo para enviar" · acción "Cambiar" (en propuesta enviada: "Enviada el {fecha}" · "Reemplazar archivo")
+
+### Campo comentario
+- Texto/label: "Comentario (opcional)" · contador "{n} / 1000" · ayuda "Lo verán los evaluadores junto a tu archivo."
+
+### Botón enviar propuesta
+- Texto/label: "Enviar propuesta" (al reemplazar: "Enviar nueva versión")
+
+### Ayuda envío
+- Texto/label: sin archivo "Elegí un archivo para continuar" · con archivo "Vas a poder reemplazarlo hasta el cierre"
+
+### Lista de ranking
+- Texto/label: por propuesta: posición, "{nombre} · {TIPO} · {tamaño}", "Ver archivo", etiqueta de posición ("La mejor" / "Intermedia" / "La que menos"), botones ↑ ↓
+- Annotation: mover intercambia con la vecina, así la posición siempre es única. Cada cambio guarda el borrador. En resultados se muestra sin botones (solo lectura).
+
+### Botón enviar ranking
+- Texto/label: "Enviar mi ranking" (ranking enviado: "Reenviar mi ranking", habilitado solo si el orden cambió)
+
+### Ayuda ranking
+- Texto/label: "Podés modificarlo hasta el cierre de la votación." · tras guardar el borrador: "Borrador guardado"
+
+### Cómo cuenta tu voto
+- Texto/label: "¿Cómo cuenta tu voto? — Tu orden se compara con el de los demás evaluadores. Si evaluás con coherencia, tu propia propuesta sube posiciones en el ranking final; si no, baja."
+- Annotation: copy corregido al modelo (REQ-003 L-6, RF 32): no dice que el voto pese más.
+
+### Aviso del paso
+- Texto/label: el texto de Texto próximo paso de la situación (pausado, cupo completo, sin propuesta en votación), en formato de aviso.
+
+### Mensaje de acción
+- Texto/label: "No pudimos inscribirte. Probá de nuevo." · "No pudimos enviar tu propuesta. Probá de nuevo." · "No pudimos abrir el archivo. Probá de nuevo." · "No pudimos enviar tu ranking. Probá de nuevo." · "No pudimos guardar el borrador. Tus cambios siguen en pantalla."
+
+### Podio
+- Texto/label: posiciones 1, 2 y 3 con participante, propuesta y "{puntaje} pts"
+- Annotation: puntaje = MBC × 10 con un decimal, separador según idioma ("8,9 pts" / "8.9 pts"). Orden del ranking ajustado (FG-5 sigue abierto).
+
+### Ranking completo
+- Texto/label: columnas "POSICIÓN · PARTICIPANTE · PROPUESTA · PUNTAJE"
+- Annotation: desde la posición 4. En mobile, filas apiladas con etiqueta. Si el usuario participó, su fila se resalta con "Vos".
+
+### Nota del puntaje
+- Texto/label: "El puntaje combina los rankings de todos los participantes, en una escala de 0 a 10. La propuesta de quien evaluó con coherencia sube posiciones; la de quien no, baja."
+
+### Tu progreso
+- Texto/label: "Tu progreso — ✓ Inscripción · Confirmada {fecha} | 2 Subir propuesta · {Pendiente · cierra en n días / Enviada} | 3 Votar · {Te avisamos cuando empiece / Pendiente / Enviado} | 4 Ver resultados"
+
+### Sobre el evento
+- Texto/label: "Sobre el evento" + descripción
+
+### Detalles
+- Texto/label: "Detalles — Organiza {organizador} · Cierre {etapa} {fecha} · Participantes {n} / {cupo} · ver" (en resultados: "Evaluaciones {m} · Finalizó {fecha}")
+
+### Después
+- Texto/label: participación "DESPUÉS — Al cerrar la inscripción, el organizador abre la votación y te asigna propuestas para evaluar." · votación "DESPUÉS — Al cerrar la votación se publica el ranking final para todos."
+
+### Banner otros eventos
+- Texto/label: "¿TE GUSTÓ? — Hay {n} eventos con inscripción abierta ahora." (visitante: "+ Creá tu cuenta para participar en el próximo.")
+- Annotation: si no hay eventos abiertos el banner no se muestra.
+
+### CTA ver eventos
+- Texto/label: "Ver eventos" (visitante: además "Crear cuenta", secondary)
+
+### footer
+- Texto/label: "Telescopio · evaluación distribuida entre pares"
 
 ## Estados
 
-| Estado | Aplica | Detalle |
-|---|---|---|
-| Vacío | **Parcial** | El único propio es el de etapa `creation` para no-organizadores. Los paneles hijos traen los suyos |
-| Cargando | **Sí, múltiple** | Página bloqueante, wrapper, y por botón: `Registering...`, `Uploading...`, `⏳ Updating...` |
-| Error | **Sí, doble vía** | Pantalla completa cuando `!event`, y banner inline para errores de acción |
-| Éxito | **Sí** | Banner con cinco mensajes. ⚠️ **Nunca se limpia por tiempo ni al navegar**: queda hasta el próximo cambio de estado |
-| Deshabilitado | **Sí** | Avance, participar, input de archivo, subir |
-| Sin permiso | **Implícito** | ⚠️ No hay mensaje: se expresa como **ausencia de bloques**. `canUploadAttachment` exige etapa `participation`, sesión, estar registrado, no haber subido, no ser el creador y que el evento no esté pausado |
-| Parcial | **Sí** | `✅ You have already submitted your file...`. ⚠️ El chequeo **solo corre si la etapa es `participation`**: en otras etapas el flag conserva su valor previo |
-| Offline | **Inalcanzable** | ⚠️ Si el health check falla se setea el aviso, **pero si `getEventById` tiene éxito hace `setError('')`** y el aviso desaparece. En la práctica no se ve nunca |
+### default
+- Aplica: Sí — Participación, no inscripto (o sin sesión).
+- Mensaje: —
+- Cambios: Requisitos y Botón inscribirme visibles.
+
+### subir propuesta
+- parent_state: default
+- Aplica: Sí — inscripto sin propuesta.
+- Mensaje: —
+- Cambios: Zona de carga visible; Botón enviar propuesta variant=disabled; Estado del evento "Inscripto · falta tu archivo".
+
+### archivo elegido
+- parent_state: subir propuesta
+- Aplica: Sí
+- Mensaje: —
+- Cambios: Zona de carga oculta; Archivo elegido y Campo comentario visibles; Botón enviar propuesta variant=primary.
+
+### propuesta enviada
+- parent_state: default
+- Aplica: Sí
+- Mensaje: "Recibimos tu propuesta."
+- Cambios: Archivo elegido con "Reemplazar archivo"; Tu progreso con paso 2 ✓.
+
+### votar
+- parent_state: default
+- Aplica: Sí — Votación, con asignación.
+- Mensaje: —
+- Cambios: Lista de ranking, Botón enviar ranking, Ayuda ranking y Cómo cuenta tu voto visibles.
+
+### ranking enviado
+- parent_state: votar
+- Aplica: Sí
+- Mensaje: "Recibimos tu ranking."
+- Cambios: Botón enviar ranking content="Reenviar mi ranking", variant=secondary hasta que cambie el orden.
+
+### sin propuesta en votación
+- parent_state: default
+- Aplica: Sí — inscripto sin propuesta en Votación (AC 41).
+- Mensaje: "No participás de esta votación"
+- Cambios: Aviso del paso visible; Lista de ranking oculta.
+
+### pausado
+- parent_state: default
+- Aplica: Sí (AC 43)
+- Mensaje: "El evento está pausado"
+- Cambios: Estado del evento "Evento pausado"; Botón inscribirme, Zona de carga, Botón enviar propuesta y Botón enviar ranking ocultos; Aviso del paso visible.
+
+### cupo completo
+- parent_state: default
+- Aplica: Sí (AC 44)
+- Mensaje: "El cupo está completo"
+- Cambios: Botón inscribirme oculto; Aviso del paso visible.
+
+### votación sin inscripción
+- parent_state: default
+- Aplica: Sí — Votación, visitante o usuario no inscripto.
+- Mensaje: "La votación está en curso"
+- Cambios: sin acciones; Después visible.
+
+### resultados
+- parent_state: default
+- Aplica: Sí — Resultados, con o sin sesión (AC 14).
+- Mensaje: —
+- Cambios: Podio, Ranking completo, Nota del puntaje, Banner otros eventos y CTA ver eventos visibles; Lista de ranking en solo lectura si el usuario votó (AC 40); Después oculto.
+
+### empty
+- Aplica: Sí — resultados sin ranking calculado.
+- Mensaje: "Los resultados todavía no están disponibles."
+- Cambios: Podio y Ranking completo ocultos.
+
+### loading
+- Aplica: Sí
+- Mensaje: "Cargando evento…"
+- Cambios: encabezado y cuerpo como skeleton. Por botón: "Inscribiendo…", "Enviando propuesta…", "Enviando ranking…".
+
+### error de validación
+- Aplica: Sí
+- Mensaje: "El archivo supera los 10 MB." / "Ese formato no está permitido. Usá JPG, PNG, GIF, WebP, PDF, TXT, DOC o DOCX."
+- Cambios: Zona de carga state=error con el motivo; Botón enviar propuesta variant=disabled.
+
+### error de sistema / sin conexión
+- Aplica: Sí
+- Mensaje: carga: "No pudimos cargar el evento." + "Reintentar" y "Ir a Eventos" · acción: el texto correspondiente de Mensaje de acción
+- Cambios: Mensaje de acción visible junto al bloque que falló; lo cargado (archivo elegido, orden) se conserva.
+
+### success
+- Aplica: Sí — se expresa como cambio de estado (propuesta enviada / ranking enviado), con un aviso breve que se cierra solo.
+
+### not found
+- Aplica: Sí — se resuelve navegando a S-13 (evento inexistente o en Creación ajeno, AC 34).
+
+### estado terminal / readonly
+- Aplica: Sí — evento cancelado: Estado del evento "Cancelado", Título próximo paso "Este evento fue cancelado", sin acciones.
 
 ## Interacciones
 
-- **Carga:** `fetchEventDetails()` al montar y ante cambio de `eventId`, con chequeo de salud antes.
-- **Registro:** registra, marca como registrado, actualiza el contexto y refetchea. Sin sesión, el
-  botón abre el modal de login.
-- **Selección de archivo**, validación client-side:
+**Eventos:**
+- Botón inscribirme · on click → con sesión inscribe y pasa a "subir propuesta"; sin sesión → `/login?next=/events/{id}`.
+- Zona de carga · on click / drop → abre el selector o toma el archivo, valida.
+- "Cambiar" en Archivo elegido · on click → vuelve a la zona de carga.
+- Botón enviar propuesta · on click → sube el archivo con el comentario.
+- "Ver archivo" en Lista de ranking · on click → descarga autenticada y abre en otra pestaña.
+- ↑ / ↓ en Lista de ranking · on click → intercambia con la vecina; guarda borrador (debounce).
+- Botón enviar ranking · on click → envía; si ya estaba enviado, lo reemplaza.
+- Botón compartir · on click → abre O-14.
+- "ver" en Detalles · on click → abre O-08.
 
-| Regla | Umbral | Mensaje |
-|---|---|---|
-| Tamaño | 10 MiB | `File cannot exceed 10MB` |
-| Tipo MIME | Whitelist de 8 tipos | `File type not allowed. Use: ...` |
+**Validaciones:**
+- Zona de carga · tamaño > 10 MB → "El archivo supera los 10 MB."
+- Zona de carga · tipo fuera de JPG, PNG, GIF, WebP, PDF, TXT, DOC, DOCX → "Ese formato no está permitido. Usá JPG, PNG, GIF, WebP, PDF, TXT, DOC o DOCX."
+- Campo comentario · > 1000 caracteres → el contador bloquea el ingreso.
 
-  ⚠️ **Inconsistencia:** el error dice `10MB` y la línea de requisitos dice `Max 10 MB`.
-
-- **Subida:** abre primero el modal de confirmación; el modal ejecuta la subida, muestra éxito,
-  limpia el input y refetchea.
-- **Avance de etapa:** abre `StageAdvanceModal` y al confirmar actualiza.
-
-> ⚠️ **Inconsistencia funcional entre pantallas (parcial, D-05):** acá el avance a `voting` ya
-> valida el mínimo de 3 participantes, igual que `ManageEventPage` y el backend (REQ-002). El avance
-> a `results` sigue sin validar que todos hayan votado, cosa que `ManageEventPage` sí hace.
+**Feedback:** cada acción exitosa cambia el estado del bloque "Tu próximo paso", actualiza "Tu progreso" y muestra un aviso breve ("Recibimos tu propuesta." / "Recibimos tu ranking.").
 
 ## Accesibilidad
 
-**Observado en el código:**
-- ⚠️ **Modales sin gestión de foco**: ninguno pone foco al abrir, atrapa el foco ni lo devuelve al
-  cerrar.
-- ⚠️ **Sin `role="dialog"` ni `aria-modal`** en ningún overlay.
-- ⚠️ **Sin cierre por Escape**: `Modal.tsx` no tiene `onKeyDown`; `StageAdvanceModal` cierra solo
-  por click en el overlay.
-- ⚠️ El `<input type="file" id="attachment-file">` **no tiene `<label>` asociado**.
-- ⚠️ Banners de éxito y error **sin `role="alert"` ni `aria-live`**.
-- ⚠️ El botón de quitar archivo tiene contenido `×` y solo `title`, sin `aria-label`: se leerá como
-  símbolo de multiplicación.
-- ⚠️ Emojis portadores de significado (`⏸`, `✅`, `📎`, `📝`, `🔭`, `▶️`, `⏳`) sin `aria-hidden` ni
-  alternativa textual.
-- ⚠️ El único `aria-label` del árbol es el de `EventTimeline`, que además pasa el `status` crudo
-  (`'completed'|'active'|'pending'`): valor de máquina, no texto para personas.
+- **Orden de foco:** header → Volver → Botón compartir → Línea de etapas → acción de Tu próximo paso → Tu progreso → Detalles ("ver").
+- **Landmarks y jerarquía:** header / main / aside (columna lateral) / footer. h1 = Título del evento; h2 = Título próximo paso, "Sobre el evento", "Detalles".
+- **Foco y teclado:** O-14 y O-08 atrapan el foco y lo devuelven al botón que los abrió. En Lista de ranking, tras mover una propuesta el foco sigue al botón de la misma propuesta.
+- **Propio de esta composición:** el cambio de posición se anuncia en una región live ("{nombre} pasó a la posición {n}"); el rechazo de archivo y el guardado del borrador también.
 
 ## Decisiones y descartes
 
-- Pantalla documentada desde el código existente `[fuente: código-existente]`. No hay registro del
-  rationale original; las decisiones se van a documentar cuando la pantalla se modifique.
+**Decisiones tomadas:**
+- Reescrita por REQ-003 sobre 1e, 1f, 1i y 2g: una sola pantalla con un bloque "Tu próximo paso" que cambia según etapa y rol; el resto de la pantalla es estable.
+- La confirmación del archivo pasa del modal (O-06) a la zona de carga: se ve qué se va a enviar sin interrumpir.
+- La propuesta se puede reemplazar hasta el cierre (RF 19); el ranking se puede reenviar (RF 31).
+- Lista ordenable ↑↓ en vez de selects: hace imposible repetir posiciones (2g).
+- Resultados públicos con podio y escala 0–10 (L-7, L-8). 1g descartada.
+- Copy del mecanismo corregido al modelo (L-6).
+- Comentario hasta 1000 caracteres, no 500 (L-9).
+- Copy neutro: "Inscripto" en vez de "Estás inscripta" (L-11).
+- Desktop en dos columnas (8/12 + 4/12): el paso principal no compite con los detalles. Mobile pone el paso primero porque es lo único que hay que hacer.
+- S-04 ya no ofrece avanzar etapa al organizador: la regla vive solo en S-05 (cierra D-05).
+
+**Alternativas descartadas:**
+- "Contactar al organizador" (1e): fuera de alcance.
+- "La votación cierra sola": el cierre automático está fuera de alcance; el copy no lo promete.
+- Mostrar el `Q_i` individual: no lo pide el REQ.
+
+**Preguntas abiertas:**
+- ¿Se muestra al participante en qué puesto quedó su propia propuesta dentro del podio/lista (resaltado "Vos")? Se propone que sí.

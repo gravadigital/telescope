@@ -1,82 +1,100 @@
 ---
 tokens: semantic
-version: 0.1.0
-last_updated: 2026-09-18
-status: placeholder
+version: 2.0.0
+last_updated: 2026-10-02
+status: diseñada
 ---
 
 # Tokens — Semantic (alias)
 
-> **Placeholder inicial** — Tier 2: tokens semánticos. Mapean primitivos a
-> roles funcionales (qué hace, no qué es).
+> Tier 2. Mapean primitivos a roles. **Los componentes consumen estos, nunca los primitivos.**
 
-## Propósito
-
-Tier 2 de la jerarquía de tokens. Cada semántico mapea a uno o más
-primitivos (`tokens/reference.md`). Los componentes consumen estos
-semánticos, NUNCA los primitivos directamente.
-
-Los semánticos comunican **intención** (`bg.action.primary`), no apariencia
-(`color.blue.500`). Esto permite cambiar la paleta sin tocar componentes.
-
-## Color (placeholder)
+## Color
 
 ### Background
 | Token | Valor | Uso |
-|-------|-------|-----|
-| `bg.surface` | `color.gray.0` | Fondo de cards, modales |
-| `bg.canvas` | `color.gray.50` | Fondo general de la página |
-| `bg.action.primary` | `color.blue.500` | Botón primario |
-| `bg.action.primary.hover` | `color.blue.600` | Hover de botón primario |
-| `bg.success` | `color.green.500` | Estado de éxito |
-| `bg.error` | `color.red.500` | Estado de error |
+|---|---|---|
+| `bg.canvas` | `color.gray.100` | Fondo de página |
+| `bg.surface` | `color.white` | Tarjetas, diálogos, tablas, inputs |
+| `bg.surface.subtle` | `color.gray.50` | Superficie secundaria, filas alternas |
+| `bg.band` | `color.black` | Header, EventHero, panel de marca |
+| `bg.band.raised` | `color.ink.800` | Superficie dentro de una banda |
+| `bg.action.primary` | `color.violet.700` | Botón primario |
+| `bg.action.primary.hover` | **Pendiente** — el diseño no define hover | Hover de botón primario |
+| `bg.action.subtle` | `color.violet.100` | Chip de acción, etiqueta "Votación" |
+| `bg.accent` | `color.violet.500` | Etapa "ahora", punto de no leída, botón sobre banda |
+| `bg.unread` | `color.violet.50` | Ítem no leído |
+| `bg.success` | `color.green.600` | Éxito sólido |
+| `bg.success.subtle` | `color.green.100` | Éxito suave |
+| `bg.warning` | `color.amber.500` | Advertencia sólida |
+| `bg.warning.subtle` | `color.amber.100` | Advertencia suave |
+| `bg.neutral.subtle` | `color.gray.150` | Chip neutro ("Finalizado") |
+| `bg.disabled` | `color.gray.200` | Control deshabilitado |
+| `bg.backdrop` | `rgba(11,16,32,.55)` | Detrás de un diálogo |
 
 ### Text
 | Token | Valor | Uso |
-|-------|-------|-----|
-| `text.primary` | `color.gray.900` | Texto principal |
-| `text.secondary` | `color.gray.500` | Texto secundario |
-| `text.inverse` | `color.gray.0` | Texto sobre fondo oscuro |
-| `text.action.primary` | `color.blue.500` | Links, botón secondary |
-| `text.error` | `color.red.500` | Mensaje de error |
+|---|---|---|
+| `text.primary` | `color.ink.900` | Texto principal |
+| `text.secondary` | `color.gray.600` | Texto secundario |
+| `text.muted` | `color.gray.500` | Metadatos (solo sobre `bg.surface`) |
+| `text.disabled` | `color.gray.400` | Deshabilitado, placeholder |
+| `text.inverse` | `color.white` | Sobre banda o acción |
+| `text.inverse.secondary` | `color.violet.200` | Secundario sobre banda |
+| `text.signal` | `color.cyan.400` | Señal sobre banda |
+| `text.action` | `color.violet.700` | Links, botón secundario |
+| `text.success` | `color.green.700` | Éxito |
+| `text.warning` | `color.amber.700` | Advertencia |
+| `text.error` | `color.red.700` | Error |
 
 ### Border
 | Token | Valor | Uso |
-|-------|-------|-----|
-| `border.default` | `color.gray.300` | Bordes neutros |
-| `border.focus` | `color.blue.500` | Borde de elemento focused |
-| `border.error` | `color.red.500` | Borde de elemento inválido |
+|---|---|---|
+| `border.default` | `color.gray.200` | Superficies, divisores |
+| `border.strong` | `color.gray.300` | Controles (inputs, botón secundario) |
+| `border.focus` | `color.violet.500` | Foco |
+| `border.error` | `color.red.700` | Inválido |
+| `border.inverse` | `rgba(255,255,255,.12)` | Controles sobre banda |
 
-## Spacing (placeholder)
+## Forma y elevación
+| Token | Valor | Uso |
+|---|---|---|
+| `radius.control` | `radius.md` | Botones |
+| `radius.field` | `radius.lg` | Inputs, ítems |
+| `radius.surface` | `radius.2xl` | Tarjetas de sección, diálogos, tablas |
+| `radius.area` | `radius.xl` | Bloques sobre canvas, zona de carga |
+| `radius.pill` | `radius.full` | Pills, chips |
+| `shadow.raised` | `shadow.1` | Paso destacado |
+| `shadow.popover` | `shadow.2` | Popovers, menús |
+| `shadow.dialog` | `shadow.3` | Diálogos |
+| `shadow.toast` | `shadow.4` | Toasts |
+| `focus.ring` | `0 0 0 4px color.violet.100` | Anillo de foco |
+
+## Spacing
 
 | Token | Valor | Uso |
-|-------|-------|-----|
-| `space.inline.sm` | `space.2` | Gap inline pequeño |
-| `space.inline.md` | `space.3` | Gap inline default |
-| `space.stack.sm` | `space.3` | Gap vertical entre líneas |
-| `space.stack.md` | `space.4` | Gap vertical entre párrafos |
-| `space.stack.lg` | `space.5` | Gap vertical entre secciones |
-| `space.padding.compact` | `space.2` | Padding interno compacto |
-| `space.padding.default` | `space.3` | Padding interno default |
-| `space.padding.spacious` | `space.4` | Padding interno holgado |
+|---|---|---|
+| `space.inline.sm` | `space.sm` (8px) | Gap entre ícono y texto |
+| `space.inline.md` | `space.ms` (12px) | Gap entre controles |
+| `space.stack.sm` | `space.sm` (8px) | Gap entre líneas relacionadas |
+| `space.stack.md` | `space.md` (16px) | Gap entre bloques |
+| `space.stack.lg` | `space.lx` (28px) | Gap entre secciones |
+| `space.padding.compact` | `space.md` (16px) | Padding de filas y tarjetas chicas |
+| `space.padding.default` | `space.lg` (24px) | Padding de tarjetas |
+| `space.padding.spacious` | `space.lx` (28px) | Padding de superficies principales y diálogos |
 
-## Typography (placeholder)
+## Typography
 
-| Token | Valor | Uso |
-|-------|-------|-----|
-| `text.heading.l` | `font.size.2xl` + `font.weight.bold` | h1 |
-| `text.heading.m` | `font.size.xl` + `font.weight.semibold` | h2 |
-| `text.heading.s` | `font.size.lg` + `font.weight.semibold` | h3 |
-| `text.body` | `font.size.md` + `font.weight.regular` | Body |
-| `text.caption` | `font.size.xs` + `font.weight.regular` | Caption |
+Ver [`typography.md`](../foundations/typography.md) → Tokens semánticos (`text.display`,
+`text.heading.l/m/s`, `text.body`, `text.ui`, `text.caption`, `text.eyebrow`, `text.metric`).
 
 ## Reglas
 
-- **Componentes consumen semánticos, NUNCA primitivos.**
-- **Cambiar el mapeo de un semántico** = MAJOR (rompe consumidores).
-- **Agregar nuevos semánticos** = MINOR.
-- **Ajuste de valor primitivo subyacente** = patch en `reference.md`, no acá.
+- Componentes consumen semánticos, nunca primitivos.
+- Cambiar el mapeo de un semántico = MAJOR. Agregar uno = MINOR.
 
 ## Historial
 
 - 2026-09-18 v0.1.0 — Placeholder inicial.
+- 2026-10-02 v2.0.0 — **Breaking.** Mapeo al rediseño de REQ-003; nuevos roles `bg.band`,
+  `bg.accent`, `bg.unread`, `text.inverse.secondary`, `text.signal`, `radius.*`, `shadow.*`.

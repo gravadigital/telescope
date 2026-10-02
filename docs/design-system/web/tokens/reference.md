@@ -1,100 +1,93 @@
 ---
 tokens: reference
-version: 0.1.0
-last_updated: 2026-09-18
-status: placeholder
+version: 2.0.0
+last_updated: 2026-10-02
+status: diseñada
 ---
 
 # Tokens — Reference (primitivos)
 
-> **Placeholder inicial** — Tier 1: tokens primitivos. NO se consumen
-> directamente por componentes; siempre vía tokens semánticos.
-
-## Propósito
-
-Tier 1 de la jerarquía de tokens (Nathan Curtis):
+> Tier 1. **No se consumen desde componentes**: siempre vía [`semantic.md`](./semantic.md).
+> Valores del rediseño de REQ-003. `[fuente: diseño REQ-003]`
 
 ```
 Reference (primitivos)  ←  ESTE NIVEL
         ↓
 Semantic (alias)
         ↓
-Component (por componente)
+Component
 ```
 
-Los tokens reference son **el inventario crudo** de valores: paleta de
-colores raw, escala de espaciado raw, type scale raw.
+## Color
 
-## Color (placeholder)
+| Token | Valor |
+|---|---|
+| `color.black` | `#000000` |
+| `color.white` | `#FFFFFF` |
+| `color.ink.900` | `#0B1020` |
+| `color.ink.800` | `#141A2E` |
+| `color.gray.700` | `#39414D` |
+| `color.gray.600` | `#575E6B` |
+| `color.gray.500` | `#6E7687` |
+| `color.gray.400` | `#8892A8` |
+| `color.gray.300` | `#D3D9E2` |
+| `color.gray.200` | `#E1E5EC` |
+| `color.gray.150` | `#E8ECF2` |
+| `color.gray.100` | `#F1F3F6` |
+| `color.gray.50` | `#FAFBFC` |
+| `color.violet.700` | `#4B3FA8` |
+| `color.violet.500` | `#6E5BF2` |
+| `color.violet.200` | `#CFC9F7` |
+| `color.violet.100` | `#EAE7F9` |
+| `color.violet.50` | `#F8F7FF` |
+| `color.cyan.400` | `#35D6F2` |
+| `color.green.700` | `#16744A` |
+| `color.green.600` | `#1F9D62` |
+| `color.green.100` | `#E1F1E8` |
+| `color.amber.700` | `#8A6212` |
+| `color.amber.500` | `#E9A227` |
+| `color.amber.100` | `#F7EDD6` |
+| `color.red.700` | `#B8381F` |
 
-```
-color.blue.50  : #eff6ff
-color.blue.100 : #dbeafe
-color.blue.500 : #2563eb
-color.blue.900 : #1e3a8a
+## Tipografía
 
-color.gray.0   : #ffffff
-color.gray.50  : #f8fafc
-color.gray.100 : #f1f5f9
-color.gray.500 : #64748b
-color.gray.900 : #0f172a
+| Token | Valor |
+|---|---|
+| `font.family.base` | `'Plus Jakarta Sans', system-ui, sans-serif` |
+| `font.family.mono` | `'JetBrains Mono', monospace` |
+| `font.size.2xs` … `font.size.5xl` | 12 · 13 · 14 · 15 · 16 · 18 · 20 · 28 · 36 · 44 px |
+| `font.weight.regular` … `extrabold` | 400 · 500 · 600 · 700 · 800 |
+| `font.leading.tight` / `snug` / `normal` / `relaxed` | 1 · 1.35 · 1.55 · 1.6 |
+| `font.tracking.tight` / `wide` | -0.02em · 0.12em |
 
-color.green.500: #10b981
-color.amber.500: #f59e0b
-color.red.500  : #ef4444
-```
+## Espaciado y forma
 
-## Spacing (placeholder)
+| Token | Valor |
+|---|---|
+| `space.xs` · `sm` · `ms` · `md` · `lg` · `lx` · `xl` · `2xl` | 4 · 8 · 12 · 16 · 24 · 28 · 32 · 48 px |
+| `radius.xs` / `sm` / `md` / `lg` / `xl` / `2xl` / `full` | 6 · 8 · 10 · 12 · 14 · 18 · 999 px |
 
-```
-space.0  : 0px
-space.1  : 4px
-space.2  : 8px
-space.3  : 12px
-space.4  : 16px
-space.5  : 24px
-space.6  : 32px
-space.8  : 48px
-space.10 : 64px
-```
+## Elevación
 
-## Typography (placeholder)
+| Token | Valor |
+|---|---|
+| `shadow.1` | `0 10px 30px rgba(11,16,32,.08)` |
+| `shadow.2` | `0 20px 60px rgba(11,16,32,.18)` |
+| `shadow.3` | `0 30px 80px rgba(0,0,0,.35)` |
+| `shadow.4` | `0 24px 60px rgba(11,16,32,.28)` |
 
-```
-font.size.xs  : 12px
-font.size.sm  : 14px
-font.size.md  : 16px
-font.size.lg  : 18px
-font.size.xl  : 24px
-font.size.2xl : 32px
-font.size.3xl : 48px
+## Breakpoint
 
-font.weight.regular : 400
-font.weight.medium  : 500
-font.weight.semibold: 600
-font.weight.bold    : 700
-
-font.lineHeight.tight : 1.2
-font.lineHeight.base  : 1.5
-font.lineHeight.loose : 1.75
-```
-
-## Radius (placeholder)
-
-```
-radius.none : 0px
-radius.sm   : 4px
-radius.md   : 8px
-radius.lg   : 12px
-radius.full : 9999px
-```
+| Token | Valor |
+|---|---|
+| `bp.desktop` | `768px` |
 
 ## Reglas
 
-- **No consumir desde componentes directamente.** Usar siempre via tokens semánticos.
-- **No agregar valores arbitrarios** sin justificación.
-- **Cambios aquí afectan TODO** — bumpear MAJOR si se modifica un valor existente.
+- Una sola definición en código: `src/styles/tokens.css` (DA-7). Se elimina la copia de `index.css`.
+- Cambiar el valor de un primitivo: PATCH si es calibración, MAJOR si cambia la apariencia general.
 
 ## Historial
 
 - 2026-09-18 v0.1.0 — Placeholder inicial.
+- 2026-10-02 v2.0.0 — Primitivos del rediseño de REQ-003.

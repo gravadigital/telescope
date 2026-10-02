@@ -1,8 +1,8 @@
 ---
 foundation: spacing
-version: 1.0.0
-last_updated: 2026-09-18
-status: relevado-desde-código
+version: 2.0.0
+last_updated: 2026-10-02
+status: diseñada
 ---
 
 # Espaciado
@@ -17,8 +17,10 @@ Base de **4px** (0.25rem), con progresión aproximadamente duplicada.
 |---|---|---|---|
 | `space.xs` | `--spacing-xs` | `0.25rem` | 4px |
 | `space.sm` | `--spacing-sm` | `0.5rem` | 8px |
+| `space.ms` | `--spacing-ms` | `0.75rem` | 12px — **nuevo en v2.0.0**: gap más usado del rediseño |
 | `space.md` | `--spacing-md` | `1rem` | 16px |
 | `space.lg` | `--spacing-lg` | `1.5rem` | 24px |
+| `space.lx` | `--spacing-lx` | `1.75rem` | 28px — **nuevo en v2.0.0**: padding de superficies principales del rediseño |
 | `space.xl` | `--spacing-xl` | `2rem` | 32px |
 | `space.2xl` | `--spacing-2xl` | `3rem` | 48px |
 | `space.3xl` | `--spacing-3xl` | — | ⚠️ solo en `global.css` |
@@ -30,20 +32,17 @@ estado.
 
 | Token | Variable CSS | Valor |
 |---|---|---|
-| `radius.sm` | `--radius-sm` | `4px` |
-| `radius.md` | `--radius-md` | `8px` |
-| `radius.lg` | `--radius-lg` | `12px` — **el de la tarjeta glass** |
-| `radius.xl` | `--radius-xl` | `16px` |
-| `radius.2xl` | `--radius-2xl` | `24px` |
-| `radius.full` | `--radius-full` | `9999px` — badges y chips |
+| `radius.xs` | `--radius-xs` | `6px` — etiquetas chicas sobre banda (eyebrow de etapa) |
+| `radius.sm` | `--radius-sm` | `8px` — controles chicos sobre banda (ES/EN, menú) |
+| `radius.md` | `--radius-md` | `10px` — **botones** |
+| `radius.lg` | `--radius-lg` | `12px` — inputs, tarjetas internas, ítems de lista |
+| `radius.xl` | `--radius-xl` | `14px` — bloques sobre canvas (franja "Cómo participar", zona de carga) |
+| `radius.2xl` | `--radius-2xl` | `18px` — **superficies principales**: tarjetas de sección, diálogos, tablas |
+| `radius.full` | `--radius-full` | `999px` — pills, chips, avatares |
 
 ## Sombra
 
-| Token | Variable CSS |
-|---|---|
-| `shadow.sm` … `shadow.2xl` | `--shadow-sm` … `--shadow-2xl` |
-| `shadow.button` | `--shadow-button` | ⚠️ solo en `global.css` |
-| `shadow.button.hover` | `--shadow-button-hover` | ⚠️ solo en `global.css` |
+Las sombras viven en [`elevation.md`](./elevation.md) desde la v2.0.0.
 
 ## Transición
 
@@ -70,7 +69,7 @@ no contempla, por ejemplo, un toast por encima de un modal.
 
 **Do:**
 - Usar la escala para todo padding, margin y gap.
-- `--radius-lg` para superficies tipo tarjeta, `--radius-full` para badges.
+- `--radius-2xl` para superficies principales, `--radius-md` para botones, `--radius-full` para pills y chips.
 - Usar los tokens de z-index en vez de números literales.
 
 **Don't:**
@@ -88,3 +87,4 @@ no contempla, por ejemplo, un toast por encima de un modal.
 ## Historial
 
 - 2026-09-18 v1.0.0 — Sembrado desde `web/src/styles/global.css` por `/product-consolidate-services`.
+- 2026-10-02 v2.0.0 — **Breaking.** Escala de radios del rediseño de REQ-003 (6/8/10/12/14/18/999px; `radius.lg` deja de ser el de la tarjeta glass). Se agregan `space.ms` (12px) y `space.lx` (28px), los dos valores del rediseño que la escala no tenía; el resto se mantiene.

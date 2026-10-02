@@ -3,157 +3,242 @@ name: events-list
 surface: web
 route: "/events"
 viewports: [desktop, mobile]
-audiences: [participante, organizador]
+audiences: [participante]
 fidelity: mid
-status: as-is-sin-validar
-version: "1.0"
-date: 2026-09-18
+status: diseñada
+version: "2.0"
+date: 2026-10-02
 ---
 
-# Listado de eventos
+# Pantalla: Eventos (S-02)
 
 ## Identidad
 
-- **Audiencia primaria:** participante. **Co-primaria:** organizador (llega acá para entrar a
-  gestionar sus eventos y para crear uno nuevo)
-- **JTBD:** participante — descubrir a qué convocatorias puede entrar y qué le toca hacer en cada
-  una. Organizador — entrar a sus eventos.
-- **Viewports:** `desktop` (base), `mobile` (≤768px)
-- **Acceso:** público. Algunas acciones exigen sesión
-
-> **Transcripta del código existente** (`docs/analysis/ux/web/screens/events-list.md`).
-> `status: as-is-sin-validar`.
+- **Audiencia primaria:** [participante](../../../audiences/participante/research-context.md) — con o sin sesión.
+- **JTBD / Propósito:** ver primero lo que me toca hacer ("Tus pendientes") y después encontrar dónde participar o consultar resultados. Cubre REQ-003 RF 13 y 14 (diseños 1c con sesión, 1h sin sesión).
+- **Viewports:**
+  - **desktop** — tabla con columnas Evento / Etapa / Participantes / Creado / acción.
+  - **mobile** — la tabla se apila: cada fila es una tarjeta con etiqueta por valor (AC 3). Los filtros se desplazan horizontalmente.
 
 ## Entrada y salida
 
-**Se llega desde:** el link `Events` de la navbar, el botón `Cancel` o `← Back to Events` de otras
-pantallas, o directamente por URL.
+**Entradas:**
+- Header · "Eventos".
+- S-01 · "Explorar eventos abiertos" / "Ver todos los eventos".
+- S-04 · "← Eventos". S-13 · "Ir a Eventos".
 
-**Se sale hacia:** `/events/create` (botón `Create Event`), `/events/{id}` o `/events/{id}/manage`
-(botón contextual de cada fila).
+**Salidas user-driven:**
+- A S-04 · acción de fila ("Participar", "Subir archivo", "Votar", "Ver evento", "Ver resultados") o acción de una tarjeta de pendientes.
+- A S-05 · "Gestionar" en un evento propio.
+- A S-03 · "+ Crear evento" / "Crear un evento".
+- A S-08 · "Crear cuenta gratis" (sin sesión).
+
+**Salidas automáticas:** ninguna.
 
 ## Estructura
 
-Durante la carga hay un **retorno temprano** que reemplaza toda la pantalla.
-
-| Bloque | Tipo | Contenido |
-|---|---|---|
-| Pantalla de carga | estado excluyente | Spinner + título + subtítulo. Reemplaza todo |
-| Cabecera con acciones | encabezado | `<h1>` + grupo de dos botones (`Create Event`, `Refresh`) a la derecha |
-| Tabs de filtrado | navegación | Tres tabs con contador. **Condicional:** solo con sesión y si el usuario tiene eventos propios o suscripciones |
-| Alerta de error | banner | Mensaje + botón `Retry`. Condicional |
-| Estado vacío | estado | Dos párrafos, con texto según el tab activo. Excluyente con la tabla |
-| Tabla de eventos | tabla | Header de 5 columnas + una fila por evento. Cada fila: título y descripción truncada, fecha, badge de etapa (+ badges de pausa/cancelación), contador de participantes y **un único botón contextual** |
-
-Máximo 4 bloques visibles a la vez.
-
-**Origen:** `web/src/components/events/Events.tsx:105-345`, vía el wrapper `EventsPage`
-(`App.tsx:59-67`).
+| # | Nombre | Tipo | Variant/Level/State | Categoría | Viewports | Visibilidad | Propósito |
+|---|--------|------|---------------------|-----------|-----------|-------------|-----------|
+| 1 | header | header | — | layout | ambos | — | AppHeader |
+| 2 | Eyebrow visitante | label | — | content | ambos | visible_only_in_states: visitante | Cantidad de eventos públicos |
+| 3 | Título | heading | h1 | content | ambos | — | "Eventos" |
+| 4 | Bajada | paragraph | body | content | ambos | state_overrides: visitante→texto sin sesión | Qué se puede hacer acá |
+| 5 | Botón crear evento | button | primary | input | ambos | — | Ir a S-03 |
+| 6 | Título pendientes | heading | h2 | content | ambos | hidden_in_states: visitante | "Tus pendientes · N" |
+| 7 | Tarjeta pendiente | card | — | content | ambos | hidden_in_states: visitante | PendingCard: tarea + evento + cierre + acción |
+| 8 | Cómo participar | list | — | content | ambos | visible_only_in_states: visitante | Franja de 4 pasos |
+| 9 | Filtros de etapa | tabs | — | navigation | ambos | — | FilterTabs con conteo |
+| 10 | Búsqueda | search-bar | default | input | ambos | — | Por nombre u organizador |
+| 11 | Tabla de eventos | table | — | content | ambos | hidden_in_states: empty, error de sistema / sin conexión · viewport_overrides: mobile→filas apiladas | DataTable |
+| 12 | Sin resultados | empty-state | — | feedback | ambos | visible_only_in_states: empty | Filtro o búsqueda sin coincidencias |
+| 13 | Error de carga | alert | error | feedback | ambos | visible_only_in_states: error de sistema / sin conexión | Falla el listado |
+| 14 | Paginación | pagination | — | navigation | ambos | hidden_in_states: empty, loading, error de sistema / sin conexión | Páginas del listado |
+| 15 | Banner cuenta | card | — | content | ambos | visible_only_in_states: visitante | CtaBanner de registro |
+| 16 | CTA crear cuenta | button | primary | input | ambos | visible_only_in_states: visitante | Ir a S-08 |
+| 17 | footer | footer | — | layout | ambos | — | Pie |
 
 ## Layout por viewport
 
-**desktop** (base)
-- Tabla en grid. Cabecera de página en fila, con el grupo de botones a la derecha.
-- A ≤1024px (`Events.css:181-190`): la tabla baja su `min-width` de 800px a 700px y las columnas
-  pasan de anchos fijos a fracciones. **No es un cambio estructural.**
+### desktop · 1200px
+- Eyebrow visitante
+- row `titulo`
+  - col 9/12: Título, Bajada
+  - col 3/12: Botón crear evento
+- Título pendientes
+- row `pendientes`
+  - col 6/12: Tarjeta pendiente
+  - col 6/12: Tarjeta pendiente
+- Cómo participar
+- row `filtros`
+  - col 8/12: Filtros de etapa
+  - col 4/12: Búsqueda
+- Tabla de eventos
+- Sin resultados
+- Error de carga
+- Paginación
+- row `banner`
+  - col 9/12: Banner cuenta
+  - col 3/12: CTA crear cuenta
 
-**mobile** (≤768px, `Events.css:192-273`) — **cambio estructural real**
-- El `.table-header` se **oculta** (`display:none`).
-- Cada fila pasa de grid a columna y se convierte en una **tarjeta** con fondo, borde y radio
-  propios.
-- Los `.cell-label` ocultos en desktop se **muestran**, supliendo el header eliminado.
-- Las celdas se reordenan explícitamente: título(1), etapa(2), fecha(3), participantes(5),
-  acciones(6).
-- La cabecera de página pasa a columna centrada; el `<h1>` baja a `--text-xl`.
-- A ≤480px: padding del contenedor a `--spacing-sm`, controles al 100%, título del evento a
-  `--text-base`.
-
-> ⚠️ **Desajuste verificado:** el grid define **6 columnas** pero el JSX renderiza **5 celdas**.
-> `.cell-location` y `.location-text` tienen reglas CSS pero **no existe ninguna celda de location
-> en el JSX**: CSS muerto de una versión anterior.
+### mobile · 400px
+- Eyebrow visitante
+- Título
+- Bajada
+- Botón crear evento
+- Título pendientes
+- Tarjeta pendiente
+- Tarjeta pendiente
+- Cómo participar
+- Búsqueda
+- Filtros de etapa
+- Tabla de eventos
+- Sin resultados
+- Error de carga
+- Paginación
+- Banner cuenta
+- CTA crear cuenta
 
 ## Contenido
 
-Microcopy transcripto **textual**, en inglés.
+### header
+- Texto/label: "TELESCOPIO | Inicio · Eventos · Cómo funciona | campana · menú de usuario" (sin sesión: "ES/EN · Iniciar sesión · Crear cuenta")
 
-### Carga
-`Loading events...` · `Connecting to server...`
+### Eyebrow visitante
+- Texto/label: "EXPLORAR · {n} EVENTOS PÚBLICOS"
 
-### Cabecera
-- Título: `Browse Events`
-- Botón: `Create Event` — con `title="Log in to create events"` cuando no hay sesión
-- Botón: `Refresh`
+### Título
+- Texto/label: "Eventos"
 
-### Tabs (con contador dinámico)
-`All Events ({n})` · `My Events ({n})` · `My Subscriptions ({n})`
+### Bajada
+- Texto/label: con sesión "Encontrá dónde participar o seguí los eventos que ya te involucran." · sin sesión "Mirá qué se está evaluando y consultá los resultados publicados. Para participar o crear tu propio evento necesitás una cuenta gratuita."
 
-### Error
-`Error loading events. Please try again.` · Botón `Retry`
+### Botón crear evento
+- Texto/label: con sesión "+ Crear evento" · sin sesión "Crear un evento"
+- Icono: plus
 
-### Estados vacíos, según el tab
-| Tab | Textos |
-|---|---|
-| `my` | `You have not created any events yet.` + `Click "Create Event" to get started!` |
-| `subscriptions` | `You have not subscribed to any events yet.` + `Browse events and register to participate!` |
-| `all` | `No events available at this time.` + `Come back soon for new observation opportunities!` |
+### Título pendientes
+- Texto/label: "TUS PENDIENTES · {n}"
 
-### Tabla
-- Headers: `Event` · `Created` · `Stage` · `Participants` · `Actions`
-- Labels de mobile (ocultos en desktop): `Created:` · `Stage:` · `Participants:`
-- Nombres de etapa: `Creation` · `Participation` · `Voting` · **`Completed`**
-- Badges: `⏸ PAUSED` · `CANCELLED`
-- Fecha: formato `en-US` (`{year:'numeric', month:'short', day:'numeric'}`). Fallback `—` si es
-  inválida, `TBD` si el constructor lanza
-- Participantes: `{n} / {max}` (max default 20)
+### Tarjeta pendiente
+- Texto/label: tres tipos:
+  - "Falta subir tu archivo" · nombre del evento · "Cierra el {fecha}" · acción "Subir archivo"
+  - "Te toca votar" · nombre del evento · "Cierra el {fecha}" · acción "Votar"
+  - "Resultados publicados" · nombre del evento · "Quedaste en el puesto {X} de {Y}" · acción "Ver ranking"
+- Annotation: sale de `my_status` de `GET /users/{id}/events`; el puesto es el del ranking ajustado (FG-5 sigue abierto).
 
-### Botón contextual, uno por fila
-| Condición | Texto | `title` |
-|---|---|---|
-| Es el creador | `Manage` | `Manage event stages and settings` |
-| `participation` + registrado | `Upload File` | `Upload your file` |
-| `participation` + no registrado | `Participate` | `Participate in this event` |
-| `voting` + registrado | `Vote` | `Submit your votes` |
-| `results` + registrado | `See Results` | `See final rankings` |
-| Fallback | `View Event` | `View event details` |
+### Cómo participar
+- Texto/label: "Cómo participar — 1 Elegí un evento con inscripción abierta · 2 Creá tu cuenta e inscribite · 3 Subí tu propuesta · 4 Votá a otros participantes"
 
-> ⚠️ **La etapa `results` se muestra acá como `Completed`**, pero como `Results` en el resto de la
-> aplicación. Inconsistencia de nomenclatura.
+### Filtros de etapa
+- Texto/label: "Todos · {n} | Inscripción abierta · {n} | En votación · {n} | Finalizados · {n}"
+- Annotation: los conteos salen de `stage_counts` sobre el conjunto filtrado por la búsqueda. No existe filtro de Creación.
+
+### Búsqueda
+- Texto/label: placeholder "Buscar por nombre u organizador"
+- Icono: search
+- Annotation: filtra con debounce mientras se escribe; no hay botón "Buscar".
+
+### Tabla de eventos
+- Texto/label: columnas "EVENTO" (nombre + descripción corta) · "ETAPA" (StatusPill) · "PARTICIPANTES" (barra de cupo + "{n} / {cupo}") · "CREADO" · acción
+- Annotation: una sola acción por fila según rol y etapa (tabla en product-map). Sin sesión, "Participar" muestra debajo "Requiere cuenta"; "Ver resultados" muestra "Público". En mobile cada fila se apila con la etiqueta de cada valor.
+
+### Sin resultados
+- Texto/label: "No hay eventos que coincidan con tu búsqueda." · acción "Limpiar filtros"
+
+### Error de carga
+- Texto/label: "No pudimos cargar los eventos." · acción "Reintentar"
+
+### Paginación
+- Texto/label: "Anterior · {página} de {total} · Siguiente"
+
+### Banner cuenta
+- Texto/label: "¿Querés que tu comunidad evalúe propuestas? — Creá una cuenta gratis y armá tu evento en menos de 5 minutos."
+
+### CTA crear cuenta
+- Texto/label: "Crear cuenta gratis"
+
+### footer
+- Texto/label: "Telescopio · evaluación distribuida entre pares"
 
 ## Estados
 
-| Estado | Aplica | Detalle |
-|---|---|---|
-| Vacío | **Sí** | Tres variantes según tab. Condición: `displayEvents.length === 0 && !loading && !error` |
-| Cargando | **Sí** | Retorno temprano bloqueante que reemplaza toda la pantalla |
-| Error | **Sí** | Banner con `Retry` |
-| Éxito | **No** — no implementado | Tras un `Refresh` exitoso nada lo confirma |
-| Deshabilitado | **Parcial** | `Refresh` tiene `disabled={loading}`, pero como `loading===true` fuerza el retorno temprano, **ese estado nunca es visible: código inalcanzable**. `Create Event` **no** se deshabilita sin sesión: se renderiza activo y al click abre el modal de login |
-| Sin permiso | **Parcial** | Sin estado visual. Se manifiesta solo como apertura del modal de auth y como el `title` del botón |
-| Parcial | **No** — no aplica | — |
-| Offline | **No** — no implementado | `ApiHealthService.checkHealth()` se llama pero **su resultado solo va a `console.log`**. El usuario nunca se entera de que la API está caída |
+### default
+- Aplica: Sí
+- Mensaje: —
+- Cambios: ninguno.
+
+### empty
+- Aplica: Sí
+- Mensaje: "No hay eventos que coincidan con tu búsqueda."
+- Cambios: Tabla de eventos y Paginación ocultas; Sin resultados visible. Si no hay ningún evento público y no hay búsqueda, el texto pasa a "Todavía no hay eventos públicos." con la acción "Crear un evento".
+
+### loading
+- Aplica: Sí
+- Mensaje: "Cargando eventos…"
+- Cambios: Tabla de eventos como skeleton de 5 filas; conteos de Filtros de etapa como skeleton; Tarjeta pendiente como skeleton.
+
+### error de validación
+- Aplica: No — la búsqueda no tiene reglas de validación.
+
+### error de sistema / sin conexión
+- Aplica: Sí
+- Mensaje: "No pudimos cargar los eventos."
+- Cambios: Error de carga visible con "Reintentar"; Tabla de eventos y Paginación ocultas. Si fallan solo los pendientes, el error se muestra en ese bloque ("No pudimos cargar tus pendientes." + "Reintentar") y la tabla sigue visible.
+
+### visitante (sin sesión)
+- parent_state: default
+- Aplica: Sí
+- Mensaje: —
+- Cambios:
+  - Eyebrow visitante, Cómo participar, Banner cuenta, CTA crear cuenta: visibles.
+  - Título pendientes, Tarjeta pendiente: ocultos.
+  - Bajada: content = texto sin sesión. Botón crear evento: content="Crear un evento", variant=secondary.
+  - header: "Iniciar sesión · Crear cuenta" en lugar de campana y menú.
+
+### success
+- Aplica: No.
+
+### not found
+- Aplica: No.
+
+### estado terminal / readonly
+- Aplica: No.
 
 ## Interacciones
 
-- ⚠️ **Doble fetch al montar:** dos `useEffect`, uno sin dependencias y otro por
-  `location.pathname === '/events'`. Al cargar `/events` **ambos disparan**: dos requests.
-- `Create Event` → con sesión navega a `/events/create`; sin sesión abre el modal de login.
-- `Refresh` → reejecuta el fetch.
-- Tabs → **el filtrado es client-side**, sobre los datos ya cargados.
-- Botón contextual → navega según rol y etapa.
-- **Feedback:** solo el spinner y la alerta de error. Ninguna acción da confirmación positiva.
+**Eventos:**
+- Filtros de etapa · on click → filtra la tabla y actualiza la URL (`?stage=`).
+- Búsqueda · on input (debounce 300 ms) → filtra y actualiza conteos (`?q=`).
+- Acción de fila / Tarjeta pendiente · on click → navega a `/events/{id}` (o `/events/{id}/manage` si es "Gestionar").
+- Botón crear evento · on click → `/events/create` (sin sesión: `/login?next=/events/create`).
+- CTA crear cuenta · on click → `/register`.
+- "Limpiar filtros" · on click → vuelve a "Todos" sin búsqueda.
+
+**Validaciones:** ninguna.
+
+**Feedback:** la tabla se actualiza en el lugar; sin botón "Refresh" (el listado se vuelve a pedir al volver a la pantalla).
 
 ## Accesibilidad
 
-**Observado en el código:**
-- ⚠️ **Tabla falsa**: es un grid de `<div>`, sin `<table>` ni roles `table`/`row`/`columnheader`.
-  Un lector de pantalla no la interpreta como tabla.
-- ⚠️ **Tabs sin semántica ARIA**: `<button>` sin `role="tab"`, sin `aria-selected`, sin
-  `role="tablist"`. El estado activo se comunica **solo por color**.
-- ⚠️ Los `title` son la única ayuda contextual; no hay `aria-label`.
-- ✅ Los badges de etapa llevan texto además del color: son legibles sin distinguir colores.
-- ✅ Todos los controles son `<button>` nativos, alcanzables por teclado.
+- **Orden de foco:** header → Botón crear evento → Tarjetas pendientes → Filtros de etapa → Búsqueda → filas de la tabla → Paginación → CTA crear cuenta.
+- **Landmarks y jerarquía:** header / main / footer. h1 = Título; h2 = Título pendientes, "Cómo participar".
+- **Foco y teclado:** Filtros de etapa se recorren con flechas (patrón tablist).
+- **Propio de esta composición:** el cambio de resultados al filtrar o buscar se anuncia en una región live ("{n} eventos").
 
 ## Decisiones y descartes
 
-- Pantalla documentada desde el código existente `[fuente: código-existente]`. No hay registro del
-  rationale original; las decisiones se van a documentar cuando la pantalla se modifique.
+**Decisiones tomadas:**
+- Reescrita por REQ-003 sobre 1c y 1h: una sola pantalla con variantes por sesión, no dos pantallas.
+- "Tus pendientes" antes de la lista: lo que el usuario tiene que hacer importa más que explorar (RF 13).
+- Filtros por etapa con conteo + búsqueda reemplazan los tabs All / My / Subscriptions; los eventos propios pasan a S-11 (REQ-003 clarificaciones).
+- Una sola acción por fila: mantiene el mecanismo de orientación de la v1.0 con textos en español.
+- En mobile la búsqueda va antes de los filtros: es la herramienta más directa a 400px.
+- Eventos en Creación nunca aparecen (RF 14).
+
+**Alternativas descartadas:**
+- Botón "Refresh": se elimina (diseño 1c).
+- "Ver demo" en la franja Cómo participar: fuera de alcance.
+- Filtro de Creación: esos eventos no son públicos.
+
+**Preguntas abiertas:**
+- ¿Cuántas tarjetas de pendientes mostrar antes de colapsar? Se propone 4 y "Ver todos en Mis eventos".
