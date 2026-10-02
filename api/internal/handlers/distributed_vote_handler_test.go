@@ -15,6 +15,7 @@ import (
 	"github.com/gravadigital/telescopio-api/internal/domain/event"
 	"github.com/gravadigital/telescopio-api/internal/domain/participant"
 	"github.com/gravadigital/telescopio-api/internal/domain/vote"
+	"github.com/gravadigital/telescopio-api/internal/middleware/auth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -185,21 +186,57 @@ func TestCreateVotingConfiguration_RejectsWhenAlreadyExists(t *testing.T) {
 	assert.Equal(t, "CONFIG_EXISTS", jsonBody(t, w)["code"])
 }
 
-func TestCreateVotingConfiguration_RejectsInsufficientParticipants(t *testing.T) {
+func TestCreateVotingConfiguration_RejectsFewerThanThreeProposals(t *testing.T) {
 	s := newTestHandlerSet()
 	e := newParticipationEvent()
 	s.eventRepo.addEvent(e)
-	users := addParticipants(s, e.ID, 2) // only 2, need >= 3
+	users := addParticipants(s, e.ID, 5)
+	addAttachments(s, e.ID, users[:2]) // 5 inscribed, only 2 proposals
+
+	w := performRequest(t, http.MethodPost, s.handler.CreateVotingConfiguration,
+		gin.Params{{Key: "event_id", Value: e.ID.String()}}, "",
+		map[string]interface{}{"attachments_per_evaluator": 2})
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	resp := jsonBody(t, w)
+	assert.Equal(t, "INSUFFICIENT_ATTACHMENTS", resp["code"])
+	assert.Equal(t, float64(2), resp["current_count"])
+	assert.Equal(t, float64(3), resp["required_minimum"])
+}
+
+func TestCreateVotingConfiguration_DefaultMinEvaluationsIsMinOfThreeAndM(t *testing.T) {
+	s := newTestHandlerSet()
+	e := newParticipationEvent()
+	s.eventRepo.addEvent(e)
+	users := addParticipants(s, e.ID, 4)
+	addAttachments(s, e.ID, users[:3])
+
+	w := performRequest(t, http.MethodPost, s.handler.CreateVotingConfiguration,
+		gin.Params{{Key: "event_id", Value: e.ID.String()}}, "",
+		map[string]interface{}{"attachments_per_evaluator": 2})
+
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	data := jsonBody(t, w)["data"].(map[string]interface{})
+	assert.Equal(t, float64(2), data["attachments_per_evaluator"])
+	assert.Equal(t, float64(2), data["min_evaluations_per_file"])
+	assert.Equal(t, 0.6, data["quality_good_threshold"])
+	assert.Equal(t, 0.3, data["quality_bad_threshold"])
+	assert.Equal(t, float64(3), data["adjustment_magnitude"])
+}
+
+func TestCreateVotingConfiguration_RejectsCloseThresholdsWith400(t *testing.T) {
+	s := newTestHandlerSet()
+	e := newParticipationEvent()
+	s.eventRepo.addEvent(e)
+	users := addParticipants(s, e.ID, 3)
 	addAttachments(s, e.ID, users)
 
 	w := performRequest(t, http.MethodPost, s.handler.CreateVotingConfiguration,
 		gin.Params{{Key: "event_id", Value: e.ID.String()}}, "",
-		map[string]interface{}{"attachments_per_evaluator": 2, "min_evaluations_per_file": 1, "adjustment_magnitude": 3})
+		map[string]interface{}{"attachments_per_evaluator": 2, "quality_good_threshold": 0.65, "quality_bad_threshold": 0.6})
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-	resp := jsonBody(t, w)
-	assert.Equal(t, "INSUFFICIENT_PARTICIPANTS", resp["code"])
-	assert.Equal(t, float64(2), resp["current_count"])
+	assert.Equal(t, "INVALID_THRESHOLDS", jsonBody(t, w)["code"])
 }
 
 func TestCreateVotingConfiguration_RejectsMExceedingConflictOfInterestBound(t *testing.T) {
@@ -338,6 +375,64 @@ func TestGenerateAssignmentsHandler_RejectsMissingConfig(t *testing.T) {
 
 	assert.Equal(t, http.StatusNotFound, w.Code)
 	assert.Equal(t, "CONFIG_NOT_FOUND", jsonBody(t, w)["code"])
+}
+
+func TestGenerateAssignmentsHandler_OnlyParticipantsWithProposalEvaluate(t *testing.T) {
+	s := newTestHandlerSet()
+	e := newVotingEvent()
+	s.eventRepo.addEvent(e)
+	users := addParticipants(s, e.ID, 5)
+	addAttachments(s, e.ID, users[:3]) // 5 inscribed, 3 proposals
+	s.configRepo.byEvent[e.ID.String()] = &vote.VotingConfiguration{
+		ID: uuid.New(), EventID: e.ID, AttachmentsPerEvaluator: 2,
+		QualityGoodThreshold: 0.6, QualityBadThreshold: 0.3,
+		AdjustmentMagnitude: 3, MinEvaluationsPerFile: 2,
+	}
+
+	w := performRequest(t, http.MethodPost, s.handler.GenerateAssignments,
+		gin.Params{{Key: "event_id", Value: e.ID.String()}}, "", nil)
+
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	resp := jsonBody(t, w)
+	assert.Equal(t, "ASSIGNMENTS_GENERATED", resp["code"])
+	data := resp["data"].(map[string]interface{})
+	assert.Equal(t, float64(3), data["assignments_count"])
+	assert.Equal(t, float64(3), data["total_participants"])
+	assert.Equal(t, float64(3), data["total_attachments"])
+	assert.Equal(t, float64(6), data["total_evaluations"])
+	assert.Equal(t, float64(2), data["attachments_per_evaluator"])
+
+	saved, err := s.voteRepo.GetAssignmentsByEventID(e.ID.String())
+	require.NoError(t, err)
+	withProposal := map[uuid.UUID]bool{}
+	for _, u := range users[:3] {
+		withProposal[u.ID] = true
+	}
+	for _, a := range saved {
+		assert.True(t, withProposal[a.ParticipantID], "assignment for a participant without proposal")
+	}
+}
+
+func TestGenerateAssignmentsHandler_RejectsFewerThanThreeProposals(t *testing.T) {
+	s := newTestHandlerSet()
+	e := newVotingEvent()
+	s.eventRepo.addEvent(e)
+	users := addParticipants(s, e.ID, 5)
+	addAttachments(s, e.ID, users[:2])
+	s.configRepo.byEvent[e.ID.String()] = &vote.VotingConfiguration{
+		ID: uuid.New(), EventID: e.ID, AttachmentsPerEvaluator: 1,
+		QualityGoodThreshold: 0.6, QualityBadThreshold: 0.3,
+		AdjustmentMagnitude: 3, MinEvaluationsPerFile: 1,
+	}
+
+	w := performRequest(t, http.MethodPost, s.handler.GenerateAssignments,
+		gin.Params{{Key: "event_id", Value: e.ID.String()}}, "", nil)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	resp := jsonBody(t, w)
+	assert.Equal(t, "INSUFFICIENT_ATTACHMENTS", resp["code"])
+	assert.Equal(t, float64(2), resp["current_count"])
+	assert.Equal(t, float64(3), resp["required_minimum"])
 }
 
 // ---------------------------------------------------------------------------
@@ -780,68 +875,107 @@ func TestDeleteVotingConfiguration_Success(t *testing.T) {
 // PreviewVotingConfiguration
 // ---------------------------------------------------------------------------
 
+func previewFor(t *testing.T, inscribed, proposals int) map[string]interface{} {
+	t.Helper()
+	s := newTestHandlerSet()
+	e := newParticipationEvent()
+	s.eventRepo.addEvent(e)
+	users := addParticipants(s, e.ID, inscribed)
+	addAttachments(s, e.ID, users[:proposals])
+
+	w := performRequest(t, http.MethodGet, s.handler.PreviewVotingConfiguration,
+		gin.Params{{Key: "event_id", Value: e.ID.String()}}, "", nil)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	return jsonBody(t, w)["data"].(map[string]interface{})
+}
+
 func TestPreviewVotingConfiguration_Success(t *testing.T) {
+	data := previewFor(t, 4, 3)
+
+	assert.Equal(t, float64(4), data["participants_count"])
+	assert.Equal(t, float64(3), data["participants_with_proposal"])
+	assert.Equal(t, true, data["can_open_voting"])
+	assert.Equal(t, float64(2), data["min_m"])
+	assert.Equal(t, float64(2), data["max_m"])
+	assert.Equal(t, float64(2), data["recommended_m"])
+	assert.Equal(t, map[string]interface{}{
+		"quality_good_threshold": 0.6,
+		"quality_bad_threshold":  0.3,
+		"adjustment_magnitude":   float64(3),
+	}, data["defaults"])
+}
+
+func TestPreviewVotingConfiguration_TenProposals(t *testing.T) {
+	data := previewFor(t, 12, 10)
+
+	assert.Equal(t, float64(12), data["participants_count"])
+	assert.Equal(t, float64(10), data["participants_with_proposal"])
+	assert.Equal(t, true, data["can_open_voting"])
+	assert.Equal(t, float64(6), data["min_m"])
+	assert.Equal(t, float64(9), data["max_m"])
+	assert.Equal(t, float64(7), data["recommended_m"])
+}
+
+func TestPreviewVotingConfiguration_TwoProposalsCannotOpen(t *testing.T) {
+	data := previewFor(t, 5, 2)
+
+	assert.Equal(t, false, data["can_open_voting"])
+	assert.Equal(t, float64(1), data["min_m"])
+	assert.Equal(t, float64(1), data["max_m"])
+	assert.Equal(t, float64(1), data["recommended_m"])
+}
+
+func TestPreviewVotingConfiguration_NoProposalsClampsToZero(t *testing.T) {
+	data := previewFor(t, 3, 0)
+
+	assert.Equal(t, float64(3), data["participants_count"])
+	assert.Equal(t, float64(0), data["participants_with_proposal"])
+	assert.Equal(t, false, data["can_open_voting"])
+	assert.Equal(t, float64(0), data["min_m"])
+	assert.Equal(t, float64(0), data["max_m"])
+	assert.Equal(t, float64(0), data["recommended_m"])
+}
+
+func TestPreviewVotingConfiguration_RejectsInvalidAndUnknownEventID(t *testing.T) {
 	s := newTestHandlerSet()
-	eventID := uuid.New()
-	users := addParticipants(s, eventID, 3)
-	_ = users
-	s.eventRepo.addEvent(&event.Event{ID: eventID, Stage: event.StageParticipation})
-	addAttachments(s, eventID, users)
 
-	body := map[string]interface{}{"attachments_per_evaluator": 2, "min_evaluations_per_file": 1, "adjustment_magnitude": 3}
-	w := performRequest(t, http.MethodPost, s.handler.PreviewVotingConfiguration,
-		gin.Params{{Key: "event_id", Value: eventID.String()}}, "", body)
+	w := performRequest(t, http.MethodGet, s.handler.PreviewVotingConfiguration,
+		gin.Params{{Key: "event_id", Value: "not-a-uuid"}}, "", nil)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, "INVALID_EVENT_ID", jsonBody(t, w)["code"])
 
+	w = performRequest(t, http.MethodGet, s.handler.PreviewVotingConfiguration,
+		gin.Params{{Key: "event_id", Value: uuid.NewString()}}, "", nil)
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Equal(t, "EVENT_NOT_FOUND", jsonBody(t, w)["code"])
+}
+
+// The route is protected by RequireEventOwner: only the author (or an admin)
+// reaches the handler.
+func TestPreviewVotingConfiguration_OnlyTheAuthorCanSeeIt(t *testing.T) {
+	s := newTestHandlerSet()
+	e := newParticipationEvent()
+	s.eventRepo.addEvent(e)
+
+	serve := func(userID uuid.UUID, role participant.Role) *httptest.ResponseRecorder {
+		router := gin.New()
+		router.GET("/events/:event_id/voting-config/preview",
+			func(c *gin.Context) {
+				c.Set("user_id", userID.String())
+				c.Set("user_role", role)
+			},
+			auth.RequireEventOwner(s.eventRepo),
+			s.handler.PreviewVotingConfiguration)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/events/"+e.ID.String()+"/voting-config/preview", nil))
+		return w
+	}
+
+	w := serve(uuid.New(), participant.RoleParticipant)
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	assert.Equal(t, "FORBIDDEN", jsonBody(t, w)["error"])
+
+	w = serve(e.AuthorID, participant.RoleOrganizer)
 	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
-}
-
-// TestPreviewVotingConfiguration_NoAttachments_DoesNotDivideByZero is a
-// regression test for a bug found while writing this suite:
-// PreviewVotingConfiguration used to compute
-// avgEvaluationsPerFile = maxPossibleAssignments / len(attachments) with no
-// guard for len(attachments) == 0. Go float division by zero doesn't panic
-// (it yields +Inf), but json.Marshal cannot encode +Inf/NaN, so the response
-// body silently failed to serialize while still reporting 200.
-//
-// The handler now guards len(attachments) == 0 and reports 0 for the
-// affected metrics instead of dividing.
-func TestPreviewVotingConfiguration_NoAttachments_DoesNotDivideByZero(t *testing.T) {
-	s := newTestHandlerSet()
-	eventID := uuid.New()
-	// No attachments registered for this event at all.
-
-	body := map[string]interface{}{"attachments_per_evaluator": 2, "min_evaluations_per_file": 1, "adjustment_magnitude": 3}
-	w := performRequest(t, http.MethodPost, s.handler.PreviewVotingConfiguration,
-		gin.Params{{Key: "event_id", Value: eventID.String()}}, "", body)
-
-	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-	resp := jsonBody(t, w) // fails the test if the body isn't valid JSON
-	metrics := resp["calculated_metrics"].(map[string]interface{})
-	assert.Equal(t, 0.0, metrics["avg_evaluations_per_file"])
-	assert.Equal(t, 0.0, metrics["evaluation_coverage_ratio"])
-}
-
-// TestPreviewVotingConfiguration_AppliesSameDefaultsAsCreate is a regression
-// test for the inconsistency found alongside the division-by-zero bug:
-// PreviewVotingConfiguration only defaulted quality thresholds, never
-// AdjustmentMagnitude/MinEvaluationsPerFile, unlike CreateVotingConfiguration.
-// A preview response could show min_evaluations_per_file=0 while the eventual
-// Create call would save it as 3 - a preview that didn't reflect reality.
-func TestPreviewVotingConfiguration_AppliesSameDefaultsAsCreate(t *testing.T) {
-	s := newTestHandlerSet()
-	eventID := uuid.New()
-	users := addParticipants(s, eventID, 3)
-	s.eventRepo.addEvent(&event.Event{ID: eventID, Stage: event.StageParticipation})
-	addAttachments(s, eventID, users)
-
-	// Omit adjustment_magnitude and min_evaluations_per_file.
-	body := map[string]interface{}{"attachments_per_evaluator": 2}
-	w := performRequest(t, http.MethodPost, s.handler.PreviewVotingConfiguration,
-		gin.Params{{Key: "event_id", Value: eventID.String()}}, "", body)
-
-	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-	resp := jsonBody(t, w)
-	configuration := resp["configuration"].(map[string]interface{})
-	assert.Equal(t, 3.0, configuration["adjustment_magnitude"])
-	assert.Equal(t, 3.0, configuration["min_evaluations_per_file"])
 }

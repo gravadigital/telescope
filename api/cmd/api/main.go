@@ -76,7 +76,8 @@ func main() {
 	resultsRepo := postgres.NewPostgresVotingResultsRepository(db)
 	distributedVoteHandler := handlers.NewDistributedVoteHandler(voteRepo, eventRepo, attachmentRepo, userRepo, configRepo, resultsRepo, cfg)
 
-	eventHandler := handlers.NewEventHandler(eventRepo, userRepo, attachmentRepo, emailService, distributedVoteHandler, cfg)
+	votingSetupRepo := postgres.NewPostgresVotingSetupRepository(db)
+	eventHandler := handlers.NewEventHandler(eventRepo, userRepo, attachmentRepo, voteRepo, votingSetupRepo, emailService, distributedVoteHandler, cfg)
 	attachmentHandler := handlers.NewAttachmentHandler(attachmentRepo, eventRepo, userRepo, fileStorage, cfg)
 	userHandler := handlers.NewUserHandler(userRepo, eventRepo, emailService, cfg)
 	googleAuthHandler := handlers.NewGoogleAuthHandler(userRepo, cfg)
@@ -178,6 +179,11 @@ func main() {
 			events.POST("/:event_id/voting-config",
 				auth.RequireEventOwnerOrOrganizer(eventRepo),
 				distributedVoteHandler.CreateVotingConfiguration)
+
+			// Preview of the distribution (min/max/recommended m) - Only event owner/admin
+			events.GET("/:event_id/voting-config/preview",
+				auth.RequireEventOwner(eventRepo),
+				distributedVoteHandler.PreviewVotingConfiguration)
 
 			// Generate assignments - Only event owner/organizer/admin
 			events.POST("/:event_id/generate-assignments",

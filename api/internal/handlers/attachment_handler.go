@@ -219,6 +219,7 @@ func (h *AttachmentHandler) UploadAttachment(c *gin.Context) {
 		"image/jpeg":         "JPEG Image",
 		"image/png":          "PNG Image",
 		"image/gif":          "GIF Image",
+		"image/webp":         "WebP Image",
 		"application/pdf":    "PDF Document",
 		"text/plain":         "Text Document",
 		"application/msword": "Word Document",

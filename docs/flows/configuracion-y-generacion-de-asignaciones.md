@@ -14,7 +14,7 @@ stories: [S-006, S-016]
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
 **Última actualización:** 2026-10-02
-**Stories:** S-006, S-016 (cambios planificados por REQ-003)
+**Stories:** S-006, S-016 (S-016 pendiente)
 
 ## Descripción
 
@@ -23,7 +23,10 @@ reparte las propuestas entre los evaluadores. **Es el paso más delicado del pro
 generadas las asignaciones, el conjunto de quién evalúa qué queda fijo, y las restricciones del
 modelo no admiten corrección posterior.
 
-Ocurre durante la etapa `voting`, después de que el organizador la abrió.
+Ocurre **dentro de la propia apertura de la votación**: `PATCH /api/v1/events/{event_id}/stage` con
+`stage: "voting"` y `voting_config` avanza la etapa, guarda la configuración y genera las
+asignaciones en una única transacción. Solo evalúan (y solo son evaluados) los participantes que
+subieron una propuesta.
 
 ## Cambios planificados (REQ-003)
 
@@ -32,18 +35,14 @@ Ocurre durante la etapa `voting`, después de que el organizador la abrió.
 
 | Paso | Cambio | Story |
 |---|---|---|
-| 1 | El `m` recomendado, mínimo y máximo los calcula **solo la api**: `GET /api/v1/events/{event_id}/voting-config/preview` → `{ participants_count, participants_with_proposal, can_open_voting, min_m, max_m, recommended_m, defaults }`. Se elimina la fórmula del front (cierra D-09) | S-006, S-016 |
-| 2 y 3 | Dejan de ser llamadas separadas: ocurren dentro de `PATCH /api/v1/events/{event_id}/stage` con `voting_config`, en una transacción (`UPDATE events` → `INSERT voting_configurations` → `INSERT assignments`). `POST …/voting-config` y `POST …/generate-assignments` quedan `deprecated` (con la misma regla) | S-006 |
-| 3 | **Evaluadores = participantes con propuesta** (`n = k`): un inscripto sin propuesta no evalúa ni es evaluado | S-006 |
-| 2 | Default de `min_evaluations_per_file` = `min(3, attachments_per_evaluator)` (con `n = k` la cobertura exige `m ≥ min_evaluations_per_file`) | S-006 |
-| Errores | Umbrales inválidos (`good <= bad` o diferencia < 0,1) pasan de 500 (CHECK) a `400 INVALID_THRESHOLDS`, validado en Go | S-006 |
+| 1 | El `web` deja de calcular el `m` recomendado y usa `GET /api/v1/events/{event_id}/voting-config/preview` (la api ya lo expone). Se elimina la fórmula del front (cierra D-09) | S-016 |
 
 ## Servicios Involucrados
 
 | Servicio | Rol | Tipo de Participación |
 |----------|-----|-----------------------|
-| `web` | Calcula y sugiere `m`, presenta el panel de configuración | Iniciador |
-| `api` | Valida las restricciones matemáticas y ejecuta el algoritmo de asignación | Procesador |
+| `web` | Sugiere `m` (hoy con su propia fórmula, ver Paso 1) y presenta la configuración | Iniciador |
+| `api` | Calcula los límites de `m`, valida las restricciones matemáticas, ejecuta el algoritmo de asignación y escribe todo en una transacción | Procesador |
 | PostgreSQL | Persiste la configuración y las asignaciones; **valida las invariantes vía triggers** | Almacenamiento + Validador |
 
 ## Pasos del Flujo
@@ -55,118 +54,108 @@ sequenceDiagram
     participant API as api
     participant DB as PostgreSQL
 
-    O->>WEB: abre /events/{id}/manage en etapa voting
-    WEB->>WEB: recommendedM = min(max(⌈2·log₂(k)⌉,1), k−1)
+    O->>WEB: abre la gestión del evento en etapa participation
+    WEB->>API: GET /api/v1/events/{event_id}/voting-config/preview
+    API-->>WEB: { participants_with_proposal, can_open_voting, min_m, max_m, recommended_m, defaults }
     WEB-->>O: precarga m con el recomendado (editable)
 
     O->>WEB: ajusta parámetros y confirma
-    WEB->>API: POST /api/v1/events/{event_id}/voting-config
-    API->>API: valida m ≤ k−1, m ≥ 2·log₂(k), cobertura
-    alt restricciones no se cumplen
-        API-->>WEB: 400 { error }
-        WEB-->>O: muestra el error del backend
-    else configuración válida
-        API->>DB: INSERT voting_configurations
-        Note over DB: CHECK valid_quality_thresholds<br/>(good > bad, diferencia ≥ 0.1)
-        API-->>WEB: 201 { data }
-
-        WEB->>API: POST /api/v1/events/{event_id}/generate-assignments
-        API->>API: fase 1 — cobertura mínima con tope m
-        API->>API: fase 2 — completar hasta m
-        API->>DB: INSERT assignments (una por participante)
+    WEB->>API: PATCH /api/v1/events/{event_id}/stage { stage: voting, estimated_end_date, voting_config }
+    API->>API: ≥ 3 propuestas · voting_config · umbrales · m · cobertura
+    alt validación falla
+        API-->>WEB: 400 { code, details }
+    else todo válido
+        API->>API: arma asignaciones en memoria (evaluadores = dueños de propuesta)
+        API->>DB: BEGIN
+        API->>DB: UPDATE events SET stage = voting
+        API->>DB: INSERT/UPDATE voting_configurations
+        API->>DB: INSERT assignments (una por participante con propuesta)
         Note over DB: trigger validate_assignment_constraints<br/>exactamente m · ninguna propia
-        API-->>WEB: 201 { data: { assignments_count, ... } }
-        WEB-->>O: "✅ Voting is underway"
+        alt falla alguna escritura
+            API->>DB: ROLLBACK
+            API-->>WEB: 500 VOTING_SETUP_ERROR (el evento sigue en participation)
+        else
+            API->>DB: COMMIT
+            API-->>WEB: 200 { data, voting: { configuration, assignments_count, total_attachments } }
+        end
     end
 ```
 
 ---
 
-### Paso 1: Cálculo del `m` recomendado (cliente)
-
-**Origen:** `web` · **Destino:** `web` · **Tipo:** Interno
-
-```
-recommendedM = min( max( ⌈2 · log₂(max(k, 2))⌉, 1 ), k − 1 )
-```
-
-donde `k` = total de propuestas del evento. Se usa como **valor inicial editable** del campo, y se
-muestra al organizador como `Recommended: {n} (max: {m})`.
-
-⚠️ **Esta fórmula está implementada dos veces**: acá en TypeScript para sugerir, y en Go para
-validar y rechazar (`voting_service.go:48-68`). Si divergen, el organizador ve un recomendado que
-el backend rechaza. Ver D-09 en `docs/prd/requirements.md`.
-
-**Ref:** `web/src/components/voting-configuration-panel/VotingConfigurationPanel.tsx:25-31`
-
----
-
-### Paso 2: Guardar la configuración de votación
+### Paso 1: Límites y `m` recomendado
 
 **Origen:** `web` · **Destino:** `api` · **Tipo:** REST
 
-- **Método:** POST
-- **Endpoint:** `/api/v1/events/{event_id}/voting-config`
-- **Auth:** JWT Bearer — solo el autor del evento, un organizador o un admin
-- **Body:**
-  ```json
-  {
-    "attachments_per_evaluator": "integer — req, min 1, max 50. El parámetro m",
-    "quality_good_threshold":    "number — opt, 0..1, default 0.6",
-    "quality_bad_threshold":     "number — opt, 0..1, default 0.3",
-    "adjustment_magnitude":      "integer — opt, 1..10, default 3. El parámetro n",
-    "min_evaluations_per_file":  "integer — opt, default 3"
-  }
-  ```
+- **Método:** GET
+- **Endpoint:** `/api/v1/events/{event_id}/voting-config/preview`
+- **Auth:** JWT Bearer — solo el autor del evento o un admin
 
-**Response (éxito) — 201:** envelope `data` con la configuración persistida.
-
-**Validaciones del backend, antes de escribir:**
-
-| Restricción | Significado |
-|---|---|
-| `m ≤ k − 1` | Nadie puede evaluar su propia propuesta |
-| `m ≥ 2·log₂(k)` | Condición de convergencia del modelo, relajada al 60% del máximo para `k ≤ 10` |
-| `n · m ≥ k · min_evaluations_per_file` | Cobertura suficiente: hay capacidad de evaluación para el mínimo pedido |
-
-**Operación de BD:** `INSERT` sobre `voting_configurations` (`event_id` es UNIQUE: **una sola
-configuración por evento**).
-
-**CHECK de base:** `valid_quality_thresholds` exige `quality_good_threshold >
-quality_bad_threshold` **y** que la diferencia sea ≥ 0.1.
-
-⚠️ **Nota sobre rangos divergentes:** el OpenAPI declara `adjustment_magnitude` entre 1 y 10,
-mientras que el CHECK de la base admite 0 a 20. El contrato efectivo es el más restrictivo de los
-dos que se aplique primero.
-
-**Ref:** `docs/apis/api.yaml` → `/api/v1/events/{event_id}/voting-config`
-
----
-
-### Paso 3: Generar las asignaciones
-
-**Origen:** `web` · **Destino:** `api` · **Tipo:** REST
-
-- **Método:** POST
-- **Endpoint:** `/api/v1/events/{event_id}/generate-assignments`
-- **Auth:** JWT Bearer
-- **Body:** ninguno
-
-**Response (éxito) — 201:**
+**Response — 200:**
 ```json
 {
   "data": {
-    "assignments_count":         "integer",
-    "total_participants":        "integer",
-    "total_attachments":         "integer",
-    "total_evaluations":         "integer",
-    "attachments_per_evaluator": "integer"
-  },
-  "message": "string",
-  "code":    "ASSIGNMENTS_GENERATED",
-  "config":  { "id": "uuid", "attachments_per_evaluator": "integer", "min_evaluations_per_file": "integer" }
+    "participants_count":         "integer — inscriptos",
+    "participants_with_proposal": "integer — k",
+    "can_open_voting":            "boolean — k >= 3",
+    "min_m":                      "integer",
+    "max_m":                      "integer — max(k − 1, 0)",
+    "recommended_m":              "integer",
+    "defaults": { "quality_good_threshold": 0.6, "quality_bad_threshold": 0.3, "adjustment_magnitude": 3 }
+  }
 }
 ```
+
+Los tres valores salen de una única función, `vote.VotingBounds(k)`, que también usa la
+apertura: lo que la vista previa recomienda es lo que la apertura acepta.
+
+```
+max_m         = max(k − 1, 0)
+recommended_m = min( ⌈2 · log₂(k)⌉, max_m )
+min_m         = recommended_m, relajado a ⌈0,6 · max_m⌉ cuando k ≤ 10
+```
+
+Para `k < 2` los tres valen 0. El `min_evaluations_per_file` recomendado es `min(3, m)` y lo
+recalcula el cliente. La respuesta no depende de la etapa del evento.
+
+⚠️ **Hasta S-016, `web` sigue calculando su propio recomendado** (`recommendedM = min(max(⌈2·log₂(max(k, 2))⌉, 1), k−1)`
+en `VotingConfigurationPanel.tsx:25-31`, con `k` = propuestas) en vez de llamar a este endpoint. Si
+divergen, el organizador ve un recomendado que la api rechaza (D-09).
+
+**Ref:** `docs/apis/api.yaml` → `/api/v1/events/{event_id}/voting-config/preview`;
+`api/internal/domain/vote/configuration.go`
+
+---
+
+### Paso 2: Validar y construir la configuración
+
+**Origen:** `api` · **Destino:** `api` · **Tipo:** Interno (dentro de `PATCH /stage`)
+
+El cuerpo `voting_config` (ver [avance de etapa](avance-de-etapa-del-evento.md), Paso 3) se
+completa con los valores por defecto para lo que no se envió (`nil` toma el default; un `0`
+explícito se respeta): `quality_good_threshold` 0,6, `quality_bad_threshold` 0,3,
+`adjustment_magnitude` 3 y **`min_evaluations_per_file` = `min(3, m)`**.
+
+**Validaciones, en este orden** (`vote.BuildVotingConfiguration`):
+
+| Restricción | Código |
+|---|---|
+| `good > bad` y diferencia ≥ 0,1, comparado en centésimas (la columna es `decimal(3,2)`) | `400 INVALID_THRESHOLDS` |
+| `m ≤ max_m` (= `k − 1`: nadie evalúa su propia propuesta) | `400 M_EXCEEDS_EVALUABLE` |
+| `m ≥ min_m` (convergencia del modelo) | `400 MATH_CONSTRAINT_VIOLATION` |
+| `k · m ≥ k · min_evaluations_per_file`, es decir `m ≥ min_evaluations_per_file` (cobertura, con `n = k` evaluadores) | `400 MATH_CONSTRAINT_VIOLATION` |
+
+Los umbrales inválidos ya no llegan al CHECK `valid_quality_thresholds` (que antes respondía
+500): el CHECK sigue en la base como garantía, pero Go valida antes.
+
+---
+
+### Paso 3: Generar las asignaciones y escribir
+
+**Origen:** `api` · **Destino:** PostgreSQL · **Tipo:** Interno (transacción)
+
+**Evaluadores = participantes con propuesta** (`n = k`): un inscripto sin propuesta no evalúa ni
+es evaluado, y no tiene fila en `assignments`.
 
 **El algoritmo, en dos fases** (`voting_service.go:GenerateAssignments`):
 
@@ -180,8 +169,13 @@ dos que se aplique primero.
 `min_evaluations_per_file`** si no hay evaluadores elegibles bajo el tope. Es un trade-off:
 exceder `m` haría fallar el trigger. **El sistema no avisa cuando esto ocurre.**
 
-**Operación de BD:** `INSERT` sobre `assignments`, una fila por participante, con
-`attachment_ids` (uuid[]).
+**Transacción** (`VotingSetupRepository.OpenVoting`), en este orden:
+1. `UPDATE events` — `stage = voting` y `voting_estimated_end_date`.
+2. `voting_configurations` — `INSERT`, o `UPDATE` reutilizando el `id` si el evento ya tenía una
+   configuración (creada con el endpoint deprecado durante `participation`). `event_id` es UNIQUE:
+   una sola configuración por evento.
+3. `INSERT` sobre `assignments`, una fila por participante con propuesta, con `attachment_ids`
+   (uuid[]). La configuración va antes porque el trigger la lee.
 
 **Triggers que validan cada INSERT** (`validate_assignment_constraints`, BEFORE INSERT/UPDATE):
 1. La cantidad de `attachment_ids` debe ser **exactamente** `attachments_per_evaluator`.
@@ -189,8 +183,26 @@ exceder `m` haría fallar el trigger. **El sistema no avisa cuando esto ocurre.*
 3. **Ninguno puede ser del propio participante** — el conflicto de interés, garantizado en base
    además de en Go.
 
-**Ref:** `docs/apis/api.yaml` → `/api/v1/events/{event_id}/generate-assignments`;
+Si cualquier paso falla, rollback completo y `500 VOTING_SETUP_ERROR`.
+
+**Ref:** `docs/apis/api.yaml` → `/api/v1/events/{event_id}/stage`;
+`api/internal/storage/postgres/voting_setup_repository.go`;
 `api/internal/storage/migrations/004_constraints_and_triggers.go`
+
+---
+
+### Endpoints deprecados
+
+`POST /api/v1/events/{event_id}/voting-config` y `POST /api/v1/events/{event_id}/generate-assignments`
+siguen disponibles (`deprecated: true`) para destrabar eventos que ya estaban en `voting` sin
+asignaciones. Aplican la misma regla que la apertura:
+
+- Evaluadores = participantes con propuesta; mínimo de 3 propuestas
+  (`400 INSUFFICIENT_ATTACHMENTS` con `current_count` y `required_minimum: 3`).
+- `voting-config` usa `vote.BuildVotingConfiguration` (mismos defaults y códigos de error) y solo
+  se acepta en `participation` o `voting`; `409 CONFIG_EXISTS` si ya hay una.
+- `generate-assignments` solo en `voting` y una vez por evento (`409 ASSIGNMENTS_EXIST`); en la
+  respuesta, `total_participants` es la cantidad de evaluadores (`k`).
 
 ---
 
@@ -198,19 +210,21 @@ exceder `m` haría fallar el trigger. **El sistema no avisa cuando esto ocurre.*
 
 | Paso | Condición | Respuesta | Qué ve el organizador |
 |---|---|---|---|
-| 2 | `m > k − 1` | 400 | Mensaje del backend, crudo |
-| 2 | `m < 2·log₂(k)` | 400 | `recommended minimum attachments per evaluator is {n} for {k} total attachments (max possible: {m})` |
-| 2 | Cobertura insuficiente | 400 | Mensaje del backend |
-| 2 | `good ≤ bad` o diferencia < 0.1 | 500 (CHECK de base) | ⚠️ Error genérico: el `RAISE`/CHECK de Postgres no tiene la forma de error de la API |
-| 2 | Ya existe configuración | 400/409 | El panel no se muestra si `votingConfigured` |
-| 3 | Etapa distinta de `voting` | 400 | — |
-| 3 | Ya se generaron las asignaciones | 400 | Una sola vez por evento |
-| 3 | Violación de trigger | **500 genérico** | ⚠️ `RAISE EXCEPTION` de plpgsql sin contexto de dominio |
+| 2 | Menos de 3 participantes con propuesta | 400 `INSUFFICIENT_ATTACHMENTS` | `current_count` y `required_minimum: 3` |
+| 2 | Falta `voting_config` | 400 `MISSING_VOTING_CONFIG` | — |
+| 2 | `m` fuera de 1..50 u otro campo mal formado | 400 `INVALID_PAYLOAD` | `details` con el detalle del binding |
+| 2 | `good ≤ bad` o diferencia < 0,1 | 400 `INVALID_THRESHOLDS` | `details` con los valores recibidos |
+| 2 | `m > k − 1` | 400 `M_EXCEEDS_EVALUABLE` | `details` con `m` y el máximo |
+| 2 | `m < min_m` o cobertura insuficiente | 400 `MATH_CONSTRAINT_VIOLATION` | `details` con el mínimo o la cobertura |
+| 3 | Falla la transacción (incluye una violación de trigger) | 500 `VOTING_SETUP_ERROR` | Mensaje genérico; el error real queda en el log y el evento sigue en `participation` |
+| — | `generate-assignments` fuera de `voting` | 400 `INVALID_EVENT_STAGE` | — |
+| — | `generate-assignments` ya ejecutado | 409 `ASSIGNMENTS_EXIST` | Una sola vez por evento |
 
 ## Estado Resultante
 
+- `events.stage = voting` y `voting_estimated_end_date`.
 - `voting_configurations` — una fila para el evento, con los parámetros definitivos.
-- `assignments` — una fila por participante, con exactamente `m` propuestas, ninguna propia,
+- `assignments` — una fila por participante **con propuesta**, con exactamente `m` propuestas, ninguna propia,
   `is_completed = false` y `quality_score` NULL.
 - Los participantes pueden consultar su asignación y empezar a rankear.
 

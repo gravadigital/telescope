@@ -150,6 +150,12 @@ func GetMigrations() []Migration {
 			Up:   migration022Up,
 			Down: migration022Down,
 		},
+		{
+			ID:   "023",
+			Name: "relax_voting_results_vote_count",
+			Up:   migration023Up,
+			Down: migration023Down,
+		},
 	}
 }
 

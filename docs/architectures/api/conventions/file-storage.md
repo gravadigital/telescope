@@ -63,7 +63,7 @@ clave que devuelve `Put` se persiste en `attachments.file_path`.
    y el handler normaliza con `filepath.Base` antes de componer. Si construís una clave
    desde entrada del usuario, sanitizala igual.
 2. **Tipos permitidos.** El upload valida el Content-Type contra una lista blanca (JPEG,
-   PNG, GIF, PDF, TXT, DOC, DOCX). Ampliarla es una decisión de producto, no un detalle.
+   PNG, GIF, WebP, PDF, TXT, DOC, DOCX). Ampliarla es una decisión de producto, no un detalle.
 3. **Tamaño.** Limitado por `MAX_FILE_SIZE` (10MB por defecto) y además por un CHECK en la
    base (≤100MB).
 4. **Compensación ante fallo.** Si el archivo se guardó pero el `INSERT` falla, el handler

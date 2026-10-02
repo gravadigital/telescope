@@ -13,6 +13,9 @@ import (
 	"github.com/gravadigital/telescopio-api/internal/logger"
 )
 
+// ErrVotingConfigurationNotFound is returned when an event has no voting configuration.
+var ErrVotingConfigurationNotFound = errors.New("voting configuration not found")
+
 // PostgresVotingConfigurationRepository implements VotingConfigurationRepository using GORM
 type PostgresVotingConfigurationRepository struct {
 	db  *gorm.DB
@@ -96,7 +99,7 @@ func (r *PostgresVotingConfigurationRepository) GetByEventID(eventID string) (*v
 	if err := r.db.Where("event_id = ?", eventUUID).First(&config).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			r.log.Debug("voting configuration not found", "event_id", eventID)
-			return nil, errors.New("voting configuration not found")
+			return nil, ErrVotingConfigurationNotFound
 		}
 		r.log.Error("failed to retrieve voting configuration", "event_id", eventID, "error", err)
 		return nil, fmt.Errorf("failed to retrieve voting configuration: %w", err)

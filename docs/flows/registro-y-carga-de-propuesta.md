@@ -33,7 +33,7 @@ Solo ocurre durante la etapa `participation` y con el evento no pausado.
 |---|---|---|
 | 1 | Un evento en `creation` responde `404 EVENT_NOT_FOUND` a quien no es su autor ni admin (autenticación opcional en los endpoints públicos) | S-008 |
 | 2 | Sin sesión, "Inscribirme" lleva a `/login?next=/events/{event_id}`. La inscripción emite `registration_confirmed` (al inscripto) y `participant_registered` agregada (al autor) | S-009, S-015 |
-| 3 | El backend suma `image/webp` (cierra la discrepancia con el cliente). La validación del cliente vive en `web/src/domain/files.ts` | S-006, S-010 |
+| 3 | La validación del cliente pasa a vivir en `web/src/domain/files.ts` | S-010 |
 | 4 | La confirmación del archivo pasa del modal a la zona de carga (`FileDropzone`); el reemplazo no tiene modal aparte | S-015 |
 | Listado | `GET /api/v1/events/{event_id}/attachments` devuelve solo la propia propuesta a quien no es el organizador (anonimato de la evaluación) | S-007 |
 
@@ -164,11 +164,9 @@ sequenceDiagram
 Reforzado en el input con `accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.doc,.docx"`.
 
 El backend vuelve a validar las dos cosas: el tamaño contra `MAX_FILE_SIZE` (10 MB por defecto,
-`FILE_TOO_LARGE`) y el tipo contra su propia lista blanca (`INVALID_FILE_TYPE`). La base admite
+`FILE_TOO_LARGE`) y el tipo contra su propia lista blanca (`INVALID_FILE_TYPE`), que incluye
+`image/webp` y coincide con la del cliente. La base admite
 hasta 100 MB (`CHECK file_size BETWEEN 1 AND 104857600`), pero no es el límite efectivo.
-
-⚠️ **Las listas de tipos no coinciden**: el cliente acepta WebP y el backend no. Un `.webp` pasa la
-validación del cliente y la api lo rechaza con `INVALID_FILE_TYPE`.
 
 **Ref:** `web/src/pages/event-detail/EventDetailPage.tsx:133-141`
 

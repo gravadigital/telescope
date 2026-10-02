@@ -32,40 +32,14 @@ func (vs *VotingService) GenerateAssignments(eventID uuid.UUID, participants []u
 	k := len(attachments)
 	m := config.AttachmentsPerEvaluator
 
-	// When there are conflict of interest constraints (participants can't evaluate own files),
-	// the maximum possible m is k-1, not k
-	// We assume each participant has submitted a file, so there's always conflict of interest
-	maxPossibleM := k
-	if n > 0 && k > 0 {
-		// Each participant will be excluded from evaluating their own file
-		maxPossibleM = k - 1
-	}
+	minM, maxPossibleM, _ := VotingBounds(k)
 
 	if m > maxPossibleM {
 		return nil, fmt.Errorf("attachments per evaluator (m=%d) cannot exceed %d (conflict of interest prevents evaluating own files)", m, maxPossibleM)
 	}
 
-	// Calculate recommended M based on the convergence formula from Merrifield & Saari (2009)
-	// For small numbers of attachments, be more flexible with the recommendation
-	recommendedM := int(math.Ceil(2 * math.Log2(float64(k))))
-	
-	// Cap recommended M at maxPossibleM to account for conflict of interest
-	if recommendedM > maxPossibleM {
-		recommendedM = maxPossibleM
-	}
-	
-	// For small numbers of attachments (k <= 10), allow more flexibility
-	// The strict recommendation is meant for larger datasets
-	if k <= 10 {
-		// Use a more lenient recommendation: at least 60% of maxPossibleM
-		minFlexibleM := int(math.Ceil(float64(maxPossibleM) * 0.6))
-		if recommendedM > minFlexibleM {
-			recommendedM = minFlexibleM
-		}
-	}
-
-	if m < recommendedM {
-		return nil, fmt.Errorf("recommended minimum attachments per evaluator is %d for %d total attachments (max possible: %d)", recommendedM, k, maxPossibleM)
+	if m < minM {
+		return nil, fmt.Errorf("recommended minimum attachments per evaluator is %d for %d total attachments (max possible: %d)", minM, k, maxPossibleM)
 	}
 
 	assignments := make([]*Assignment, n)
@@ -441,14 +415,7 @@ func (vs *VotingService) ValidateVotingConfiguration(config *VotingConfiguration
 		return errors.New("attachments per evaluator must be positive")
 	}
 
-	// When there are conflict of interest constraints (participants can't evaluate own files),
-	// the maximum possible m is k-1, not k
-	// We assume each participant has submitted a file, so there's always conflict of interest
-	maxPossibleM := k
-	if n > 0 && k > 0 {
-		// Each participant will be excluded from evaluating their own file
-		maxPossibleM = k - 1
-	}
+	minM, maxPossibleM, _ := VotingBounds(k)
 
 	if m > maxPossibleM {
 		return fmt.Errorf("attachments per evaluator cannot exceed %d (conflict of interest prevents evaluating own files)", maxPossibleM)
@@ -461,27 +428,8 @@ func (vs *VotingService) ValidateVotingConfiguration(config *VotingConfiguration
 		return errors.New("quality thresholds must be in [0, 1] range")
 	}
 
-	// Calculate recommended M based on the convergence formula from Merrifield & Saari (2009)
-	// For small numbers of attachments, be more flexible with the recommendation
-	recommendedM := int(math.Ceil(2 * math.Log2(float64(k))))
-	
-	// Cap recommended M at maxPossibleM to account for conflict of interest
-	if recommendedM > maxPossibleM {
-		recommendedM = maxPossibleM
-	}
-	
-	// For small numbers of attachments (k <= 10), allow more flexibility
-	// The strict recommendation is meant for larger datasets
-	if k <= 10 {
-		// Use a more lenient recommendation: at least 60% of maxPossibleM
-		minFlexibleM := int(math.Ceil(float64(maxPossibleM) * 0.6))
-		if recommendedM > minFlexibleM {
-			recommendedM = minFlexibleM
-		}
-	}
-
-	if m < recommendedM {
-		return fmt.Errorf("recommended minimum m is %d for optimal convergence with %d attachments (max possible: %d)", recommendedM, k, maxPossibleM)
+	if m < minM {
+		return fmt.Errorf("recommended minimum m is %d for optimal convergence with %d attachments (max possible: %d)", minM, k, maxPossibleM)
 	}
 
 	totalEvaluations := n * m

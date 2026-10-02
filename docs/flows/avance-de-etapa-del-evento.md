@@ -35,8 +35,6 @@ según desde qué pantalla se ejecute.** Está documentada en el Paso 1.
 |---|---|---|
 | 1 | Se reemplaza la doble validación de `ManageEventPage`/`EventDetailPage` por un único módulo `web/src/domain/stages.ts`, usado **solo desde la gestión**. Se elimina "todos votaron". `EventDetailPage` deja de avanzar etapas. Cierra D-05 | S-015, S-016 |
 | 2 | El modal pasa a `Dialog` + `DateQuickPicker` (atajos 3 días / 1 semana / 2 semanas). Para `voting` el diálogo incluye la configuración (`GET /api/v1/events/{event_id}/voting-config/preview`) | S-016 |
-| 3 | Body con `voting_config` cuando `stage = voting`. Mínimo: **3 participantes con propuesta** (`400 INSUFFICIENT_ATTACHMENTS`, `required_minimum: 3`); se eliminan `INSUFFICIENT_PARTICIPANTS` y la regla de 2 propuestas. `400 MISSING_VOTING_CONFIG`, `400 INVALID_THRESHOLDS`. Etapa + configuración + asignaciones en una transacción; si falla → `500 VOTING_SETUP_ERROR` y el evento sigue en `participation`. Response con `voting: { configuration, assignments_count, total_attachments }` | S-006 |
-| 3 | `voting → results` con rankings faltantes: el resultado se persiste (CHECK relajado, migración 023) | S-006 |
 | 4 | Además del email, notificaciones in-app `stage_changed` (ver [notificaciones-in-app](notificaciones-in-app.md)) | S-009 |
 | Acciones | Cancelar, pausar (solo al pausar) y posponer emiten `event_cancelled`, `event_paused` y `deadline_changed`. "Posponer deadline" también se valida en el cliente (cierra D-06) | S-009, S-016 |
 
@@ -81,9 +79,15 @@ sequenceDiagram
     O->>WEB: confirma
     WEB->>API: PATCH /api/v1/events/{event_id}/stage
     API->>API: valida transición (sin saltos ni retroceso)
-    alt transición inválida
-        API-->>WEB: 400
-    else válida
+    alt transición inválida o precondición no cumplida
+        API-->>WEB: 400 { code }
+    else a voting
+        API->>API: valida voting_config y arma las asignaciones en memoria
+        API->>DB: BEGIN · UPDATE events · INSERT/UPDATE voting_configurations · INSERT assignments · COMMIT
+        API-->>WEB: 200 { data, voting }
+        API->>SMTP: emails a los participantes (en segundo plano)
+        WEB-->>O: recarga los datos del evento
+    else otra transición
         API->>DB: UPDATE events SET stage, estimated_end_date
         API-->>WEB: 200 { data }
         API->>SMTP: emails a los participantes (en segundo plano)
@@ -148,23 +152,47 @@ baja `n` posiciones**: un cierre prematuro penaliza a gente que todavía tenía 
   ```json
   {
     "stage":              "enum — req: creation | participation | voting | results",
-    "estimated_end_date": "string (date, YYYY-MM-DD) — obligatoria si stage es participation o voting"
+    "estimated_end_date": "string (date, YYYY-MM-DD) — obligatoria si stage es participation o voting",
+    "voting_config": {
+      "attachments_per_evaluator": "integer — req, 1..50",
+      "quality_good_threshold":    "number — opt, 0..1, default 0.6",
+      "quality_bad_threshold":     "number — opt, 0..1, default 0.3",
+      "adjustment_magnitude":      "integer — opt, 1..10, default 3",
+      "min_evaluations_per_file":  "integer — opt, 1..20, default min(3, attachments_per_evaluator)"
+    }
   }
   ```
+  `voting_config` es obligatorio cuando `stage = voting` y se ignora en el resto de las transiciones.
 
-**Response (éxito) — 200:** envelope `data` con el evento actualizado.
+**Response (éxito) — 200:** envelope `data` con el evento actualizado, `message`, `code:
+STAGE_UPDATED` y `transition: { from, to }`. Cuando `stage = voting` suma
+`voting: { configuration, assignments_count, total_attachments }`.
 
 **Validaciones del backend:**
 - Transiciones válidas: `creation → participation → voting → results`. **Sin retroceso ni saltos.**
 - `estimated_end_date` es **obligatoria** cuando la etapa destino es `participation` o `voting`.
-- **Pasar a `voting` exige al menos 3 participantes registrados** (`INSUFFICIENT_PARTICIPANTS`)
-  **y al menos 2 propuestas cargadas.**
-- Pasar a `results` calcula y guarda el ranking (`CalculateAndPersistResults`). Si falla, la
-  etapa cambia igual y el error solo se loguea (ver
+- **Pasar a `voting`** se valida completo antes de escribir, en este orden:
+  1. **Al menos 3 participantes con propuesta** → `400 INSUFFICIENT_ATTACHMENTS` con
+     `current_count` y `required_minimum: 3`. Ya no se exige un mínimo de inscriptos ni existen
+     `INSUFFICIENT_PARTICIPANTS` ni `NO_ATTACHMENTS` en esta transición.
+  2. `voting_config` presente → `400 MISSING_VOTING_CONFIG`.
+  3. Reglas de la configuración (las mismas que usa la vista previa, ver
+     [configuración y generación de asignaciones](configuracion-y-generacion-de-asignaciones.md)):
+     `400 INVALID_THRESHOLDS`, `400 M_EXCEEDS_EVALUABLE` o `400 MATH_CONSTRAINT_VIOLATION`, con el
+     detalle en `details`. Un cuerpo mal formado o con `attachments_per_evaluator` fuera de 1..50
+     responde `400 INVALID_PAYLOAD`.
+- **Escritura atómica.** Etapa, configuración y asignaciones se guardan en una única transacción
+  (`UPDATE events` → `INSERT voting_configurations` → `INSERT assignments`). Si el evento ya tenía
+  una configuración creada con el endpoint deprecado, se reemplaza en la misma transacción. Si algo
+  falla, rollback completo, `500 VOTING_SETUP_ERROR` y el evento sigue en `participation`.
+- Pasar a `results` calcula y guarda el ranking (`CalculateAndPersistResults`), también cuando
+  faltan rankings (el CHECK `valid_participant_counts` se relajó con la migración 023). Si el
+  cálculo falla, la etapa cambia igual y el error solo se loguea (ver
   [cálculo y publicación de resultados](calculo-y-publicacion-de-resultados.md)).
 
 **Operación de BD:** `UPDATE` sobre `events` — `stage` y, según la etapa destino,
-`participation_estimated_end_date` o `voting_estimated_end_date`.
+`participation_estimated_end_date` o `voting_estimated_end_date`. Para `voting`, además
+`voting_configurations` y `assignments` dentro de la misma transacción.
 
 **Ref:** `docs/apis/api.yaml` → `/api/v1/events/{event_id}/stage`;
 `api/internal/domain/event/events.go:69-92`
@@ -193,7 +221,7 @@ participante se entera de que se abrió la votación.
 | Transición | Precondición | Qué habilita |
 |---|---|---|
 | `creation → participation` | `estimated_end_date` requerida | Registro de participantes y carga de propuestas |
-| `participation → voting` | `estimated_end_date` requerida · **≥ 2 propuestas** · (desde Manage: ≥ 1 participante) | Configuración de votación y generación de asignaciones |
+| `participation → voting` | `estimated_end_date` + `voting_config` · **≥ 3 participantes con propuesta** · (desde Manage: ≥ 1 participante) | La votación: configuración y asignaciones ya quedan creadas por la propia transición |
 | `voting → results` | (desde Manage: todos votaron) | Panel de resultados |
 
 ## Acciones Independientes de la Etapa
@@ -218,8 +246,10 @@ cancelarse en cualquier etapa.
 | 1 | Votación incompleta (solo desde Manage) | — | `Cannot advance: Only {x} of {y} participants have voted.` |
 | 3 | Salto de etapa o retroceso | 400 | Mensaje del backend |
 | 3 | Falta `estimated_end_date` | 400 | Idem |
-| 3 | Menos de 3 participantes al pasar a `voting` | 400 | `At least 3 participants are required to advance to voting` (`INSUFFICIENT_PARTICIPANTS`) |
-| 3 | Menos de 2 propuestas al pasar a `voting` | 400 | Idem |
+| 3 | Menos de 3 participantes con propuesta al pasar a `voting` | 400 | `INSUFFICIENT_ATTACHMENTS` con `current_count` y `required_minimum: 3` |
+| 3 | Falta `voting_config` al pasar a `voting` | 400 | `MISSING_VOTING_CONFIG` |
+| 3 | Umbrales inválidos, `m` fuera de rango o cobertura insuficiente | 400 | `INVALID_THRESHOLDS`, `M_EXCEEDS_EVALUABLE` o `MATH_CONSTRAINT_VIOLATION` |
+| 3 | Falla la escritura de la apertura | 500 | `VOTING_SETUP_ERROR`; el evento sigue en `participation` |
 | 3 | No es el autor del evento | 403 | — |
 | 4 | Falla el envío de email | — | ⚠️ **Nada.** Falla en silencio |
 
@@ -229,6 +259,7 @@ feedback es que los datos se recargan. `EventDetailPage` sí muestra `Stage upda
 ## Estado Resultante
 
 - `events.stage` — la nueva etapa.
+- Al pasar a `voting`: una fila en `voting_configurations` y una asignación por cada participante con propuesta.
 - `events.participation_estimated_end_date` o `voting_estimated_end_date` — el deadline fijado.
 - Los participantes reciben (o no, si SMTP falla) el email de cambio de etapa.
 - Las acciones habilitadas en la interfaz cambian según la etapa, para todos los roles.

@@ -96,6 +96,12 @@ Los IDs se pasan como `string`, no como `uuid.UUID` — es la convención del re
 existente. Las firmas **no reciben `context.Context`**, a diferencia de lo que pide el
 catálogo.
 
+Los repositorios no reciben una transacción. El único caso que escribe en varias tablas de forma
+atómica es `VotingSetupRepository.OpenVoting`, que abre `db.Transaction` y arma los
+repositorios sobre ese `tx` con `NewTransactionContainer(tx)` (etapa del evento, configuración y
+asignaciones de la apertura de votación). Para otra operación atómica, seguir ese patrón en un
+repositorio propio en vez de pasar el `tx` a los demás.
+
 ## Migraciones
 
 Son Go, no SQL. Cada una es un par `Up`/`Down` registrado en orden en `GetMigrations()`:

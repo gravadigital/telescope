@@ -56,6 +56,40 @@ func NewDistributedVoteHandler(
 	}
 }
 
+// minProposalsToVote is the number of proposals (and therefore evaluators)
+// needed to open the voting stage.
+const minProposalsToVote = 3
+
+// VotingConfigRequest is the voting configuration the organizer sends. Optional
+// fields are pointers so that an omitted value takes the default and an explicit
+// zero is respected.
+type VotingConfigRequest struct {
+	AttachmentsPerEvaluator int      `json:"attachments_per_evaluator" binding:"required,min=1,max=50"`
+	QualityGoodThreshold    *float64 `json:"quality_good_threshold" binding:"omitempty,min=0,max=1"`
+	QualityBadThreshold     *float64 `json:"quality_bad_threshold" binding:"omitempty,min=0,max=1"`
+	AdjustmentMagnitude     *int     `json:"adjustment_magnitude" binding:"omitempty,min=1,max=10"`
+	MinEvaluationsPerFile   *int     `json:"min_evaluations_per_file" binding:"omitempty,min=1,max=20"`
+}
+
+func (r VotingConfigRequest) input() vote.ConfigInput {
+	return vote.ConfigInput{
+		AttachmentsPerEvaluator: r.AttachmentsPerEvaluator,
+		QualityGoodThreshold:    r.QualityGoodThreshold,
+		QualityBadThreshold:     r.QualityBadThreshold,
+		AdjustmentMagnitude:     r.AdjustmentMagnitude,
+		MinEvaluationsPerFile:   r.MinEvaluationsPerFile,
+	}
+}
+
+func respondInsufficientProposals(c *gin.Context, count int) {
+	c.JSON(http.StatusBadRequest, gin.H{
+		"error":            "At least 3 participants with a proposal are required for voting",
+		"code":             "INSUFFICIENT_ATTACHMENTS",
+		"current_count":    count,
+		"required_minimum": minProposalsToVote,
+	})
+}
+
 // CreateVotingConfiguration handles POST /api/events/{event_id}/voting-config
 func (h *DistributedVoteHandler) CreateVotingConfiguration(c *gin.Context) {
 	eventID := c.Param("event_id")
@@ -86,13 +120,7 @@ func (h *DistributedVoteHandler) CreateVotingConfiguration(c *gin.Context) {
 	// Authorization handled by RequireEventOwnerOrOrganizer middleware
 	// User is guaranteed to have permission to configure this event
 
-	var req struct {
-		AttachmentsPerEvaluator int     `json:"attachments_per_evaluator" binding:"required,min=1,max=50"`
-		QualityGoodThreshold    float64 `json:"quality_good_threshold" binding:"min=0,max=1"`
-		QualityBadThreshold     float64 `json:"quality_bad_threshold" binding:"min=0,max=1"`
-		AdjustmentMagnitude     int     `json:"adjustment_magnitude" binding:"omitempty,min=1,max=10"`
-		MinEvaluationsPerFile   int     `json:"min_evaluations_per_file" binding:"omitempty,min=1,max=20"`
-	}
+	var req VotingConfigRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.log.Warn("invalid request payload", "error", err)
@@ -102,18 +130,6 @@ func (h *DistributedVoteHandler) CreateVotingConfiguration(c *gin.Context) {
 			"details": err.Error(),
 		})
 		return
-	}
-
-	// Additional business validation
-	if req.QualityGoodThreshold != 0 && req.QualityBadThreshold != 0 {
-		if req.QualityGoodThreshold <= req.QualityBadThreshold {
-			h.log.Warn("invalid quality thresholds", "good", req.QualityGoodThreshold, "bad", req.QualityBadThreshold)
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "Quality good threshold must be higher than bad threshold",
-				"code":  "INVALID_THRESHOLDS",
-			})
-			return
-		}
 	}
 
 	// Check if event exists
@@ -157,23 +173,14 @@ func (h *DistributedVoteHandler) CreateVotingConfiguration(c *gin.Context) {
 		return
 	}
 
-	// Get participants and attachments to validate configuration
+	// Participants are only counted for the statistics; evaluators are the
+	// owners of the proposals.
 	participants, err := h.userRepo.GetEventParticipants(eventID)
 	if err != nil {
 		h.log.Error("failed to get participants", "event_id", eventID, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to get participants",
 			"code":  "PARTICIPANTS_ERROR",
-		})
-		return
-	}
-
-	if len(participants) < 3 {
-		h.log.Warn("insufficient participants for voting", "event_id", eventID, "participant_count", len(participants))
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":         "At least 3 participants are required for distributed voting",
-			"code":          "INSUFFICIENT_PARTICIPANTS",
-			"current_count": len(participants),
 		})
 		return
 	}
@@ -188,119 +195,22 @@ func (h *DistributedVoteHandler) CreateVotingConfiguration(c *gin.Context) {
 		return
 	}
 
-	if len(attachments) == 0 {
-		h.log.Warn("no attachments for voting configuration", "event_id", eventID)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "At least 1 attachment is required for voting configuration",
-			"code":  "NO_ATTACHMENTS",
-		})
+	if len(attachments) < minProposalsToVote {
+		h.log.Warn("insufficient proposals for voting", "event_id", eventID, "attachment_count", len(attachments))
+		respondInsufficientProposals(c, len(attachments))
 		return
 	}
 
-	// Validate minimum attachments for meaningful voting (at least 2)
-	if len(attachments) < 2 {
-		h.log.Warn("insufficient attachments for voting", "event_id", eventID, "attachment_count", len(attachments))
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":            "At least 2 attachments are required for meaningful voting (ranking requires comparison)",
-			"code":             "INSUFFICIENT_ATTACHMENTS",
-			"current_count":    len(attachments),
-			"required_minimum": 2,
-		})
+	config, err := vote.BuildVotingConfiguration(eventUUID, req.input(), len(attachments))
+	if err != nil {
+		h.log.Warn("invalid voting configuration", "event_id", eventID, "error", err)
+		respondVotingConfigError(c, err)
 		return
 	}
+	config.CreatedAt = time.Now()
 
-	// Validate that m doesn't exceed available attachments
-	if req.AttachmentsPerEvaluator > len(attachments) {
-		h.log.Warn("attachments_per_evaluator exceeds total attachments",
-			"event_id", eventID,
-			"requested_m", req.AttachmentsPerEvaluator,
-			"total_attachments", len(attachments))
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":                     "attachments_per_evaluator cannot exceed total number of attachments",
-			"code":                      "M_EXCEEDS_ATTACHMENTS",
-			"attachments_per_evaluator": req.AttachmentsPerEvaluator,
-			"total_attachments":         len(attachments),
-		})
-		return
-	}
-
-	// IMPORTANT: Validate considering conflict of interest (participants can't evaluate their own files)
-	// Maximum evaluable attachments per participant = total_attachments - 1 (excluding their own)
-	maxEvaluablePerParticipant := len(attachments) - 1
-	if req.AttachmentsPerEvaluator > maxEvaluablePerParticipant {
-		h.log.Warn("attachments_per_evaluator exceeds maximum evaluable (excluding own submissions)",
-			"event_id", eventID,
-			"requested_m", req.AttachmentsPerEvaluator,
-			"max_evaluable", maxEvaluablePerParticipant,
-			"total_attachments", len(attachments))
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "attachments_per_evaluator cannot exceed maximum evaluable attachments per participant",
-			"code":  "M_EXCEEDS_EVALUABLE",
-			"details": "Participants cannot evaluate their own submissions (conflict of interest). " +
-				"With " + fmt.Sprintf("%d", len(attachments)) + " total attachments, " +
-				"each participant can evaluate at most " + fmt.Sprintf("%d", maxEvaluablePerParticipant) + " files.",
-			"attachments_per_evaluator":     req.AttachmentsPerEvaluator,
-			"max_evaluable_per_participant": maxEvaluablePerParticipant,
-			"total_attachments":             len(attachments),
-		})
-		return
-	}
-
-	// Create voting configuration
-	config := &vote.VotingConfiguration{
-		ID:                      uuid.New(),
-		EventID:                 eventUUID,
-		AttachmentsPerEvaluator: req.AttachmentsPerEvaluator,
-		QualityGoodThreshold:    req.QualityGoodThreshold,
-		QualityBadThreshold:     req.QualityBadThreshold,
-		AdjustmentMagnitude:     req.AdjustmentMagnitude,
-		MinEvaluationsPerFile:   req.MinEvaluationsPerFile,
-		CreatedAt:               time.Now(),
-	}
-
-	// Set smart defaults if not provided
-	if config.QualityGoodThreshold == 0 {
-		config.QualityGoodThreshold = 0.6
-	}
-	if config.QualityBadThreshold == 0 {
-		config.QualityBadThreshold = 0.3
-	}
-	if config.AdjustmentMagnitude == 0 {
-		config.AdjustmentMagnitude = 3
-	}
-	if config.MinEvaluationsPerFile == 0 {
-		config.MinEvaluationsPerFile = 3
-	}
-
-	// Validate configuration with current data
-	if err := h.votingService.ValidateVotingConfiguration(config, len(attachments), len(participants)); err != nil {
-		h.log.Error("voting configuration validation failed", "event_id", eventID, "error", err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid voting configuration",
-			"code":    "VALIDATION_FAILED",
-			"details": err.Error(),
-		})
-		return
-	}
-
-	// Validate mathematical constraints
-	maxPossibleAssignments := req.AttachmentsPerEvaluator * len(participants)
-	minRequiredAssignments := req.MinEvaluationsPerFile * len(attachments)
-	if maxPossibleAssignments < minRequiredAssignments {
-		h.log.Warn("mathematical constraint violation",
-			"max_possible", maxPossibleAssignments,
-			"min_required", minRequiredAssignments,
-			"participants", len(participants),
-			"attachments", len(attachments))
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":                    "Configuration violates mathematical constraints",
-			"code":                     "MATH_CONSTRAINT_VIOLATION",
-			"details":                  "Not enough evaluation capacity to meet minimum evaluations per file",
-			"max_possible_evaluations": maxPossibleAssignments,
-			"min_required_evaluations": minRequiredAssignments,
-		})
-		return
-	}
+	maxPossibleAssignments := config.AttachmentsPerEvaluator * len(attachments)
+	minRequiredAssignments := config.MinEvaluationsPerFile * len(attachments)
 
 	// Save configuration
 	if err := h.configRepo.Create(config); err != nil {
@@ -404,32 +314,6 @@ func (h *DistributedVoteHandler) GenerateAssignments(c *gin.Context) {
 		return
 	}
 
-	// Get participants and attachments
-	participantUsers, err := h.userRepo.GetEventParticipants(eventID)
-	if err != nil {
-		h.log.Error("failed to get participants", "event_id", eventID, "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to get participants",
-			"code":  "PARTICIPANTS_ERROR",
-		})
-		return
-	}
-
-	if len(participantUsers) < 3 {
-		h.log.Warn("insufficient participants for assignment generation", "event_id", eventID, "participant_count", len(participantUsers))
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":         "At least 3 participants are required for distributed voting",
-			"code":          "INSUFFICIENT_PARTICIPANTS",
-			"current_count": len(participantUsers),
-		})
-		return
-	}
-
-	participants := make([]uuid.UUID, len(participantUsers))
-	for i, p := range participantUsers {
-		participants[i] = p.ID
-	}
-
 	attachments, err := h.attachmentRepo.GetByEventID(eventID)
 	if err != nil {
 		h.log.Error("failed to get attachments", "event_id", eventID, "error", err)
@@ -440,17 +324,17 @@ func (h *DistributedVoteHandler) GenerateAssignments(c *gin.Context) {
 		return
 	}
 
-	if len(attachments) == 0 {
-		h.log.Warn("no attachments for assignment generation", "event_id", eventID)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "At least 1 attachment is required for assignment generation",
-			"code":  "NO_ATTACHMENTS",
-		})
+	if len(attachments) < minProposalsToVote {
+		h.log.Warn("insufficient proposals for assignment generation", "event_id", eventID, "attachment_count", len(attachments))
+		respondInsufficientProposals(c, len(attachments))
 		return
 	}
 
+	// Evaluators are the participants who uploaded a proposal.
+	participants := make([]uuid.UUID, len(attachments))
 	attachmentIDs := make([]uuid.UUID, len(attachments))
 	for i, a := range attachments {
+		participants[i] = a.ParticipantID
 		attachmentIDs[i] = a.ID
 	}
 
@@ -1349,7 +1233,9 @@ func (h *DistributedVoteHandler) DeleteVotingConfiguration(c *gin.Context) {
 	})
 }
 
-// PreviewVotingConfiguration handles POST /api/events/{event_id}/voting-config/preview
+// PreviewVotingConfiguration handles GET /api/v1/events/{event_id}/voting-config/preview
+// It uses the same bounds that validate the opening of the voting stage, so the
+// client does not have to recompute m.
 func (h *DistributedVoteHandler) PreviewVotingConfiguration(c *gin.Context) {
 	eventID := c.Param("event_id")
 
@@ -1363,26 +1249,27 @@ func (h *DistributedVoteHandler) PreviewVotingConfiguration(c *gin.Context) {
 		return
 	}
 
-	var req struct {
-		AttachmentsPerEvaluator int     `json:"attachments_per_evaluator" binding:"required,min=1,max=50"`
-		QualityGoodThreshold    float64 `json:"quality_good_threshold" binding:"min=0,max=1"`
-		QualityBadThreshold     float64 `json:"quality_bad_threshold" binding:"min=0,max=1"`
-		AdjustmentMagnitude     int     `json:"adjustment_magnitude" binding:"omitempty,min=1,max=10"`
-		MinEvaluationsPerFile   int     `json:"min_evaluations_per_file" binding:"omitempty,min=1,max=20"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if _, err := uuid.Parse(eventID); err != nil {
+		h.log.Warn("invalid event_id format", "event_id", eventID, "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid request payload",
-			"code":    "INVALID_PAYLOAD",
-			"details": err.Error(),
+			"error": "Invalid event_id format",
+			"code":  "INVALID_EVENT_ID",
 		})
 		return
 	}
 
-	// Get current participants and attachments
+	if _, err := h.eventRepo.GetByID(eventID); err != nil {
+		h.log.Error("event not found", "event_id", eventID, "error", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Event not found",
+			"code":  "EVENT_NOT_FOUND",
+		})
+		return
+	}
+
 	participants, err := h.userRepo.GetEventParticipants(eventID)
 	if err != nil {
+		h.log.Error("failed to get participants", "event_id", eventID, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to get participants",
 			"code":  "PARTICIPANTS_ERROR",
@@ -1392,6 +1279,7 @@ func (h *DistributedVoteHandler) PreviewVotingConfiguration(c *gin.Context) {
 
 	attachments, err := h.attachmentRepo.GetByEventID(eventID)
 	if err != nil {
+		h.log.Error("failed to get attachments", "event_id", eventID, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to get attachments",
 			"code":  "ATTACHMENTS_ERROR",
@@ -1399,82 +1287,22 @@ func (h *DistributedVoteHandler) PreviewVotingConfiguration(c *gin.Context) {
 		return
 	}
 
-	// Create temporary configuration for validation
-	eventUUID, _ := uuid.Parse(eventID)
-	tempConfig := &vote.VotingConfiguration{
-		EventID:                 eventUUID,
-		AttachmentsPerEvaluator: req.AttachmentsPerEvaluator,
-		QualityGoodThreshold:    req.QualityGoodThreshold,
-		QualityBadThreshold:     req.QualityBadThreshold,
-		AdjustmentMagnitude:     req.AdjustmentMagnitude,
-		MinEvaluationsPerFile:   req.MinEvaluationsPerFile,
-	}
+	k := len(attachments)
+	minM, maxM, recommendedM := vote.VotingBounds(k)
 
-	// Set defaults (mirrors CreateVotingConfiguration's smart defaults)
-	if tempConfig.QualityGoodThreshold == 0 {
-		tempConfig.QualityGoodThreshold = 0.6
-	}
-	if tempConfig.QualityBadThreshold == 0 {
-		tempConfig.QualityBadThreshold = 0.3
-	}
-	if tempConfig.AdjustmentMagnitude == 0 {
-		tempConfig.AdjustmentMagnitude = 3
-	}
-	if tempConfig.MinEvaluationsPerFile == 0 {
-		tempConfig.MinEvaluationsPerFile = 3
-	}
-
-	// Validate and calculate metrics. Use tempConfig (defaults applied) for
-	// AdjustmentMagnitude/MinEvaluationsPerFile rather than the raw request,
-	// so an omitted field reflects the default that will actually be saved
-	// instead of a stale zero.
-	validationErr := h.votingService.ValidateVotingConfiguration(tempConfig, len(attachments), len(participants))
-
-	maxPossibleAssignments := req.AttachmentsPerEvaluator * len(participants)
-	minRequiredAssignments := tempConfig.MinEvaluationsPerFile * len(attachments)
-
-	// Guard against division by zero: len(attachments) comes from the
-	// database, not request validation, so it can legitimately be 0 (e.g.
-	// previewing a configuration before any files have been uploaded).
-	// json.Marshal cannot encode +Inf/NaN, so an unguarded division here
-	// would silently corrupt the response body while still returning 200.
-	var avgEvaluationsPerFile, evaluationCoverageRatio float64
-	if len(attachments) > 0 {
-		avgEvaluationsPerFile = float64(maxPossibleAssignments) / float64(len(attachments))
-		evaluationCoverageRatio = avgEvaluationsPerFile / float64(tempConfig.MinEvaluationsPerFile)
-	}
-	workloadBalance := float64(req.AttachmentsPerEvaluator)
-
-	response := gin.H{
-		"configuration": gin.H{
-			"attachments_per_evaluator": req.AttachmentsPerEvaluator,
-			"quality_good_threshold":    tempConfig.QualityGoodThreshold,
-			"quality_bad_threshold":     tempConfig.QualityBadThreshold,
-			"adjustment_magnitude":      tempConfig.AdjustmentMagnitude,
-			"min_evaluations_per_file":  tempConfig.MinEvaluationsPerFile,
+	c.JSON(http.StatusOK, gin.H{
+		"data": gin.H{
+			"participants_count":         len(participants),
+			"participants_with_proposal": k,
+			"can_open_voting":            k >= minProposalsToVote,
+			"min_m":                      minM,
+			"max_m":                      maxM,
+			"recommended_m":              recommendedM,
+			"defaults": gin.H{
+				"quality_good_threshold": vote.DefaultQualityGoodThreshold,
+				"quality_bad_threshold":  vote.DefaultQualityBadThreshold,
+				"adjustment_magnitude":   vote.DefaultAdjustmentMagnitude,
+			},
 		},
-		"current_data": gin.H{
-			"participants_count": len(participants),
-			"attachments_count":  len(attachments),
-		},
-		"calculated_metrics": gin.H{
-			"max_possible_evaluations":  maxPossibleAssignments,
-			"min_required_evaluations":  minRequiredAssignments,
-			"avg_evaluations_per_file":  avgEvaluationsPerFile,
-			"workload_per_participant":  workloadBalance,
-			"evaluation_coverage_ratio": evaluationCoverageRatio,
-		},
-		"validation": gin.H{
-			"is_valid": validationErr == nil,
-		},
-	}
-
-	if validationErr != nil {
-		response["validation"].(gin.H)["error"] = validationErr.Error()
-		response["validation"].(gin.H)["feasible"] = false
-	} else {
-		response["validation"].(gin.H)["feasible"] = true
-	}
-
-	c.JSON(http.StatusOK, response)
+	})
 }

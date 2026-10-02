@@ -1306,7 +1306,7 @@ paths:
         Usa la misma regla de mínimo (3 propuestas) y de evaluadores.
 
         Solo el autor del evento, un organizador o un admin. Una sola configuración por evento.
-        Requiere al menos 3 participantes (`INSUFFICIENT_PARTICIPANTS`).
+        Requiere al menos 3 propuestas (`INSUFFICIENT_ATTACHMENTS`).
 
         Valida las restricciones matemáticas del algoritmo: `m ≤ k-1` (nadie evalúa lo propio),
         `m ≥ 2·log₂(k)` para convergencia, y cobertura suficiente (`n·m ≥ k·min_evaluations`).
@@ -1350,8 +1350,8 @@ paths:
                   type: integer
                   minimum: 1
                   maximum: 20
-                  default: 3
-                  description: Opcional. Mismo tratamiento que `adjustment_magnitude`
+                  description: |
+                    Opcional. Si se omite se aplica `min(3, attachments_per_evaluator)`.
       responses:
         '201':
           description: Configuración creada
@@ -1373,9 +1373,8 @@ paths:
         '400':
           description: |
             `MISSING_EVENT_ID`, `INVALID_EVENT_ID`, `INVALID_PAYLOAD`, `INVALID_THRESHOLDS`,
-            `INVALID_EVENT_STAGE`, `INSUFFICIENT_PARTICIPANTS`, `NO_ATTACHMENTS`,
-            `INSUFFICIENT_ATTACHMENTS`, `M_EXCEEDS_ATTACHMENTS`, `M_EXCEEDS_EVALUABLE`,
-            `VALIDATION_FAILED`, `MATH_CONSTRAINT_VIOLATION`
+            `INVALID_EVENT_STAGE`, `INSUFFICIENT_ATTACHMENTS` (+ `current_count`,
+            `required_minimum: 3`), `M_EXCEEDS_EVALUABLE`, `MATH_CONSTRAINT_VIOLATION`
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
         '403': { $ref: '#/components/responses/MiddlewareForbidden' }
@@ -1399,7 +1398,8 @@ paths:
         misma regla: evaluadores = participantes con propuesta, mínimo 3 propuestas.
 
         Sin body. Solo durante la etapa `voting` y una sola vez por evento. Requiere al menos 3
-        participantes (`INSUFFICIENT_PARTICIPANTS`).
+        propuestas (`INSUFFICIENT_ATTACHMENTS`); `total_participants` es la cantidad de
+        evaluadores (participantes con propuesta).
 
         Ejecuta el algoritmo de asignación: garantiza el mínimo de evaluaciones por propuesta,
         completa hasta `m` por participante y excluye la propuesta propia de cada evaluador.
@@ -1432,7 +1432,7 @@ paths:
         '400':
           description: |
             `MISSING_EVENT_ID`, `INVALID_EVENT_ID`, `INVALID_EVENT_STAGE`,
-            `INSUFFICIENT_PARTICIPANTS`, `NO_ATTACHMENTS`, `CONFIG_INVALID`
+            `INSUFFICIENT_ATTACHMENTS` (+ `current_count`, `required_minimum: 3`), `CONFIG_INVALID`
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
         '403': { $ref: '#/components/responses/MiddlewareForbidden' }

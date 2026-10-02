@@ -39,6 +39,7 @@ type mockEventRepository struct {
 	removeErr         error
 	cancelErr         error
 	pauseErr          error
+	stageUpdates      int // calls to UpdateStageWithEstimatedDate
 }
 
 func newMockEventRepository() *mockEventRepository {
@@ -119,10 +120,21 @@ func (m *mockEventRepository) UpdateStage(eventID string, stage event.Stage) err
 }
 
 func (m *mockEventRepository) UpdateStageWithEstimatedDate(eventID string, stage event.Stage, estimatedDate *time.Time) error {
+	m.stageUpdates++
+	m.applyStage(eventID, stage, estimatedDate)
+	return nil
+}
+
+func (m *mockEventRepository) applyStage(eventID string, stage event.Stage, estimatedDate *time.Time) {
 	if e, ok := m.events[eventID]; ok {
 		e.Stage = stage
+		switch stage {
+		case event.StageParticipation:
+			e.ParticipationEstimatedEndDate = estimatedDate
+		case event.StageVoting:
+			e.VotingEstimatedEndDate = estimatedDate
+		}
 	}
-	return nil
 }
 
 func (m *mockEventRepository) UpdateEstimatedEndDate(eventID string, stage event.Stage, newDate time.Time) error {
@@ -736,4 +748,39 @@ func (m *mockVoteDraftRepository) GetByAssignmentAndParticipant(assignmentID, pa
 		return nil, gorm.ErrRecordNotFound
 	}
 	return d, nil
+}
+
+// ---------------------------------------------------------------------------
+// VotingSetupRepository
+// ---------------------------------------------------------------------------
+
+// mockVotingSetupRepository records the arguments of OpenVoting. When eventRepo
+// is set it also moves the event to voting, as the real transaction would.
+type mockVotingSetupRepository struct {
+	eventRepo      *mockEventRepository
+	OpenVotingFunc func(eventID string, estimatedDate *time.Time, config *vote.VotingConfiguration, assignments []*vote.Assignment) error
+
+	calls         int
+	eventID       string
+	estimatedDate *time.Time
+	config        *vote.VotingConfiguration
+	assignments   []*vote.Assignment
+}
+
+func (m *mockVotingSetupRepository) OpenVoting(eventID string, estimatedDate *time.Time, config *vote.VotingConfiguration, assignments []*vote.Assignment) error {
+	m.calls++
+	m.eventID, m.estimatedDate, m.config, m.assignments = eventID, estimatedDate, config, assignments
+	if m.OpenVotingFunc != nil {
+		return m.OpenVotingFunc(eventID, estimatedDate, config, assignments)
+	}
+	if m.eventRepo != nil {
+		m.eventRepo.applyStage(eventID, event.StageVoting, estimatedDate)
+	}
+	// GORM fills the timestamps on the same pointer the handler then serializes.
+	now := time.Now()
+	if config.CreatedAt.IsZero() {
+		config.CreatedAt = now
+	}
+	config.UpdatedAt = now
+	return nil
 }

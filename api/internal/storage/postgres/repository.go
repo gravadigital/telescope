@@ -131,6 +131,12 @@ type VotingConfigurationRepository interface {
 	ValidateConfiguration(config *vote.VotingConfiguration) error
 }
 
+// VotingSetupRepository opens the voting stage atomically: stage change, voting
+// configuration and assignments are written in a single transaction.
+type VotingSetupRepository interface {
+	OpenVoting(eventID string, estimatedDate *time.Time, config *vote.VotingConfiguration, assignments []*vote.Assignment) error
+}
+
 // VoteDraftRepository defines methods for persisting partial voting selections
 type VoteDraftRepository interface {
 	Upsert(draft *vote.VoteDraft) error

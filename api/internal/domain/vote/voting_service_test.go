@@ -568,3 +568,42 @@ func TestVotingConfigurationValidate(t *testing.T) {
 	config.AttachmentsPerEvaluator = 0
 	assert.Error(t, config.Validate())
 }
+
+// ---------------------------------------------------------------------------
+// GenerateAssignments with n = k (evaluators are the participants with a proposal)
+// ---------------------------------------------------------------------------
+
+func TestGenerateAssignments_EvaluatorsAreProposalOwners(t *testing.T) {
+	for _, k := range []int{3, 4, 10} {
+		vs, _, attachmentRepo, _ := newTestService()
+		eventID := uuid.New()
+
+		participants := make([]uuid.UUID, k)
+		attachments := make([]uuid.UUID, k)
+		ownerOf := map[string]uuid.UUID{}
+		for i := range participants {
+			participants[i] = uuid.New()
+			attachments[i] = uuid.New()
+			ownerOf[attachments[i].String()] = participants[i]
+			attachmentRepo.add(eventID, &fakeAttachment{id: attachments[i], participantID: participants[i]})
+		}
+
+		_, _, m := VotingBounds(k)
+		config := defaultConfig(eventID, m)
+		config.MinEvaluationsPerFile = min(3, m)
+
+		assignments, err := vs.GenerateAssignments(eventID, participants, attachments, config)
+		require.NoError(t, err, "k=%d", k)
+		require.Len(t, assignments, k)
+
+		total := 0
+		for _, a := range assignments {
+			assert.Len(t, a.AttachmentIDs, m, "k=%d", k)
+			total += len(a.AttachmentIDs)
+			for _, id := range a.AttachmentIDs {
+				assert.NotEqual(t, a.ParticipantID, ownerOf[id], "k=%d: own proposal assigned", k)
+			}
+		}
+		assert.Equal(t, k*m, total, "k=%d", k)
+	}
+}

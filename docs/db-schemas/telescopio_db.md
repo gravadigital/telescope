@@ -6,7 +6,7 @@
 | **Extensiones** | `uuid-ossp` |
 | **Acceso** | GORM 1.30.2 (`gorm.io/driver/postgres`) |
 | **Servicio propietario** | [`api`](../architectures/api/index.md) |
-| **Migraciones** | 22 aplicadas + 2 planificadas (023, 024 — REQ-003), versionadas en Go (`internal/storage/migrations/`) |
+| **Migraciones** | 23 aplicadas + 1 planificada (024 — REQ-003), versionadas en Go (`internal/storage/migrations/`) |
 
 Todo el estado del producto vive acá. Las claves primarias son UUID generadas por
 `uuid_generate_v4()` o por la aplicación en el hook `BeforeCreate`.
@@ -353,7 +353,7 @@ Resultados calculados, uno por evento (`event_id` UNIQUE).
 | `participant_qualities` | `jsonb` | Objeto `{uuid_participante: Q_i}` |
 | `adjusted_ranking` | `jsonb` | Array tras aplicar los incentivos |
 | `total_participants` | `integer` | CHECK > 0 |
-| `total_votes` | `integer` | CHECK `>= total_participants` hoy; **pasa a `>= 0` con la migración 023 (S-006)** para persistir resultados publicados con rankings faltantes |
+| `total_votes` | `integer` | CHECK `>= 0` (migración 023, S-006): puede ser menor que `total_participants` cuando se publica con rankings faltantes |
 | `attachments_per_evaluator` | `integer` | El `m` usado en el cálculo |
 
 Forma de cada elemento de los rankings:
@@ -366,10 +366,10 @@ Forma de cada elemento de los rankings:
 }
 ```
 
-> **Por qué se relaja el CHECK (S-006).** `CalculateAndPersistResults` guarda
+> **Por qué se relajó el CHECK (migración 023, S-006).** `CalculateAndPersistResults` guarda
 > `total_participants = len(participant_qualities)`. Si se publica con rankings faltantes
-> (permitido desde REQ-003), `total_votes < total_participants`, el upsert falla y el evento
-> queda en `results` sin ranking (el error solo se loguea).
+> (permitido desde REQ-003), `total_votes < total_participants`; con el CHECK original el upsert
+> fallaba y el evento quedaba en `results` sin ranking (el error solo se loguea).
 
 > **Misma divergencia que en `voting_configurations`.** La tabla se crea con columnas
 > adicionales (`statistical_metrics`, `algorithm_used`, `quality_adjustments_applied`,
@@ -548,7 +548,7 @@ Migraciones en Go, no en SQL, con `Up` y `Down` registradas en orden en
 | 020 | `add_is_paused_to_events` | Pausa |
 | 021 | `add_description_to_attachments` | Descripción opcional de la propuesta |
 | 022 | `fix_uuid_comparison_in_triggers` | Recrea las funciones de validación comparando `uuid` con `uuid` (la 004 comparaba `text` contra `uuid[]` y fallaba todo insert en `assignments` y `votes`) |
-| 023 | `relax_voting_results_vote_count` | **Planificada (S-006).** CHECK `valid_participant_counts` pasa a `total_participants > 0 AND total_votes >= 0`. `Down` restaura el original |
+| 023 | `relax_voting_results_vote_count` | CHECK `valid_participant_counts` pasa a `total_participants > 0 AND total_votes >= 0`. `Down` restaura `total_votes >= total_participants` |
 | 024 | `add_notifications` | **Planificada (S-009).** Enum `notification_type`, tabla `notifications` e índices |
 
 Notas:

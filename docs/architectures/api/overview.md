@@ -114,7 +114,8 @@ Relevada del código, para que no se confunda con decisión de diseño:
    una consulta de participantes por evento.
 7. **Handlers implementados sin rutas**: `UpdateEvent`/`DeleteEvent` (devuelven 501),
    `GetVotingConfiguration`, `UpdateVotingConfiguration`, `DeleteVotingConfiguration`,
-   `PreviewVotingConfiguration`, `GetAttachment`, `RemoveParticipant`.
+   `GetAttachment`, `RemoveParticipant`. (`PreviewVotingConfiguration` ya tiene ruta:
+   `GET /events/:event_id/voting-config/preview`, desde S-006.)
 8. **Código sin `gofmt`**: hay bloques con indentación rota que hacen difícil leer el
    control de flujo (por ejemplo `event_handler.go:196-207`, cuya lógica es correcta pero
    parece rota). `_base` exige `gofumpt`.

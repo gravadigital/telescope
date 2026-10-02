@@ -281,6 +281,46 @@ func TestUploadAttachment_RejectsDisallowedFileType(t *testing.T) {
 	assert.Equal(t, "INVALID_FILE_TYPE", jsonBody(t, w)["code"])
 }
 
+func TestUploadAttachment_AcceptsWebP(t *testing.T) {
+	s := newTestAttachmentHandlerSet()
+	e, _ := newParticipationStageEvent()
+	s.eventRepo.addEvent(e)
+	p := participant.NewParticipant("P", "One", "p@example.com")
+	s.userRepo.addUser(p)
+	s.eventRepo.byParticipant[p.ID.String()] = []*event.Event{e}
+
+	w, c := buildMultipartUpload(t,
+		gin.Params{{Key: "event_id", Value: e.ID.String()}, {Key: "participant_id", Value: p.ID.String()}},
+		"photo.webp", "image/webp", make([]byte, 2*1024*1024))
+
+	s.handler.UploadAttachment(c)
+
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	resp := jsonBody(t, w)
+	assert.Equal(t, "UPLOAD_SUCCESS", resp["code"])
+	assert.Equal(t, "image/webp", resp["data"].(map[string]interface{})["mime_type"])
+}
+
+func TestUploadAttachment_StillRejectsBMP(t *testing.T) {
+	s := newTestAttachmentHandlerSet()
+	e, _ := newParticipationStageEvent()
+	s.eventRepo.addEvent(e)
+	p := participant.NewParticipant("P", "One", "p@example.com")
+	s.userRepo.addUser(p)
+	s.eventRepo.byParticipant[p.ID.String()] = []*event.Event{e}
+
+	w, c := buildMultipartUpload(t,
+		gin.Params{{Key: "event_id", Value: e.ID.String()}, {Key: "participant_id", Value: p.ID.String()}},
+		"photo.bmp", "image/bmp", []byte("data"))
+
+	s.handler.UploadAttachment(c)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	resp := jsonBody(t, w)
+	assert.Equal(t, "INVALID_FILE_TYPE", resp["code"])
+	assert.Equal(t, "image/bmp", resp["received_type"])
+}
+
 func TestUploadAttachment_CleansUpStorageWhenDBSaveFails(t *testing.T) {
 	s := newTestAttachmentHandlerSet()
 	e, _ := newParticipationStageEvent()

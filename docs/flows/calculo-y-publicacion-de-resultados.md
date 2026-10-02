@@ -14,7 +14,7 @@ stories: [S-006, S-009, S-015, S-016]
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
 **Última actualización:** 2026-10-02
-**Stories:** S-006, S-009, S-015, S-016 (cambios planificados por REQ-003)
+**Stories:** S-006, S-009, S-015, S-016 (S-006 implementada; el resto, planificado por REQ-003)
 
 ## Descripción
 
@@ -34,7 +34,6 @@ la pregunta abierta #1 del PRD.
 |---|---|---|
 | — | Sin cambio de cálculo | — |
 | Disparador | Se puede publicar con rankings faltantes (confirmación explícita en el diálogo de la gestión); quien no completó queda con `Q_i = 0` | S-016 |
-| 5 | CHECK `valid_participant_counts` relajado a `total_votes >= 0` (migración 023), así el upsert no falla con rankings faltantes | S-006 |
 | 5 | Tras persistir, notificaciones `stage_changed { stage: "results", result_position, result_total }` por inscripto | S-009 |
 | Presentación | Puntaje `mbc_score × 10` con un decimal y separador según idioma; podio (1–3) + lista sobre `adjusted_ranking`; el propio participante resaltado | S-015 |
 
@@ -171,7 +170,7 @@ de la propuesta propia.
 | `participant_qualities` | jsonb — `{uuid_participante: Q_i}` |
 | `adjusted_ranking` | jsonb — array tras aplicar los incentivos (el ranking `G'`) |
 | `total_participants` | integer, CHECK > 0 |
-| `total_votes` | integer, CHECK ≥ `total_participants` |
+| `total_votes` | integer, CHECK ≥ 0. Puede ser menor que `total_participants` cuando se publica con rankings faltantes (migración 023) |
 | `attachments_per_evaluator` | El `m` usado en el cálculo |
 
 **Forma de cada elemento de los rankings:**
@@ -208,8 +207,8 @@ trivialmente.
 |---|---|---|---|
 | 1 | Etapa distinta de `voting` o `results` | 400 | La UI no muestra el panel |
 | 1 | Sin configuración de votación | 400 | — |
-| 2 | Sin votos registrados | 400/500 | `total_votes` violaría el CHECK ≥ `total_participants` |
-| 5 | Violación de CHECK | **500** | ⚠️ Error genérico de Postgres |
+| 2 | Sin votos registrados | 400 | No hay ranking que calcular |
+| 5 | Violación de CHECK (p. ej. `total_participants = 0`) | **500** | ⚠️ Error genérico de Postgres |
 
 ## Estado Resultante
 

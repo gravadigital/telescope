@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/gravadigital/telescopio-api/internal/config"
 	"github.com/gravadigital/telescopio-api/internal/domain/event"
 	"github.com/gravadigital/telescopio-api/internal/domain/participant"
+	"github.com/gravadigital/telescopio-api/internal/domain/vote"
 	"github.com/gravadigital/telescopio-api/internal/email"
 	"github.com/gravadigital/telescopio-api/internal/logger"
 	"github.com/gravadigital/telescopio-api/internal/storage/postgres"
@@ -20,7 +22,11 @@ type EventHandler struct {
 	eventRepo      postgres.EventRepository
 	userRepo       postgres.UserRepository
 	attachmentRepo postgres.AttachmentRepository
-	emailService   *email.EmailService
+	// votingSetupRepo writes the stage change, configuration and assignments of
+	// the participation → voting transition in one transaction.
+	votingSetupRepo postgres.VotingSetupRepository
+	votingService   *vote.VotingService
+	emailService    *email.EmailService
 	// voteHandler recalculates and stores the ranking when the event enters
 	// the results stage; may be nil in tests that never reach that stage.
 	voteHandler *DistributedVoteHandler
@@ -28,15 +34,23 @@ type EventHandler struct {
 	log         *log.Logger
 }
 
-func NewEventHandler(eventRepo postgres.EventRepository, userRepo postgres.UserRepository, attachmentRepo postgres.AttachmentRepository, emailService *email.EmailService, voteHandler *DistributedVoteHandler, cfg *config.Config) *EventHandler {
+func NewEventHandler(eventRepo postgres.EventRepository, userRepo postgres.UserRepository, attachmentRepo postgres.AttachmentRepository, voteRepo postgres.VoteRepository, votingSetupRepo postgres.VotingSetupRepository, emailService *email.EmailService, voteHandler *DistributedVoteHandler, cfg *config.Config) *EventHandler {
+	votingService := vote.NewVotingService(
+		NewVoteRepositoryAdapter(voteRepo),
+		NewAttachmentRepositoryAdapter(attachmentRepo),
+		NewUserRepositoryAdapter(userRepo),
+	)
+
 	return &EventHandler{
-		eventRepo:      eventRepo,
-		userRepo:       userRepo,
-		attachmentRepo: attachmentRepo,
-		emailService:   emailService,
-		voteHandler:    voteHandler,
-		config:         cfg,
-		log:            logger.Handler("event"),
+		eventRepo:       eventRepo,
+		userRepo:        userRepo,
+		attachmentRepo:  attachmentRepo,
+		votingSetupRepo: votingSetupRepo,
+		votingService:   votingService,
+		emailService:    emailService,
+		voteHandler:     voteHandler,
+		config:          cfg,
+		log:             logger.Handler("event"),
 	}
 }
 
@@ -259,6 +273,8 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 type UpdateStageRequest struct {
 	Stage            string `json:"stage" binding:"required"`
 	EstimatedEndDate string `json:"estimated_end_date"` // Optional: YYYY-MM-DD format, required for participation/voting
+	// VotingConfig is required when stage is voting and ignored otherwise.
+	VotingConfig *VotingConfigRequest `json:"voting_config"`
 }
 
 type UpdateEstimatedEndDateRequest struct {
@@ -283,7 +299,8 @@ func (h *EventHandler) UpdateEventStage(c *gin.Context) {
 	}
 
 	// Validate UUID format
-	if _, err := uuid.Parse(eventID); err != nil {
+	eventUUID, err := uuid.Parse(eventID)
+	if err != nil {
 		h.log.Warn("invalid event_id format", "event_id", eventID, "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Invalid event_id format",
@@ -344,6 +361,8 @@ func (h *EventHandler) UpdateEventStage(c *gin.Context) {
 		return
 	}
 
+	previousStage := existingEvent.Stage
+
 	// Validate estimated_end_date for participation and voting stages
 	var estimatedDate *time.Time
 	if newStage == event.StageParticipation || newStage == event.StageVoting {
@@ -383,72 +402,34 @@ func (h *EventHandler) UpdateEventStage(c *gin.Context) {
 	}
 
 	// Additional business rules validation before stage transitions
+	var voting *votingSetup
 	switch newStage {
 	case event.StageVoting:
 		h.log.Debug("moving to voting stage", "event_id", eventID)
 
-		// Validate that there are enough participants for meaningful voting
-		participants, err := h.userRepo.GetEventParticipants(eventID)
-		if err != nil {
-			h.log.Error("failed to get participants", "event_id", eventID, "error", err)
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Failed to validate participants",
-				"code":  "PARTICIPANTS_ERROR",
-			})
+		var ok bool
+		if voting, ok = h.prepareVoting(c, eventID, eventUUID, req.VotingConfig); !ok {
 			return
 		}
 
-		if len(participants) < 3 {
-			h.log.Warn("insufficient participants for voting", "event_id", eventID, "participant_count", len(participants))
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":            "At least 3 participants are required to advance to voting",
-				"code":             "INSUFFICIENT_PARTICIPANTS",
-				"current_count":    len(participants),
-				"required_minimum": 3,
-			})
-			return
-		}
-
-		// Validate that there are enough attachments for voting
-		attachments, err := h.attachmentRepo.GetByEventID(eventID)
-		if err != nil {
-			h.log.Error("failed to get attachments", "event_id", eventID, "error", err)
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Failed to validate attachments",
-				"code":  "ATTACHMENTS_ERROR",
-			})
-			return
-		}
-
-		if len(attachments) == 0 {
-			h.log.Warn("attempting to move to voting stage without attachments", "event_id", eventID)
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "Cannot move to voting stage without attachments. Participants must upload their proposals first.",
-				"code":  "NO_ATTACHMENTS",
-			})
-			return
-		}
-
-		// Validate minimum attachments for meaningful voting (at least 2)
-		if len(attachments) < 2 {
-			h.log.Warn("insufficient attachments for voting", "event_id", eventID, "attachment_count", len(attachments))
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":            "At least 2 attachments are required for meaningful voting",
-				"code":             "INSUFFICIENT_ATTACHMENTS",
-				"current_count":    len(attachments),
-				"required_minimum": 2,
-			})
-			return
-		}
-
-		h.log.Info("voting stage validation passed", "event_id", eventID, "attachments", len(attachments))
+		h.log.Info("voting stage validation passed", "event_id", eventID, "attachments", voting.totalAttachments)
 
 	case event.StageResult:
 		h.log.Debug("moving to results stage", "event_id", eventID)
 	}
 
-	// Update stage with estimated date
-	if err := h.eventRepo.UpdateStageWithEstimatedDate(eventID, newStage, estimatedDate); err != nil {
+	if voting != nil {
+		// Stage, configuration and assignments are written together; on failure
+		// the event stays in participation.
+		if err := h.votingSetupRepo.OpenVoting(eventID, estimatedDate, voting.config, voting.assignments); err != nil {
+			h.log.Error("failed to open voting", "event_id", eventID, "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to open voting",
+				"code":  "VOTING_SETUP_ERROR",
+			})
+			return
+		}
+	} else if err := h.eventRepo.UpdateStageWithEstimatedDate(eventID, newStage, estimatedDate); err != nil {
 		h.log.Error("failed to update event stage", "event_id", eventID, "new_stage", req.Stage, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to update event stage",
@@ -470,7 +451,7 @@ func (h *EventHandler) UpdateEventStage(c *gin.Context) {
 
 	h.log.Info("event stage updated successfully",
 		"event_id", eventID,
-		"old_stage", existingEvent.Stage.String(),
+		"old_stage", previousStage.String(),
 		"new_stage", updatedEvent.Stage.String())
 
 	// Entering the results stage: calculate and store the ranking once, so the
@@ -499,7 +480,7 @@ func (h *EventHandler) UpdateEventStage(c *gin.Context) {
 		}
 	}()
 
-	c.JSON(http.StatusOK, gin.H{
+	response := gin.H{
 		"data": gin.H{
 			"id":                               updatedEvent.ID.String(),
 			"name":                             updatedEvent.Name,
@@ -515,10 +496,111 @@ func (h *EventHandler) UpdateEventStage(c *gin.Context) {
 		"message": "Event stage updated successfully",
 		"code":    "STAGE_UPDATED",
 		"transition": gin.H{
-			"from": existingEvent.Stage.String(),
+			"from": previousStage.String(),
 			"to":   updatedEvent.Stage.String(),
 		},
-	})
+	}
+	if voting != nil {
+		response["voting"] = gin.H{
+			"configuration":     votingConfigurationPayload(voting.config),
+			"assignments_count": len(voting.assignments),
+			"total_attachments": voting.totalAttachments,
+		}
+	}
+	c.JSON(http.StatusOK, response)
+}
+
+// votingSetup is what the participation → voting transition writes.
+type votingSetup struct {
+	config           *vote.VotingConfiguration
+	assignments      []*vote.Assignment
+	totalAttachments int
+}
+
+// prepareVoting validates everything the transition needs before any write and
+// builds the configuration and assignments in memory. Evaluators are the
+// participants who uploaded a proposal. It responds with the error and
+// returns false when the transition cannot proceed.
+func (h *EventHandler) prepareVoting(c *gin.Context, eventID string, eventUUID uuid.UUID, req *VotingConfigRequest) (*votingSetup, bool) {
+	attachments, err := h.attachmentRepo.GetByEventID(eventID)
+	if err != nil {
+		h.log.Error("failed to get attachments", "event_id", eventID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to validate attachments",
+			"code":  "ATTACHMENTS_ERROR",
+		})
+		return nil, false
+	}
+
+	if len(attachments) < minProposalsToVote {
+		h.log.Warn("insufficient proposals for voting", "event_id", eventID, "attachment_count", len(attachments))
+		respondInsufficientProposals(c, len(attachments))
+		return nil, false
+	}
+
+	if req == nil {
+		h.log.Warn("missing voting_config for voting transition", "event_id", eventID)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "voting_config is required when advancing to the voting stage",
+			"code":  "MISSING_VOTING_CONFIG",
+		})
+		return nil, false
+	}
+
+	k := len(attachments)
+	config, err := vote.BuildVotingConfiguration(eventUUID, req.input(), k)
+	if err != nil {
+		h.log.Warn("invalid voting configuration", "event_id", eventID, "error", err)
+		respondVotingConfigError(c, err)
+		return nil, false
+	}
+
+	evaluators := make([]uuid.UUID, k)
+	attachmentIDs := make([]uuid.UUID, k)
+	for i, a := range attachments {
+		evaluators[i] = a.ParticipantID
+		attachmentIDs[i] = a.ID
+	}
+
+	assignments, err := h.votingService.GenerateAssignments(eventUUID, evaluators, attachmentIDs, config)
+	if err != nil {
+		h.log.Error("failed to generate assignments", "event_id", eventID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to open voting",
+			"code":  "VOTING_SETUP_ERROR",
+		})
+		return nil, false
+	}
+
+	return &votingSetup{config: config, assignments: assignments, totalAttachments: k}, true
+}
+
+// votingConfigurationPayload is built explicitly instead of serializing the
+// domain entity.
+func votingConfigurationPayload(cfg *vote.VotingConfiguration) gin.H {
+	return gin.H{
+		"id":                        cfg.ID.String(),
+		"event_id":                  cfg.EventID.String(),
+		"attachments_per_evaluator": cfg.AttachmentsPerEvaluator,
+		"quality_good_threshold":    cfg.QualityGoodThreshold,
+		"quality_bad_threshold":     cfg.QualityBadThreshold,
+		"adjustment_magnitude":      cfg.AdjustmentMagnitude,
+		"min_evaluations_per_file":  cfg.MinEvaluationsPerFile,
+		"created_at":                cfg.CreatedAt,
+		"updated_at":                cfg.UpdatedAt,
+	}
+}
+
+// respondVotingConfigError maps the domain errors of BuildVotingConfiguration.
+func respondVotingConfigError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, vote.ErrInvalidThresholds):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid quality thresholds", "code": "INVALID_THRESHOLDS", "details": err.Error()})
+	case errors.Is(err, vote.ErrMExceedsEvaluable):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Attachments per evaluator exceeds the proposals each participant can evaluate", "code": "M_EXCEEDS_EVALUABLE", "details": err.Error()})
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Voting configuration violates mathematical constraints", "code": "MATH_CONSTRAINT_VIOLATION", "details": err.Error()})
+	}
 }
 
 // UpdateEstimatedEndDate handles PATCH /api/v1/events/{event_id}/estimated-end-date
