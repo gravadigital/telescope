@@ -980,7 +980,81 @@
             "error de sistema",
             "not found"
           ],
-          "annotation": "EventTimeline · ≤600px oculta descripciones y deadlines (defecto registrado en gaps)"
+          "annotation": "EventTimeline · ≤600px oculta descripciones y deadlines (defecto registrado en gaps)",
+          "state_overrides": {
+            "votación · panel de ranking": {
+              "items": [
+                {
+                  "title": "Creation",
+                  "subtitle": "Completada",
+                  "icon": "check"
+                },
+                {
+                  "title": "Participation",
+                  "subtitle": "Completada",
+                  "icon": "check"
+                },
+                {
+                  "title": "Voting",
+                  "subtitle": "En curso · deadline 20 Apr 2026",
+                  "icon": "clock"
+                },
+                {
+                  "title": "Results",
+                  "subtitle": "Pendiente",
+                  "icon": "clock"
+                }
+              ]
+            },
+            "error de descarga": {
+              "items": [
+                {
+                  "title": "Creation",
+                  "subtitle": "Completada",
+                  "icon": "check"
+                },
+                {
+                  "title": "Participation",
+                  "subtitle": "Completada",
+                  "icon": "check"
+                },
+                {
+                  "title": "Voting",
+                  "subtitle": "En curso · deadline 20 Apr 2026",
+                  "icon": "clock"
+                },
+                {
+                  "title": "Results",
+                  "subtitle": "Pendiente",
+                  "icon": "clock"
+                }
+              ]
+            },
+            "votación · ranking enviado": {
+              "items": [
+                {
+                  "title": "Creation",
+                  "subtitle": "Completada",
+                  "icon": "check"
+                },
+                {
+                  "title": "Participation",
+                  "subtitle": "Completada",
+                  "icon": "check"
+                },
+                {
+                  "title": "Voting",
+                  "subtitle": "En curso · deadline 20 Apr 2026",
+                  "icon": "clock"
+                },
+                {
+                  "title": "Results",
+                  "subtitle": "Pendiente",
+                  "icon": "clock"
+                }
+              ]
+            }
+          }
         },
         {
           "name": "aviso-pausa",
@@ -1018,7 +1092,10 @@
           "hidden_in_states": [
             "loading",
             "error de sistema",
-            "not found"
+            "not found",
+            "votación · panel de ranking",
+            "error de descarga",
+            "votación · ranking enviado"
           ]
         },
         {
@@ -1029,7 +1106,10 @@
           "hidden_in_states": [
             "loading",
             "error de sistema",
-            "not found"
+            "not found",
+            "votación · panel de ranking",
+            "error de descarga",
+            "votación · ranking enviado"
           ],
           "state_overrides": {
             "empty": {
@@ -1048,7 +1128,10 @@
             "loading",
             "error de sistema",
             "not found",
-            "empty"
+            "empty",
+            "votación · panel de ranking",
+            "error de descarga",
+            "votación · ranking enviado"
           ]
         },
         {
@@ -1060,7 +1143,10 @@
             "loading",
             "error de sistema",
             "not found",
-            "empty"
+            "empty",
+            "votación · panel de ranking",
+            "error de descarga",
+            "votación · ranking enviado"
           ]
         },
         {
@@ -1073,7 +1159,10 @@
             "loading",
             "error de sistema",
             "not found",
-            "empty"
+            "empty",
+            "votación · panel de ranking",
+            "error de descarga",
+            "votación · ranking enviado"
           ],
           "state_overrides": {
             "success": {
@@ -1095,7 +1184,10 @@
             "loading",
             "error de sistema",
             "not found",
-            "empty"
+            "empty",
+            "votación · panel de ranking",
+            "error de descarga",
+            "votación · ranking enviado"
           ],
           "annotation": "title=\"Remove selected file\" · sin aria-label"
         },
@@ -1106,7 +1198,211 @@
           "content": "✅ Voting is underway — Reviewers have been assigned their submissions and can now submit their rankings.",
           "visible_only_in_states": [
             "readonly"
+          ],
+          "annotation": "bloque de organizador · inalcanzable desde REQ-002 (el creador va a S-05)"
+        },
+        {
+          "name": "rk-titulo",
+          "type": "heading",
+          "level": "h3",
+          "category": "content",
+          "content": "🎯 Rank your assigned submissions",
+          "visible_only_in_states": [
+            "votación · panel de ranking",
+            "votación · ranking enviado",
+            "error de descarga"
+          ],
+          "state_overrides": {
+            "votación · ranking enviado": {
+              "content": "✅ Assignment Completed"
+            }
+          }
+        },
+        {
+          "name": "rk-instrucciones",
+          "type": "paragraph",
+          "level": "body",
+          "category": "content",
+          "content": "You have been assigned 3 submissions to review. Rank them from best (1) to worst (3) — each must have a unique position.",
+          "visible_only_in_states": [
+            "votación · panel de ranking",
+            "error de descarga",
+            "votación · ranking enviado"
+          ],
+          "state_overrides": {
+            "votación · ranking enviado": {
+              "content": "You have already submitted your rankings for this event. Your submissions:"
+            }
+          }
+        },
+        {
+          "name": "rk-prop-1",
+          "type": "card",
+          "category": "content",
+          "content": "propuesta-carla.pdf",
+          "icon": "file",
+          "paragraph": "Uploaded: 02/04/2026 | Size: 2.35 MB",
+          "visible_only_in_states": [
+            "votación · panel de ranking",
+            "votación · ranking enviado",
+            "error de descarga"
           ]
+        },
+        {
+          "name": "rk-descargar-1",
+          "type": "button",
+          "variant": "tertiary",
+          "category": "input",
+          "content": "📥 Download / View File",
+          "visible_only_in_states": [
+            "votación · panel de ranking",
+            "votación · ranking enviado",
+            "error de descarga"
+          ],
+          "annotation": "AttachmentService.downloadAttachment · con Authorization: Bearer · limpia el error previo"
+        },
+        {
+          "name": "rk-rank-1",
+          "type": "dropdown",
+          "state": "closed",
+          "category": "input",
+          "label": "Rank:",
+          "content": "Select...",
+          "options": [
+            "Select...",
+            "1 (Best)",
+            "2",
+            "3 (Worst)"
+          ],
+          "visible_only_in_states": [
+            "votación · panel de ranking",
+            "error de descarga"
+          ],
+          "state_overrides": {
+            "error de descarga": {
+              "content": "2"
+            }
+          },
+          "annotation": "el borrador se conserva tras un error de descarga"
+        },
+        {
+          "name": "rk-prop-2",
+          "type": "card",
+          "category": "content",
+          "content": "atardecer-en-el-puerto.jpg",
+          "icon": "file",
+          "paragraph": "Uploaded: 28/03/2026 | Size: 4.12 MB",
+          "visible_only_in_states": [
+            "votación · panel de ranking",
+            "votación · ranking enviado",
+            "error de descarga"
+          ]
+        },
+        {
+          "name": "rk-descargar-2",
+          "type": "button",
+          "variant": "tertiary",
+          "category": "input",
+          "content": "📥 Download / View File",
+          "visible_only_in_states": [
+            "votación · panel de ranking",
+            "votación · ranking enviado",
+            "error de descarga"
+          ]
+        },
+        {
+          "name": "rk-rank-2",
+          "type": "dropdown",
+          "state": "closed",
+          "category": "input",
+          "label": "Rank:",
+          "content": "Select...",
+          "options": [
+            "Select...",
+            "1 (Best)",
+            "2",
+            "3 (Worst)"
+          ],
+          "visible_only_in_states": [
+            "votación · panel de ranking",
+            "error de descarga"
+          ],
+          "state_overrides": {
+            "error de descarga": {
+              "content": "1 (Best)"
+            }
+          }
+        },
+        {
+          "name": "rk-prop-3",
+          "type": "card",
+          "category": "content",
+          "content": "serie-urbana-nocturna.pdf",
+          "icon": "file",
+          "paragraph": "Uploaded: 30/03/2026 | Size: 1.08 MB",
+          "visible_only_in_states": [
+            "votación · panel de ranking",
+            "votación · ranking enviado",
+            "error de descarga"
+          ]
+        },
+        {
+          "name": "rk-descargar-3",
+          "type": "button",
+          "variant": "tertiary",
+          "category": "input",
+          "content": "📥 Download / View File",
+          "visible_only_in_states": [
+            "votación · panel de ranking",
+            "votación · ranking enviado",
+            "error de descarga"
+          ]
+        },
+        {
+          "name": "rk-rank-3",
+          "type": "dropdown",
+          "state": "closed",
+          "category": "input",
+          "label": "Rank:",
+          "content": "Select...",
+          "options": [
+            "Select...",
+            "1 (Best)",
+            "2",
+            "3 (Worst)"
+          ],
+          "visible_only_in_states": [
+            "votación · panel de ranking",
+            "error de descarga"
+          ],
+          "state_overrides": {
+            "error de descarga": {
+              "content": "Select..."
+            }
+          }
+        },
+        {
+          "name": "rk-error-descarga",
+          "type": "alert",
+          "kind": "error",
+          "category": "feedback",
+          "content": "Failed to download \"propuesta-carla.pdf\": You are not authorized to download this attachment.",
+          "visible_only_in_states": [
+            "error de descarga"
+          ],
+          "annotation": "role=\"alert\" · 404 → Attachment not found · 401 cierra la sesión global (ADR-008)"
+        },
+        {
+          "name": "rk-btn-enviar",
+          "type": "button",
+          "variant": "primary",
+          "category": "input",
+          "content": "Submit Rankings",
+          "visible_only_in_states": [
+            "votación · panel de ranking",
+            "error de descarga"
+          ],
+          "annotation": "envío irreversible · Submitting... mientras envía"
         }
       ],
       "layouts": {
@@ -1227,7 +1523,65 @@
                       }
                     ]
                   },
-                  "aviso-votacion"
+                  "aviso-votacion",
+                  "rk-titulo",
+                  "rk-instrucciones",
+                  {
+                    "row": "rk-fila-1",
+                    "cols": [
+                      {
+                        "w": 8,
+                        "stack": [
+                          "rk-prop-1",
+                          "rk-descargar-1"
+                        ]
+                      },
+                      {
+                        "w": 4,
+                        "stack": [
+                          "rk-rank-1"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "row": "rk-fila-2",
+                    "cols": [
+                      {
+                        "w": 8,
+                        "stack": [
+                          "rk-prop-2",
+                          "rk-descargar-2"
+                        ]
+                      },
+                      {
+                        "w": 4,
+                        "stack": [
+                          "rk-rank-2"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "row": "rk-fila-3",
+                    "cols": [
+                      {
+                        "w": 8,
+                        "stack": [
+                          "rk-prop-3",
+                          "rk-descargar-3"
+                        ]
+                      },
+                      {
+                        "w": 4,
+                        "stack": [
+                          "rk-rank-3"
+                        ]
+                      }
+                    ]
+                  },
+                  "rk-error-descarga",
+                  "rk-btn-enviar"
                 ]
               }
             ]
@@ -1285,7 +1639,20 @@
                   "requisitos-archivo",
                   "btn-subir",
                   "btn-quitar",
-                  "aviso-votacion"
+                  "aviso-votacion",
+                  "rk-titulo",
+                  "rk-instrucciones",
+                  "rk-prop-1",
+                  "rk-descargar-1",
+                  "rk-rank-1",
+                  "rk-prop-2",
+                  "rk-descargar-2",
+                  "rk-rank-2",
+                  "rk-prop-3",
+                  "rk-descargar-3",
+                  "rk-rank-3",
+                  "rk-error-descarga",
+                  "rk-btn-enviar"
                 ]
               }
             ]
@@ -1328,6 +1695,21 @@
         {
           "name": "terminal",
           "applies": true
+        },
+        {
+          "name": "votación · panel de ranking",
+          "applies": true,
+          "parent_state": "default"
+        },
+        {
+          "name": "error de descarga",
+          "applies": true,
+          "parent_state": "votación · panel de ranking"
+        },
+        {
+          "name": "votación · ranking enviado",
+          "applies": true,
+          "parent_state": "default"
         }
       ]
     },

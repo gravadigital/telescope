@@ -6,7 +6,7 @@
 | **Extensiones** | `uuid-ossp` |
 | **Acceso** | GORM 1.30.2 (`gorm.io/driver/postgres`) |
 | **Servicio propietario** | [`api`](../architectures/api/index.md) |
-| **Migraciones** | 21, versionadas en Go (`internal/storage/migrations/`) |
+| **Migraciones** | 22, versionadas en Go (`internal/storage/migrations/`) |
 
 Todo el estado del producto vive acá. Las claves primarias son UUID generadas por
 `uuid_generate_v4()` o por la aplicación en el hook `BeforeCreate`.
@@ -44,7 +44,6 @@ erDiagram
         varchar email UK
         varchar password_hash "nullable (OAuth)"
         varchar google_id UK "nullable"
-        user_role role "nullable"
         varchar password_reset_token UK "nullable"
         timestamptz password_reset_expires_at "nullable"
         timestamptz created_at
@@ -164,12 +163,13 @@ erDiagram
 | Tipo | Valores | Notas |
 |---|---|---|
 | `event_stage` | `creation`, `participation`, `voting`, `results` | La migración 012 unificó `registration` y `attachment_upload` en `participation` |
-| `user_role` | `admin`, `participant`, `organizer` | Rol **global**. Nullable desde la migración 010 |
+| ~~`user_role`~~ | `admin`, `participant`, `organizer` | **Eliminado por la migración 022** (S-005). Era el rol global de `users.role` |
 | `event_participant_role` | `creator`, `participant` | Rol **dentro de un evento** |
 
-El modelo de roles tiene dos niveles: `users.role` para capacidades del sistema y
-`event_participants.role` para quién manda en cada evento. Un usuario puede ser `creator`
-de un evento y `participant` de otro.
+El único modelo de roles es `event_participants.role`: quién manda en cada evento. Un
+usuario puede ser `creator` de un evento y `participant` de otro. El rol global
+`users.role` se retiró en la migración 022 (S-005, NFR-S-03); sus valores se descartaron sin
+preservar.
 
 ---
 
@@ -185,7 +185,6 @@ de un evento y `participant` de otro.
 | `email` | `varchar` | NOT NULL, UNIQUE, CHECK de formato |
 | `password_hash` | `varchar(255)` | **Nullable** — los usuarios de Google OAuth y los creados al registrarse a un evento no tienen |
 | `google_id` | `varchar` | UNIQUE, nullable. Índice parcial `WHERE google_id IS NOT NULL` |
-| `role` | `user_role` | Nullable desde la migración 010 |
 | `password_reset_token` | `varchar(64)` | UNIQUE, nullable. Hex de 32 bytes |
 | `password_reset_expires_at` | `timestamptz` | Nullable. Vigencia de 1 hora |
 | `created_at` / `updated_at` | `timestamptz` | |
@@ -423,7 +422,7 @@ Ninguna se consulta desde la aplicación: son herramientas de inspección manual
 
 Creados en la migración 003. Además de las PK y los UNIQUE:
 
-**`users`** — `email`, `role`, `google_id` (parcial, `WHERE google_id IS NOT NULL`)
+**`users`** — `email`, `google_id` (parcial, `WHERE google_id IS NOT NULL`). `idx_users_role` se eliminó en la migración 022
 **`events`** — `author_id`, `stage`, `(start_date, end_date)`, `created_at DESC`
 **`event_participants`** — `event_id`, `user_id`
 **`attachments`** — `event_id`, `participant_id`, `vote_count DESC`, `uploaded_at DESC`
@@ -464,6 +463,7 @@ Migraciones en Go, no en SQL, con `Up` y `Down` registradas en orden en
 | 019 | `add_password_reset_to_users` | Token de recuperación |
 | 020 | `add_is_paused_to_events` | Pausa |
 | 021 | `add_description_to_attachments` | Descripción opcional de la propuesta |
+| 022 | `drop_user_role` | Elimina `idx_users_role`, la columna `users.role` y el enum `user_role` (S-005) |
 
 Notas:
 
@@ -473,3 +473,6 @@ Notas:
   `system_validation` y desactivación temporal del CHECK `future_start_date`.
 - El `Down` de la 017 **no restaura** `password_hash NOT NULL`, deliberadamente, para no
   romper los usuarios OAuth ya creados.
+- El `Down` de la 022 restaura la estructura de `users.role` (tipo, columna e índice) pero
+  **no los valores**, que se descartaron por decisión de negocio. La 006 y `models.go` siguen
+  declarando `role`: corren antes de la 022 en una base nueva y son historia de migraciones.

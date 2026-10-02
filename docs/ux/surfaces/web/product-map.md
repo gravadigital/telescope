@@ -1,7 +1,7 @@
 ---
 document: Product Map — web
 version: "1.0"
-date: 2026-09-18
+date: 2026-09-25
 status: as-is-sin-validar
 superficie: web
 plataforma: web
@@ -83,8 +83,9 @@ La zona de acción de S-04 resuelve, en un solo contenedor, ocho situaciones mut
 | `participation` | registrado, sin entregar | Bloque de carga de propuesta |
 | `participation` | ya entregó | Confirmación de entrega recibida |
 | cualquiera | evento pausado | Aviso de pausa; acciones bloqueadas |
-| `voting` | sin configurar | Panel de configuración de votación |
-| `voting` | configurada, con asignación | Panel de ranking |
+| `voting` | sin configurar (organizador) | Panel de configuración de votación. ⚠️ Inalcanzable desde REQ-002: solo lo ve el creador, que es redirigido a S-05 |
+| `voting` | configurada, con asignación | Panel de ranking, con apertura de propuestas con la sesión |
+| `voting` | ranking ya enviado | Asignación completada + propuestas asignadas en solo lectura, descargables (REQ-002) |
 | `results` | — | Panel de resultados |
 
 `[fuente: código-existente — EventDetailPage.tsx:284-420]`
@@ -179,11 +180,11 @@ No son rutas: se montan sobre las pantallas.
 | O-05 | `StageAdvanceModal` | S-04, S-05 | Confirmar el avance de etapa y fijar deadline |
 | O-06 | Modal de confirmación de subida | S-04 | Confirmar el archivo antes de subirlo |
 | O-07 | Modal de edición de deadline | S-05 | Posponer el deadline de la etapa |
-| O-08 | Modal de participantes | S-04 | Ver quiénes se registraron |
+| O-08 | Modal de participantes | S-04 | Ver quiénes se registraron (nombre y email; sin badge de rol desde REQ-002) |
 | O-09 | `VotingConfigurationPanel` | S-04, S-05 | Configurar los parámetros del algoritmo (embebido) |
 | O-10 | `VotingResultsPanel` | S-04, S-05 y una tercera | Mostrar el ranking (embebido) |
 | O-11 | `EventTimeline` | S-04, S-05 | Stepper de 4 etapas (embebido) |
-| O-12 | `RankingVotePanel` | S-04 | Ordenar las propuestas asignadas (embebido) |
+| O-12 | `RankingVotePanel` | S-04 | Ordenar las propuestas asignadas y abrirlas con la sesión (embebido) |
 
 **O-09 a O-12 son paneles embebidos**, no overlays: se renderizan dentro del flujo de la pantalla.
 Se listan acá porque concentran funcionalidad propia y aparecen en más de una pantalla.
@@ -201,7 +202,7 @@ Cruce entre las capabilities del PRD y las pantallas que las implementan.
 | Capability | Pantalla | Notas |
 |---|---|---|
 | C-01 a C-08 (identidad) | O-02, O-03, O-04, S-06 | Todo el flujo de auth vive en overlays, salvo el reset |
-| C-09 (consultar usuario) | — | Sin pantalla propia |
+| C-09 (consultar usuario) | — | Sin pantalla propia. Desde REQ-002 solo la puede hacer el propio usuario o el creador de un evento donde participa; `web` no la consume |
 | C-10 (crear evento) | S-03 | ⚠️ **Sin campo de fecha**: se autogenera hoy+1día |
 | C-11, C-24 (listar) | S-02 | Con tres tabs de filtrado client-side |
 | C-12 (ver detalle) | S-04 | |
@@ -215,7 +216,7 @@ Cruce entre las capabilities del PRD y las pantallas que las implementan.
 | C-20 (listar participantes) | S-05, O-08 | ⚠️ Datos inventados ante fallo de API |
 | C-21 (listar propuestas) | S-05 | Solo como contador |
 | C-22 (consultar propuesta propia) | S-04 | Para saber si ya entregó |
-| C-23 (descargar propuesta) | O-12 | ⚠️ **El enlace apunta a `localhost` hardcodeado** |
+| C-23 (descargar propuesta) | O-12, S-04, S-05 | Con la sesión del usuario (REQ-002). El evaluador descarga solo mientras el evento está en `voting` y sin cancelar, incluso después de enviar su ranking |
 | C-25 (configurar votación) | O-09 | Con el `m` recomendado precargado |
 | C-26 (generar asignaciones) | O-09 | Irreversible |
 | C-27 (consultar asignación) | O-12 | |

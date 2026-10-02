@@ -338,8 +338,12 @@ paths:
       tags: [Usuarios y autenticación]
       summary: Obtener usuario
       description: |
-        **No verifica ownership**: cualquier usuario autenticado puede leer cualquier otro.
-        Tampoco valida el formato del UUID.
+        Solo el propio usuario, o el autor (`events.author_id`) de un evento en el que el
+        usuario consultado tiene fila en `event_participants` (cualquier `stage`, incluso
+        `is_cancelled`). Lo verifica el middleware `RequireSelfOrEventCreator` (S-003).
+
+        Un usuario inexistente consultado por un tercero responde `403`, no `404`, para no
+        revelar su existencia.
       parameters:
         - $ref: '#/components/parameters/UserId'
       responses:
@@ -351,10 +355,15 @@ paths:
                 type: object
                 properties:
                   user: { $ref: '#/components/schemas/UserSummary' }
+        '400': { $ref: '#/components/responses/MiddlewareBadRequest' }
         '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '403': { $ref: '#/components/responses/MiddlewareForbidden' }
         '404':
-          description: '`USER_NOT_FOUND`'
+          description: '`USER_NOT_FOUND` — solo alcanzable por el propio usuario'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`INTERNAL_ERROR` (forma `MiddlewareError`) — falla la verificación de permiso'
+          content: { application/json: { schema: { $ref: '#/components/schemas/MiddlewareError' } } }
 
   /api/v1/users/{user_id}/events:
     get:
@@ -665,7 +674,7 @@ paths:
       tags: [Eventos]
       summary: Avanzar la etapa del evento
       description: |
-        Solo el autor del evento o un admin. Las transiciones válidas son
+        Solo el autor del evento (S-005 retira el bypass de `admin`). Las transiciones válidas son
         `creation → participation → voting → results`, sin retroceso ni saltos.
 
         `estimated_end_date` es obligatoria cuando la etapa destino es `participation` o
@@ -1036,11 +1045,15 @@ paths:
       tags: [Propuestas]
       summary: Descargar una propuesta
       description: |
-        Pueden descargarla su dueño, el autor del evento o un `admin`. El permiso se verifica
-        en el handler (`canDownload`), no con un middleware de ruta.
+        Pueden descargarla:
+        - su dueño (`attachments.participant_id`), en cualquier etapa;
+        - el autor del evento (`events.author_id`), en cualquier etapa;
+        - el evaluador que la tiene en `assignments.attachment_ids` de su asignación en ese
+          evento, solo con `events.stage = voting` y `events.is_cancelled = false`.
+          `is_paused` no afecta, y tampoco `assignments.is_completed` (S-003, corrige D-15).
 
-        ⚠️ **Los evaluadores no están incluidos**: un participante no puede descargar las
-        propuestas de su propia asignación. Ver D-15 en `docs/prd/requirements.md`.
+        El permiso se verifica en el handler (`canDownload`), no con un middleware de ruta:
+        el evento se deriva del attachment. S-005 retira el acceso por rol `admin`.
 
         Si la copia del stream falla a mitad de camino, la respuesta queda truncada con el
         `200` ya enviado.
@@ -1056,7 +1069,7 @@ paths:
               schema: { type: string, format: binary }
         '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
         '403':
-          description: '`FORBIDDEN` — no es el dueño, el autor del evento ni un admin'
+          description: '`FORBIDDEN` — no es el dueño, ni el autor del evento, ni tiene la propuesta en su asignación con el evento en `voting` y sin cancelar'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '404':
           description: '`ATTACHMENT_NOT_FOUND`, `FILE_NOT_FOUND`'
@@ -1068,8 +1081,8 @@ paths:
       summary: Eliminar la propia propuesta
       description: |
         Solo el dueño de la propuesta, y solo durante la etapa `participation`: permite
-        reemplazarla subiendo otra. Ni el autor del evento ni un `admin` pueden eliminar la
-        propuesta de otro.
+        reemplazarla subiendo otra. El autor del evento no puede eliminar la propuesta de
+        otro.
 
         Se borra primero el registro y después el archivo. Si falla el borrado del archivo,
         la respuesta es igual `200`: el archivo queda huérfano en el storage.
@@ -1104,7 +1117,8 @@ paths:
       tags: [Votación distribuida]
       summary: Configurar los parámetros de votación
       description: |
-        Solo el autor del evento, un organizador o un admin. Una sola configuración por evento.
+        Solo el autor del evento (`RequireEventOwner`; S-005 retira el acceso de `organizer` y
+        `admin`). Una sola configuración por evento.
 
         Valida las restricciones matemáticas del algoritmo: `m ≤ k-1` (nadie evalúa lo propio),
         `m ≥ 2·log₂(k)` para convergencia, y cobertura suficiente (`n·m ≥ k·min_evaluations`).
@@ -1244,8 +1258,8 @@ paths:
       tags: [Votación distribuida]
       summary: Obtener la asignación de un participante
       description: |
-        Las propuestas que le tocó evaluar. Solo el propio participante, el autor del evento
-        o un admin, y solo durante la etapa `voting`.
+        Las propuestas que le tocó evaluar. Solo el propio participante o el autor del evento
+        (S-005 retira el bypass de `admin`), y solo durante la etapa `voting`.
 
         Devuelve la entidad de dominio completa, incluyendo campos internos como
         `quality_score` y `expertise_match_score`.
@@ -1597,6 +1611,13 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/MiddlewareError' }
+    MiddlewareBadRequest:
+      description: |
+        Parámetro de ruta con formato inválido (por ejemplo, un UUID mal formado), detectado
+        por un middleware de permisos. Forma `{error: "BAD_REQUEST", message: "..."}`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/MiddlewareError' }
 
   schemas:
 
@@ -1624,7 +1645,7 @@ components:
       properties:
         error:
           type: string
-          enum: [UNAUTHORIZED, FORBIDDEN, BAD_REQUEST, NOT_FOUND]
+          enum: [UNAUTHORIZED, FORBIDDEN, BAD_REQUEST, NOT_FOUND, INTERNAL_ERROR]
         message: { type: string }
       required: [error, message]
 
@@ -1648,16 +1669,14 @@ components:
 
     UserSummary:
       type: object
+      description: |
+        Sin rol global: S-005 retira `role` (`users.role`). El único modelo de roles es el de
+        Participación (`creator` / `participant`).
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
         lastname: { type: string }
         email: { type: string, format: email }
-        role:
-          type: string
-          enum: [admin, organizer, participant]
-          nullable: true
-          description: 'Rol global. Distinto del rol por evento (creator/participant)'
         created_at: { type: string, format: date-time }
 
     EventListItem:

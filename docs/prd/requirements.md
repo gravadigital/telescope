@@ -27,13 +27,16 @@ esta sección son el vocabulario único del PRD.
 - **Atributos clave:** `name` (string, req), `lastname` (string, opt), `email` (string, req,
   unique, CHECK de formato), `password_hash` (string, **nullable** — los usuarios de Google
   OAuth y los creados al registrarse a un evento no tienen), `google_id` (string, unique,
-  nullable), `role` (enum: `admin`/`organizer`/`participant`, nullable), `password_reset_token`
-  (string(64), unique, nullable), `password_reset_expires_at` (timestamptz, nullable)
+  nullable), `password_reset_token` (string(64), unique, nullable), `password_reset_expires_at`
+  (timestamptz, nullable)
 - **Relaciones:** has_many Evento (como autor), has_many Participación, has_many Propuesta,
   has_many Asignación, has_many Voto
 - **Reglas:** Password con bcrypt, mínimo 8 caracteres. El token de reset es hex de 32 bytes
-  con vigencia de 1 hora. ⚠️ **`role` es deuda a eliminar** (ver goals-and-context): el rol
-  vigente es el de Participación
+  con vigencia de 1 hora. **Sin rol global** (REQ-002): el atributo `role`
+  (`admin`/`organizer`/`participant`) se elimina y sus valores se descartan sin migración de
+  datos; los permisos salen solo de la Participación. Los datos de un usuario (`name`,
+  `lastname`, `email`) solo los consulta él mismo o el `creator` de un evento en el que ese
+  usuario tiene Participación (cualquier etapa, incluso cancelado)
 
 ### Evento (`events`)
 
@@ -56,8 +59,9 @@ esta sección son el vocabulario único del PRD.
 - **Atributos clave:** PK compuesta (`event_id`, `user_id`), `role` (enum: `creator`/
   `participant`, req, default `participant`), `joined_at` (timestamptz)
 - **Relaciones:** belongs_to Evento, belongs_to Usuario
-- **Reglas:** Es el modelo de roles vigente. Un usuario es `creator` de un evento y
-  `participant` de otro. El `creator` es el único que gestiona el evento
+- **Reglas:** Es el **único** modelo de roles del sistema (REQ-002). Un usuario es `creator`
+  de un evento y `participant` de otro. El `creator` es el único que gestiona el evento; no
+  existe ningún rol que saltee esta verificación
 
 ### Propuesta (`attachments`)
 
@@ -68,6 +72,10 @@ esta sección son el vocabulario único del PRD.
   **mantenido por trigger**)
 - **Relaciones:** belongs_to Evento, belongs_to Usuario (participante), has_many Voto
 - **Reglas:** **Una propuesta por participante por evento**, impuesto por la aplicación.
+  **Descarga** (REQ-002): pueden descargarla su dueño y el `creator` del evento en cualquier
+  etapa, y el evaluador que la tiene en su Asignación solo con el evento en etapa `voting` y
+  `is_cancelled = false` (`is_paused` no afecta; haber enviado el ranking tampoco). No hay
+  acceso por rol global.
   ⚠️ **Discrepancia de límite de tamaño**: la base admite 100 MB, el cliente valida 10 MB
   (`EventDetailPage.tsx:135`). El límite efectivo es el del cliente y **no está validado en el
   backend**. Tipos MIME aceptados (whitelist del cliente): JPEG, PNG, GIF, WebP, PDF, TXT,

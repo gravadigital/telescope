@@ -4,8 +4,8 @@ title: Configuración de la votación y generación de asignaciones
 type: feature
 status: Active
 created: 2026-09-18
-last_updated: 2026-09-18
-stories: []
+last_updated: 2026-09-25
+stories: [S-005]
 ---
 
 # Configuración de la votación y generación de asignaciones
@@ -13,8 +13,8 @@ stories: []
 **Tipo:** Feature
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-09-18
-**Stories:** — (documentado retroactivamente desde el código)
+**Última actualización:** 2026-09-25
+**Stories:** S-005 (base documentada retroactivamente desde el código)
 
 ## Descripción
 
@@ -94,7 +94,7 @@ el backend rechaza. Ver D-09 en `docs/prd/requirements.md`.
 
 - **Método:** POST
 - **Endpoint:** `/api/v1/events/{event_id}/voting-config`
-- **Auth:** JWT Bearer — solo el autor del evento, un organizador o un admin
+- **Auth:** JWT Bearer — solo el autor del evento (`RequireEventOwner`; S-005 retira el acceso de `organizer` y `admin`)
 - **Body:**
   ```json
   {
@@ -136,7 +136,7 @@ dos que se aplique primero.
 
 - **Método:** POST
 - **Endpoint:** `/api/v1/events/{event_id}/generate-assignments`
-- **Auth:** JWT Bearer
+- **Auth:** JWT Bearer — solo el autor del evento (`RequireEventOwner`; S-005 retira el acceso de `organizer` y `admin`)
 - **Body:** ninguno
 
 **Response (éxito) — 201:**

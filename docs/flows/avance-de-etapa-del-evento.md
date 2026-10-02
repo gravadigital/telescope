@@ -4,8 +4,8 @@ title: Avance de etapa del evento
 type: event
 status: Active
 created: 2026-09-18
-last_updated: 2026-09-18
-stories: []
+last_updated: 2026-09-25
+stories: [S-003, S-005]
 ---
 
 # Avance de etapa del evento
@@ -13,8 +13,8 @@ stories: []
 **Tipo:** Evento
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-09-18
-**Stories:** — (documentado retroactivamente desde el código)
+**Última actualización:** 2026-09-25
+**Stories:** S-003, S-005 (base documentada retroactivamente desde el código)
 
 ## Descripción
 
@@ -115,7 +115,7 @@ baja `n` posiciones**: un cierre prematuro penaliza a gente que todavía tenía 
 
 - **Método:** PATCH
 - **Endpoint:** `/api/v1/events/{event_id}/stage`
-- **Auth:** JWT Bearer — **solo el autor del evento o un admin**
+- **Auth:** JWT Bearer — **solo el autor del evento** (`RequireEventOwner`; S-005 retira el bypass de `admin`)
 - **Body:**
   ```json
   {
@@ -162,7 +162,7 @@ participante se entera de que se abrió la votación.
 |---|---|---|
 | `creation → participation` | `estimated_end_date` requerida | Registro de participantes y carga de propuestas |
 | `participation → voting` | `estimated_end_date` requerida · **≥ 2 propuestas** · (desde Manage: ≥ 1 participante) | Configuración de votación y generación de asignaciones |
-| `voting → results` | (desde Manage: todos votaron) | Panel de resultados |
+| `voting → results` | (desde Manage: todos votaron) | Panel de resultados. **Cierra la descarga de propuestas de los evaluadores** (S-003) |
 
 ## Acciones Independientes de la Etapa
 
@@ -172,7 +172,7 @@ cancelarse en cualquier etapa.
 | Acción | Endpoint | Efecto |
 |---|---|---|
 | Pausar / reanudar | `PATCH /api/v1/events/{event_id}/pause` | Con el evento pausado no se puede registrar ni subir propuestas |
-| Cancelar | `PATCH /api/v1/events/{event_id}/cancel` | Dispara email de cancelación |
+| Cancelar | `PATCH /api/v1/events/{event_id}/cancel` | Dispara email de cancelación. En `voting`, cierra la descarga de propuestas de los evaluadores (S-003) |
 | Posponer deadline | `PATCH /api/v1/events/{event_id}/estimated-end-date` | **Solo posponer, no adelantar** — regla activa en el backend. ⚠️ El cliente no la valida (D-06) |
 
 > La confirmación de pausa usa **`window.confirm` nativo** (`ManageEventPage.tsx:258`), el único
@@ -187,7 +187,7 @@ cancelarse en cualquier etapa.
 | 3 | Salto de etapa o retroceso | 400 | Mensaje del backend |
 | 3 | Falta `estimated_end_date` | 400 | Idem |
 | 3 | Menos de 2 propuestas al pasar a `voting` | 400 | Idem |
-| 3 | No es el autor del evento | 403 | — |
+| 3 | No es el autor del evento | 403 | `Only the event creator can perform this action` |
 | 4 | Falla el envío de email | — | ⚠️ **Nada.** Falla en silencio |
 
 ⚠️ **`ManageEventPage` no muestra ningún mensaje de éxito** tras avanzar de etapa: el único
@@ -195,7 +195,8 @@ feedback es que los datos se recargan. `EventDetailPage` sí muestra `Stage upda
 
 ## Estado Resultante
 
-- `events.stage` — la nueva etapa.
+- `events.stage` — la nueva etapa. Al pasar a `results`, los evaluadores ya no pueden descargar
+  las propuestas de su asignación (S-003).
 - `events.participation_estimated_end_date` o `voting_estimated_end_date` — el deadline fijado.
 - Los participantes reciben (o no, si SMTP falla) el email de cambio de etapa.
 - Las acciones habilitadas en la interfaz cambian según la etapa, para todos los roles.

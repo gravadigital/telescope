@@ -5,7 +5,7 @@ type: feature
 status: Active
 created: 2026-09-18
 last_updated: 2026-09-25
-stories: []
+stories: [S-005]
 ---
 
 # Registro a un evento y carga de propuesta
@@ -14,7 +14,7 @@ stories: []
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
 **Última actualización:** 2026-09-25
-**Stories:** — (documentado retroactivamente desde el código)
+**Stories:** S-005 (base documentada retroactivamente desde el código)
 
 ## Descripción
 
@@ -127,7 +127,8 @@ sequenceDiagram
 **Operaciones de BD:**
 - `SELECT` sobre `users` por `email`.
 - **`INSERT` sobre `users` si el email no existe** — con `password_hash` NULL. El usuario queda
-  creado sin poder iniciar sesión hasta que use el flujo de recuperación de contraseña.
+  creado sin poder iniciar sesión hasta que use el flujo de recuperación de contraseña, y **sin
+  rol global** (S-005): sus permisos dependen solo de sus filas en `event_participants`.
 - `INSERT` sobre `event_participants` — PK compuesta (`event_id`, `user_id`), `role = 'participant'`.
 
 **Reglas validadas:**
@@ -184,8 +185,8 @@ validación del cliente y la api lo rechaza con `INVALID_FILE_TYPE`.
 evento**; el creador no puede subir.
 
 **Reemplazo:** durante `participation`, el dueño puede eliminar su propuesta
-(`DELETE /api/v1/attachments/{attachment_id}`) y subir otra. Ni el autor del evento ni un
-`admin` pueden eliminar la de otro.
+(`DELETE /api/v1/attachments/{attachment_id}`) y subir otra. El autor del evento no puede
+eliminar la de otro.
 
 **Ref:** `docs/apis/api.yaml` → `.../participant/{participant_id}/attachment`
 

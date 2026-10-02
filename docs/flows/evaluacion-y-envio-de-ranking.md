@@ -4,8 +4,8 @@ title: Evaluación por pares y envío del ranking
 type: feature
 status: Active
 created: 2026-09-18
-last_updated: 2026-09-18
-stories: []
+last_updated: 2026-09-25
+stories: [S-003, S-004]
 ---
 
 # Evaluación por pares y envío del ranking
@@ -13,8 +13,8 @@ stories: []
 **Tipo:** Feature
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-09-18
-**Stories:** — (documentado retroactivamente desde el código)
+**Última actualización:** 2026-09-25
+**Stories:** S-003, S-004 (base documentada retroactivamente desde el código)
 
 ## Descripción
 
@@ -45,6 +45,19 @@ sequenceDiagram
     WEB->>API: GET .../participants/{participant_id}/assignment
     API->>DB: SELECT assignments
     API-->>WEB: 200 { assignment_id, attachment_ids }
+
+    opt abre una propuesta asignada (S-003, S-004)
+        P->>WEB: 📥 Download / View File
+        WEB->>API: GET /attachments/{attachment_id}/download (Bearer)
+        API->>DB: SELECT attachments, events, assignments
+        alt voting · no cancelado · en su asignación
+            API-->>WEB: 200 (stream)
+            WEB-->>P: descarga el archivo
+        else fuera de la ventana o de la asignación
+            API-->>WEB: 403 FORBIDDEN
+            WEB-->>P: Failed to download "{archivo}": {mensaje}.
+        end
+    end
 
     WEB->>API: GET .../participants/{participant_id}/vote-draft
     alt existe borrador
@@ -89,6 +102,31 @@ sequenceDiagram
 trigger `validate_assignment_constraints` lo impidió al crearlas.
 
 **Ref:** `docs/apis/api.yaml` → `.../participants/{participant_id}/assignment`
+
+---
+
+### Paso 1b: Abrir una propuesta asignada
+
+**Origen:** `web` · **Destino:** `api` · **Tipo:** REST · **Stories:** S-003 (regla), S-004 (panel)
+
+- **Método:** GET
+- **Endpoint:** `/api/v1/attachments/{attachment_id}/download`
+- **Auth:** JWT Bearer — `RankingVotePanel` usa `AttachmentService.downloadAttachment`, no un
+  `<a href>`
+
+**Response (éxito) — 200:** el archivo binario con `Content-Disposition`, `Content-Type` y
+`Content-Length`.
+
+**Operaciones de BD:** `SELECT` sobre `attachments` por `id`; `SELECT` sobre `events` por
+`attachments.event_id`; si el usuario no es dueño ni autor, `SELECT` sobre `assignments` por
+(`event_id`, `participant_id`).
+
+**Regla de evaluador (`canDownload`):** permite si `events.stage = voting`,
+`events.is_cancelled = false` y `attachment_id ∈ assignments.attachment_ids`. `is_paused` no
+afecta, y tampoco `assignments.is_completed`: el evaluador puede volver a abrir sus propuestas
+después de enviar el ranking, mientras dure `voting`. Se evalúa en cada descarga.
+
+**Ref:** `docs/apis/api.yaml` → `/api/v1/attachments/{attachment_id}/download`
 
 ---
 
@@ -186,6 +224,9 @@ del resto de la API. Es una de las cuatro formas de respuesta que el cliente tie
 | Paso | Condición | Respuesta | Qué ve el participante |
 |---|---|---|---|
 | 1 | Sin asignación (no participó, o no se generaron) | 404 | La UI no muestra el panel de ranking |
+| 1b | Propuesta fuera de la asignación, evento en `results` o cancelado | 403 `FORBIDDEN` | `Failed to download "{archivo}": You are not authorized to download this attachment.` inline, sin perder el ranking |
+| 1b | Attachment o archivo inexistente | 404 `ATTACHMENT_NOT_FOUND` / `FILE_NOT_FOUND` | `Failed to download "{archivo}": {mensaje}.` inline |
+| 1b | Token vencido | 401 | Se cierra la sesión global (ADR-008) |
 | 3 | Falla el guardado de borrador | 4xx/5xx | Depende del panel; el progreso local se mantiene |
 | 4 | Rangos no consecutivos o duplicados | 400 | Mensaje del backend, crudo |
 | 4 | Propuesta fuera de la asignación | 400 (o trigger) | Idem |

@@ -150,14 +150,14 @@ que el usuario vea como cierto algo que el sistema inventó.
 
 | Gap | Alcance | Severidad | Acción | Evidencia |
 |---|---|---|---|---|
-| **El enlace de descarga de propuestas tiene `http://localhost:8080` hardcodeado**, ignorando `REACT_APP_API_URL`. En producción el evaluador **no puede abrir las propuestas que evalúa** | panel de ranking | **alta** | story | `RankingVotePanel.tsx:242` |
+| ~~**El enlace de descarga de propuestas tiene `http://localhost:8080` hardcodeado**, ignorando `REACT_APP_API_URL`. En producción el evaluador **no puede abrir las propuestas que evalúa**~~ **→ Se resuelve en REQ-002** (descarga con sesión) | panel de ranking | **alta** | story | `RankingVotePanel.tsx:242` |
 | **Ningún overlay tiene `role="dialog"`, `aria-modal`, gestión de foco ni cierre por Escape** | los 8 overlays | **alta** | story | `Modal.tsx`, `StageAdvanceModal.tsx:82` |
 | **Sin rutas protegidas**: `/events/create` y `/events/:eventId/manage` son alcanzables por URL sin sesión | todas | media | story | `App.tsx:177-184` |
 | **Sin ruta 404**: una URL desconocida renderiza la navbar sobre contenido vacío | todas | media | story | `App.tsx:177-184` |
 | **Copiar el link puede fallar en silencio**: `navigator.clipboard` exige contexto seguro; si falla solo hace `console.error` | ShareButton (2 usos) | media | story | `ShareButton.tsx:47-50` |
 | **Sin estado offline** en ninguna pantalla | todas | media | decisión UX | no se detectó manejo de conectividad |
 | **Tema claro a medias**: solo `Auth.css` y `Modal.css` responden a `prefers-color-scheme: light` | todas | media | decisión UX | `Auth.css:290`, `Modal.css:113` |
-| **Tres islas en español** en una interfaz en inglés: etiquetas de rol (`Participante`, `Organizador`, `Administrador`), un `aria-label` y datos mock | Participants, GoogleLoginButton | media | decisión de producto | `Participants.tsx:67-70`, `GoogleLoginButton.tsx:29` |
+| **Tres islas en español** en una interfaz en inglés: etiquetas de rol (`Participante`, `Organizador`, `Administrador`) — **REQ-002 las quita junto con el badge de rol de O-08** —, un `aria-label` y datos mock | Participants, GoogleLoginButton | media | decisión de producto | `Participants.tsx:67-70`, `GoogleLoginButton.tsx:29` |
 | **Sin i18n**: los textos están embebidos en el JSX | todas | baja | decisión de producto | — |
 | **Un tercio de los colores hardcodeado**: 350 hex vs 753 `var()`, con una paleta implícita sin tokens | todas | baja | story | `foundations/color.md` deuda #2 |
 | **Fuente de verdad duplicada de tokens**: las 57 variables de `index.css` repetidas en `global.css` | todas | baja | story | `index.css:4-85`, `global.css:9+` |

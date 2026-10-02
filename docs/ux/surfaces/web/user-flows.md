@@ -1,7 +1,7 @@
 ---
 document: User Flows — web
 version: "1.0"
-date: 2026-09-18
+date: 2026-09-25
 status: as-is-sin-validar
 superficie: web
 ---
@@ -74,53 +74,58 @@ Inconsistencia menor de microcopy.
 
 **Audiencia:** participante · **Resuelve:** JTBD-02 (cumplir con la evaluación)
 **Pantallas:** S-04 → O-12 · **Flujo técnico:** [`evaluacion-y-envio-de-ranking`](../../../flows/evaluacion-y-envio-de-ranking.md)
+**Modificado por:** REQ-002 (apertura de propuestas con la sesión)
 
 ```mermaid
 graph TD
     A[Recibe email: el evento pasó a votación] --> B[S-04 Detalle del evento]
     B --> C{¿Tiene asignación?}
     C -->|no| D[No se muestra el panel<br/>sin explicación]
-    C -->|sí| E[O-12 Panel de ranking]
+    C -->|sí, pendiente| E[O-12 Panel de ranking]
     E --> F[Ve m propuestas:<br/>nombre, fecha, tamaño]
-    F --> G[📥 Download / View File]
-    G --> H{¿El enlace funciona?}
-    H -->|en producción| I[⚠️ localhost hardcodeado<br/>el archivo NO se abre]
-    H -->|en local| J[Abre el archivo]
-    I --> K[Ordena igual, a ciegas]
+    F --> G[📥 Download / View File<br/>con su sesión]
+    G --> H{¿La API permite la descarga?}
+    H -->|sí| J[Abre el archivo]
+    H -->|403 / 404| I[Error inline en el panel<br/>el ranking no se pierde]
+    I --> F
     J --> L[Lee y ordena]
-    K --> M[Autoguardado de borrador]
-    L --> M
+    L --> M[Autoguardado de borrador]
     M --> N{¿Termina ahora?}
     N -->|no| O[Abandona<br/>el borrador queda guardado]
     O --> B
     N -->|sí| P[Envía el ranking]
-    P --> Q[✅ Your rankings have been submitted<br/>IRREVERSIBLE]
+    P --> Q[✅ Assignment Completed<br/>IRREVERSIBLE]
+    Q --> R[Sigue viendo sus propuestas<br/>en solo lectura, descargables<br/>mientras dure voting]
 
-    style I fill:#ef4444,color:#fff
-    style K fill:#ef4444,color:#fff
+    style I fill:#f59e0b,color:#fff
     style D fill:#f59e0b,color:#fff
     style Q fill:#22c55e,color:#fff
 ```
 
-### El problema central de este flujo
+### La ventana de descarga del evaluador
 
-⚠️ **El enlace de descarga tiene `http://localhost:8080` hardcodeado**
-(`RankingVotePanel.tsx:242`), ignorando `REACT_APP_API_URL`. En cualquier despliegue real **el
-evaluador no puede abrir las propuestas** y termina ordenándolas por nombre de archivo, fecha y
-tamaño — los únicos datos que la tarjeta muestra.
+El evaluador puede abrir las propuestas de su Asignación **mientras el evento está en `voting` y no
+está cancelado**, haya enviado o no su ranking. **Pausar no corta la ventana**, porque la pausa es
+temporal. La ventana se cierra cuando el evento pasa a `results` o se cancela. La API revisa esta
+regla en cada descarga (REQ-002, RF-1).
 
-**Un ranking emitido sin leer las propuestas no mide calidad**, y el `Q_i` derivado de él tampoco.
-Es el defecto de mayor impacto sobre el valor del producto.
+Antes de REQ-002 el enlace tenía `http://localhost:8080` hardcodeado y en producción el evaluador
+ordenaba **sin leer las propuestas**. Un ranking así no mide calidad, y tampoco el `Q_i` que se
+deriva de él. Ese defecto está cerrado: la apertura con sesión es el paso que le da sentido al resto
+del flujo.
 
 ### Caminos no felices
 
 | Situación | Qué ve el usuario | Estado |
 |---|---|---|
 | Sin asignación | El panel simplemente no aparece | ⚠️ **Sin explicación.** No se distingue "no te tocó" de "todavía no se generaron" |
-| Enlace de descarga roto | Un link que no lleva a ningún lado | ⚠️ **Falla en silencio** |
+| Descarga rechazada (`403`), por ejemplo si el evento se canceló durante la votación | `Failed to download "{archivo}": You are not authorized to download this attachment.` inline en el panel | Bien resuelto (REQ-002) |
+| Archivo inexistente (`404`) | `Failed to download "{archivo}": File not found in storage.` inline | Bien resuelto (REQ-002) |
+| Sesión expirada (`401`) | Logout global y modal de login (ADR-008) | Bien resuelto |
+| Evento pausado | Descarga igual que sin pausa | Bien resuelto (REQ-002) |
 | Abandona a mitad | El borrador se guarda solo | Bien resuelto |
 | Rangos inválidos | Mensaje crudo del backend | Aceptable |
-| Ya votó | No admite reenvío | Correcto, pero **irreversible sin advertencia previa** |
+| Ya votó | No admite reenvío. Sigue viendo sus propuestas en solo lectura y puede abrirlas | Correcto, pero **irreversible sin advertencia previa** |
 
 **Lo mejor resuelto:** el autoguardado con debounce del borrador. Abandonar no cuesta nada.
 
@@ -173,12 +178,20 @@ graph TD
 | Umbrales inválidos | **Error 500 genérico** (CHECK de base) | ⚠️ Malo |
 | Falla una carga secundaria | **Nada: se ven datos falsos o vacíos** | ⚠️ **Crítico** |
 
+> **Desde REQ-002 solo el creador conduce el evento.** Se retiró el rol global `users.role`: ya no
+> hay `admin` que saltee los permisos ni `organizer` que configure la votación de un evento ajeno.
+> Avanzar la etapa, pausar, posponer el deadline, configurar la votación y generar asignaciones
+> exigen ser el autor del evento. Los pasos del flujo no cambian.
+
 ### Los tres problemas de este flujo
 
 1. **Las validaciones de avance dependen de la pantalla.** Desde S-05 se valida; **desde S-04 el
    mismo avance no valida nada**. Un organizador que llegue por el camino equivocado puede cerrar
    la votación con evaluaciones pendientes — y quien no completó recibe `Q_i = 0` y su propuesta
    baja `n` posiciones.
+
+   **Neutralizado por REQ-002:** el avance desde S-04 solo lo veía un `admin` que no era creador
+   (el creador es redirigido a S-05). Sin rol global, nadie llega a ese botón. El código sigue ahí.
 
 2. **No hay confirmación de éxito en toda S-05.** Tras avanzar de etapa, pausar o cambiar un
    deadline, **el único feedback es que los datos se recargan**. S-04 sí muestra

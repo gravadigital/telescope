@@ -93,9 +93,9 @@ JTBD no se parecen — uno conduce un proceso, el otro compite en él.
 - **Visitante anónimo** — No tiene un JTBD propio: es el estado previo a registrarse. La landing,
   el listado público y el detalle del evento son el embudo de entrada del participante y se
   documentan dentro de esa audiencia.
-- **Administrador global** — El rol `users.role = 'admin'` existe en el backend, saltea todas las
-  verificaciones de permiso y **no tiene ninguna pantalla**. Está declarado como deuda a eliminar
-  en [`goals-and-context.md`](../prd/goals-and-context.md), no como audiencia a atender.
+- **Administrador global** — El rol `users.role = 'admin'` salteaba todas las verificaciones de
+  permiso y **no tenía ninguna pantalla**. **REQ-002 lo retira** junto con todo `users.role`: el
+  único modelo de roles es el de Participación (`creator` / `participant`) de cada evento.
 
 ---
 
