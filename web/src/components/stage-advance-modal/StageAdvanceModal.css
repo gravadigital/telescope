@@ -48,21 +48,21 @@
 .stage-modal-header h2 {
   margin: 0;
   font-size: 1.25rem;
-  color: var(--text-primary, #fff);
+  color: #fff;
 }
 
 .stage-modal-close {
   background: none;
   border: none;
   font-size: 1.5rem;
-  color: var(--text-secondary, #888);
+  color: #888;
   cursor: pointer;
   padding: 0;
   line-height: 1;
 }
 
 .stage-modal-close:hover {
-  color: var(--text-primary, #fff);
+  color: #fff;
 }
 
 .stage-modal-body {
@@ -70,7 +70,7 @@
 }
 
 .stage-modal-description {
-  color: var(--text-secondary, #aaa);
+  color: #aaa;
   margin-bottom: 20px;
   line-height: 1.5;
 }
@@ -95,7 +95,7 @@
 
 .stage-badge.current {
   background: rgba(255, 255, 255, 0.1);
-  color: var(--text-secondary, #aaa);
+  color: #aaa;
 }
 
 .stage-badge.next {
@@ -104,7 +104,7 @@
 }
 
 .stage-arrow {
-  color: var(--text-secondary, #888);
+  color: #888;
   font-size: 1.25rem;
 }
 
@@ -114,7 +114,7 @@
 
 .stage-modal-date-field label {
   display: block;
-  color: var(--text-primary, #fff);
+  color: #fff;
   font-weight: 500;
   margin-bottom: 8px;
 }
@@ -126,7 +126,7 @@
 
 .stage-modal-date-field .field-hint {
   font-size: 0.85rem;
-  color: var(--text-secondary, #888);
+  color: #888;
   margin-bottom: 12px;
 }
 
@@ -136,7 +136,7 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.05);
-  color: var(--text-primary, #fff);
+  color: #fff;
   font-size: 1rem;
   box-sizing: border-box;
 }
@@ -180,7 +180,7 @@
 .stage-modal-footer .btn-secondary {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  color: var(--text-secondary, #aaa);
+  color: #aaa;
 }
 
 .stage-modal-footer .btn-secondary:hover:not(:disabled) {
@@ -204,11 +204,11 @@
 
 /* Current date info for edit modal */
 .current-date-info {
-  color: var(--text-secondary, #aaa);
+  color: #aaa;
   margin-bottom: 16px;
 }
 
 .current-date-info strong {
-  color: var(--text-primary, #fff);
+  color: #fff;
 }
 

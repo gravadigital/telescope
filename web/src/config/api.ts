@@ -71,13 +71,47 @@ export const DEFAULT_HEADERS: Record<string, string> = {
   'Accept': 'application/json',
 };
 
-// Error lanzado por apiRequest: conserva el status HTTP y el code estable del backend
-export interface ApiRequestError extends Error {
-  status: number;
-  code?: string;
+const FORM_B_CODE = /^[A-Z][A-Z0-9_]*$/;
+
+/**
+ * Error lanzado por apiRequest, uploadFile y downloadFile.
+ * Conserva el status HTTP, el `code` estable del backend y los campos extra
+ * del body (`details`) para que la pantalla traduzca por `code` (DA-6).
+ *
+ * - Forma A (handlers): `{ error, code, ...extras }`.
+ * - Forma B (middlewares): `{ error: "UNAUTHORIZED", message }` -> code = error.
+ * - Forma C (degradada): `{ error: "texto" }` -> sin code.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code?: string;
+  readonly details: Record<string, unknown>;
+
+  constructor({ status, body }: { status: number; body: unknown }) {
+    const data: Record<string, unknown> =
+      body && typeof body === 'object' && !Array.isArray(body)
+        ? (body as Record<string, unknown>)
+        : {};
+    const error = typeof data.error === 'string' ? data.error : undefined;
+    const text = typeof data.message === 'string' ? data.message : undefined;
+    super(error || text || `HTTP error! status: ${status}`);
+    Object.setPrototypeOf(this, ApiError.prototype);
+    this.name = 'ApiError';
+    this.status = status;
+    if (typeof data.code === 'string') {
+      this.code = data.code;
+    } else if (error && text !== undefined && FORM_B_CODE.test(error)) {
+      this.code = error;
+    }
+    const { error: _error, code: _code, message: _message, ...rest } = data;
+    this.details = rest;
+  }
 }
 
+export type ApiRequestError = ApiError;
+
 export const getErrorCode = (err: unknown): string | undefined => {
+  if (err instanceof ApiError) return err.code;
   if (err instanceof Error) {
     const code = (err as Partial<ApiRequestError>).code;
     if (typeof code === 'string') return code;
@@ -96,14 +130,6 @@ export const apiRequest = async <T = any>(
   // Note: The token is stored directly as a string (not JSON.stringify)
   const token = localStorage.getItem('telescopio_token');
 
-  console.log('🌐 API Request Debug:', {
-    endpoint,
-    hasToken: !!token,
-    tokenPreview: token ? `${token.substring(0, 20)}...` : 'NO TOKEN',
-    method: options.method || 'GET',
-    isFormData: options.body instanceof FormData
-  });
-
   // Si estamos enviando FormData, no establecer Content-Type (el browser lo hace automáticamente)
   const isFormData = options.body instanceof FormData;
   const headers: Record<string, string> = {
@@ -116,8 +142,6 @@ export const apiRequest = async <T = any>(
     ...options,
     headers,
   };
-
-  console.log('📤 Request Headers:', config.headers);
 
   try {
     const response = await fetch(url, config);
@@ -141,14 +165,7 @@ export const apiRequest = async <T = any>(
         // sin perder el contexto de navegación
       }
       
-      const requestError: ApiRequestError = Object.assign(
-        new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`),
-        {
-          status: response.status,
-          code: typeof errorData.code === 'string' ? (errorData.code as string) : undefined,
-        }
-      );
-      throw requestError;
+      throw new ApiError({ status: response.status, body: errorData });
     }
 
     const data = await response.json();
@@ -178,7 +195,7 @@ export const uploadFile = async (endpoint: string, formData: FormData): Promise<
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Upload failed! status: ${response.status}`);
+      throw new ApiError({ status: response.status, body: errorData });
     }
 
     return await response.json();
@@ -200,7 +217,7 @@ export const downloadFile = async (endpoint: string, filename: string): Promise<
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`);
+    throw new ApiError({ status: response.status, body: errorData });
   }
 
   const blob = await response.blob();

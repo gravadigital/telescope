@@ -1,0 +1,81 @@
+.ui-date-quick-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ref-space-sm);
+  font: var(--type-body);
+}
+.ui-date-quick-picker__label {
+  font: var(--type-ui);
+  color: var(--text-primary);
+}
+.ui-date-quick-picker__value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ref-space-ms);
+}
+.ui-date-quick-picker__value {
+  margin: 0;
+  font: var(--type-body);
+  font-weight: var(--ref-font-weight-semibold);
+}
+.ui-date-quick-picker__change {
+  min-height: 44px;
+  padding: 0 var(--ref-space-ms);
+  border: 0;
+  background: transparent;
+  color: var(--text-action);
+  font: var(--type-ui);
+  cursor: pointer;
+}
+.ui-date-quick-picker__date {
+  min-height: 44px;
+  padding: 0 var(--ref-space-md);
+  border: 1px solid var(--text-field-border);
+  border-radius: var(--radius-field);
+  font: var(--type-body);
+}
+.ui-date-quick-picker--error .ui-date-quick-picker__date {
+  border-color: var(--border-error);
+}
+.ui-date-quick-picker__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ref-space-sm);
+}
+.ui-date-quick-picker__preset {
+  min-height: 36px;
+  padding: 0 var(--ref-space-md);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  font: var(--type-ui);
+  cursor: pointer;
+}
+.ui-date-quick-picker__preset--selected {
+  background: var(--date-picker-preset-selected-bg);
+  color: var(--date-picker-preset-selected-fg);
+  border-color: transparent;
+}
+.ui-date-quick-picker__preset[aria-disabled='true'],
+.ui-date-quick-picker__preset:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+.ui-date-quick-picker__preset:focus-visible,
+.ui-date-quick-picker__change:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ui-date-quick-picker__help,
+.ui-date-quick-picker__error {
+  margin: 0;
+  font: var(--type-caption);
+}
+.ui-date-quick-picker__help {
+  color: var(--text-field-help);
+}
+.ui-date-quick-picker__error {
+  color: var(--text-field-error);
+}

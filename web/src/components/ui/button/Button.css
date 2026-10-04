@@ -1,0 +1,112 @@
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-inline-sm);
+  min-width: 88px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: var(--button-radius);
+  font: var(--type-ui);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: box-shadow var(--ref-motion-fast), border-color var(--ref-motion-fast);
+}
+
+.ui-button__icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Sizes (mobile-first: el área táctil mínima es 44px) */
+.ui-button--sm {
+  padding: 0 var(--ref-space-ms);
+}
+.ui-button--lg {
+  min-height: 46px;
+  padding: 0 var(--ref-space-lg);
+}
+.ui-button--full {
+  width: 100%;
+}
+
+/* Variants */
+.ui-button--primary {
+  background: var(--button-primary-bg);
+  color: var(--button-primary-fg);
+}
+.ui-button--primary:hover:not(:disabled) {
+  background: var(--button-primary-bg-hover);
+}
+.ui-button--secondary {
+  background: var(--button-secondary-bg);
+  color: var(--button-secondary-fg);
+  border-color: var(--button-secondary-border);
+}
+.ui-button--tertiary {
+  background: transparent;
+  color: var(--button-tertiary-fg);
+}
+.ui-button--on-band {
+  background: var(--button-on-band-bg);
+  color: var(--button-on-band-fg);
+  border-color: var(--button-on-band-border);
+}
+.ui-button--icon {
+  min-width: 44px;
+  padding: 0;
+  background: transparent;
+  color: var(--button-tertiary-fg);
+}
+
+.ui-button:focus-visible {
+  outline: none;
+  box-shadow: var(--button-focus);
+  border-color: var(--border-focus);
+}
+
+.ui-button:disabled {
+  background: var(--button-disabled-bg);
+  color: var(--button-disabled-fg);
+  cursor: not-allowed;
+}
+.ui-button--tertiary:disabled,
+.ui-button--icon:disabled {
+  background: transparent;
+}
+.ui-button[aria-busy='true'] {
+  cursor: progress;
+}
+
+/* Indicador de carga */
+.ui-button__spinner {
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: ui-button-spin 700ms linear infinite;
+}
+@keyframes ui-button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-button__spinner {
+    animation: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .ui-button--sm {
+    min-height: 36px;
+  }
+  .ui-button--md {
+    min-height: 40px;
+  }
+  .ui-button--icon {
+    min-height: 44px;
+  }
+}

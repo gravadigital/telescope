@@ -3,9 +3,7 @@
    Design System & Reusable Components
    ======================================== */
 
-/* ========================================
-   CSS VARIABLES (Design Tokens)
-   ======================================== */
+/* LEGACY v1.0 — variables de las pantallas viejas. Se borra con la última story de pantalla (S-016 / S-017). No agregar variables acá: usar src/styles/tokens.css. */
 :root {
   /* Primary Colors */
   --color-primary: #6a5acd;
@@ -45,8 +43,8 @@
   --color-gray-50: #f9fafb;
   --color-gray-100: #f3f4f6;
   --color-gray-200: #e5e7eb;
-  --color-gray-300: #e8eaed;
-  --color-gray-400: #c4c9d4;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
   --color-gray-500: #6b7280;
   --color-gray-600: #4b5563;
   --color-gray-700: #374151;
@@ -832,7 +830,8 @@
 }
 
 @media (max-width: 480px) {
-  :root {
+  /* Override responsive de variables LEGACY (mismo bloque lógico; :is() evita un segundo :root). */
+  :is(:root) {
     --spacing-xl: 1.5rem;
     --spacing-2xl: 2rem;
   }

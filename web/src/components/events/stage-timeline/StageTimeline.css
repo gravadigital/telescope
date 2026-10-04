@@ -1,0 +1,83 @@
+/* Mobile (base): solo el resumen de la etapa actual; la lista queda oculta a propósito
+   (viewport_override del screen.md). Desde 768px: 4 etapas en fila. */
+.ev-stage-timeline {
+  box-sizing: border-box;
+  padding: var(--ref-space-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-surface);
+  font: var(--type-body);
+  color: var(--text-primary);
+}
+.ev-stage-timeline__summary {
+  display: block;
+  margin: 0;
+  font: var(--type-ui);
+}
+
+.ev-stage-timeline__list {
+  display: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  gap: var(--ref-space-md);
+}
+.ev-stage-timeline__list--compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ref-space-ms);
+}
+
+.ev-stage-timeline__item {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ref-space-xs) var(--ref-space-sm);
+  min-width: 0;
+}
+.ev-stage-timeline__marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-disabled);
+  color: var(--text-inverse);
+}
+.ev-stage-timeline__item--completed .ev-stage-timeline__marker {
+  background: var(--bg-success);
+}
+.ev-stage-timeline__item--current .ev-stage-timeline__marker {
+  background: var(--bg-accent);
+}
+.ev-stage-timeline__name {
+  font: var(--type-ui);
+}
+.ev-stage-timeline__item--pending .ev-stage-timeline__name {
+  color: var(--text-secondary);
+}
+.ev-stage-timeline__now {
+  font: var(--type-eyebrow);
+  letter-spacing: var(--type-tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-action);
+}
+.ev-stage-timeline__subtitle {
+  flex-basis: 100%;
+  font: var(--type-caption);
+  color: var(--text-muted);
+}
+
+@media (min-width: 768px) {
+  .ev-stage-timeline {
+    padding: var(--space-padding-default);
+  }
+  .ev-stage-timeline__summary {
+    display: none;
+  }
+  .ev-stage-timeline__list {
+    display: flex;
+  }
+}
