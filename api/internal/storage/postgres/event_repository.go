@@ -592,3 +592,35 @@ func (r *PostgresEventRepository) CancelEvent(eventID string) error {
 	r.log.Info("event cancelled successfully", "event_id", eventID)
 	return nil
 }
+
+// CountParticipantsByEventIDs counts the registered participants of each event in
+// one query. The author is excluded, as in UserRepository.GetEventParticipants.
+func (r *PostgresEventRepository) CountParticipantsByEventIDs(eventIDs []string) (map[string]int, error) {
+	counts := make(map[string]int, len(eventIDs))
+	if len(eventIDs) == 0 {
+		return counts, nil
+	}
+	ids, err := parseUUIDs(eventIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	var rows []struct {
+		EventID uuid.UUID
+		Count   int
+	}
+	err = r.db.Raw(`SELECT event_participants.event_id AS event_id, COUNT(*) AS count
+		FROM event_participants
+		JOIN events ON events.id = event_participants.event_id
+		WHERE event_participants.event_id IN ?
+		AND event_participants.user_id <> events.author_id
+		GROUP BY event_participants.event_id`, ids).Scan(&rows).Error
+	if err != nil {
+		r.log.Error("failed to count participants by event IDs", "error", err)
+		return nil, fmt.Errorf("failed to count participants by event IDs: %w", err)
+	}
+	for _, row := range rows {
+		counts[row.EventID.String()] = row.Count
+	}
+	return counts, nil
+}

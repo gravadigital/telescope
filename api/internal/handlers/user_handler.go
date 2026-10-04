@@ -2,11 +2,15 @@ package handlers
 
 import (
 	"net/http"
+	"sort"
 
 	"github.com/charmbracelet/log"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/gravadigital/telescopio-api/internal/config"
+	"github.com/gravadigital/telescopio-api/internal/domain/event"
 	"github.com/gravadigital/telescopio-api/internal/domain/participant"
+	"github.com/gravadigital/telescopio-api/internal/domain/vote"
 	"github.com/gravadigital/telescopio-api/internal/email"
 	"github.com/gravadigital/telescopio-api/internal/logger"
 	"github.com/gravadigital/telescopio-api/internal/middleware/auth"
@@ -14,20 +18,27 @@ import (
 )
 
 type UserHandler struct {
-	userRepo     postgres.UserRepository
-	eventRepo    postgres.EventRepository
-	emailService *email.EmailService
-	config       *config.Config
-	log          *log.Logger
+	userRepo  postgres.UserRepository
+	eventRepo postgres.EventRepository
+	// attachmentRepo, voteRepo and resultsRepo feed my_status in scope=all.
+	attachmentRepo postgres.AttachmentRepository
+	voteRepo       postgres.VoteRepository
+	resultsRepo    postgres.VotingResultsRepository
+	emailService   *email.EmailService
+	config         *config.Config
+	log            *log.Logger
 }
 
-func NewUserHandler(userRepo postgres.UserRepository, eventRepo postgres.EventRepository, emailService *email.EmailService, cfg *config.Config) *UserHandler {
+func NewUserHandler(userRepo postgres.UserRepository, eventRepo postgres.EventRepository, attachmentRepo postgres.AttachmentRepository, voteRepo postgres.VoteRepository, resultsRepo postgres.VotingResultsRepository, emailService *email.EmailService, cfg *config.Config) *UserHandler {
 	return &UserHandler{
-		userRepo:     userRepo,
-		eventRepo:    eventRepo,
-		emailService: emailService,
-		config:       cfg,
-		log:          logger.Handler("user"),
+		userRepo:       userRepo,
+		eventRepo:      eventRepo,
+		attachmentRepo: attachmentRepo,
+		voteRepo:       voteRepo,
+		resultsRepo:    resultsRepo,
+		emailService:   emailService,
+		config:         cfg,
+		log:            logger.Handler("user"),
 	}
 }
 
@@ -240,6 +251,21 @@ func (h *UserHandler) GetUserEvents(c *gin.Context) {
 		return
 	}
 
+	switch scope := c.Query("scope"); scope {
+	case "", "participating":
+		// Historical behavior, handled below.
+	case "all":
+		h.getAllUserEvents(c, authenticatedUserID.(string), requestedUserID)
+		return
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid scope",
+			"code":    "INVALID_PAYLOAD",
+			"details": "scope must be one of: participating, all",
+		})
+		return
+	}
+
 	// Verify user can only access their own events
 	if authenticatedUserID.(string) != requestedUserID {
 		h.log.Warn("user attempting to access another user's events",
@@ -287,6 +313,173 @@ func (h *UserHandler) GetUserEvents(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"data": response,
 	})
+}
+
+// getAllUserEvents answers GET /users/:user_id/events?scope=all: the events the
+// user organizes plus the ones they take part in, with their role and, for
+// participations, their progress. Related data is read in batches, one query
+// per table, never per event.
+func (h *UserHandler) getAllUserEvents(c *gin.Context, authenticatedUserID, requestedUserID string) {
+	isAdmin := false
+	if role, err := auth.GetUserRoleFromContext(c); err == nil && role == participant.RoleAdmin {
+		isAdmin = true
+	}
+	if authenticatedUserID != requestedUserID && !isAdmin {
+		h.log.Warn("user attempting scope=all on another user's events",
+			"authenticated_user", authenticatedUserID,
+			"requested_user", requestedUserID)
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "You can only view your own events",
+			"code":  "FORBIDDEN",
+		})
+		return
+	}
+
+	userID, err := uuid.Parse(requestedUserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid user_id format",
+			"code":  "INVALID_USER_ID",
+		})
+		return
+	}
+
+	fail := func(what string, err error) {
+		h.log.Error("failed to retrieve user events", "user_id", requestedUserID, "step", what, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to retrieve user events",
+			"code":  "RETRIEVAL_ERROR",
+		})
+	}
+
+	organized, err := h.eventRepo.GetByAuthor(requestedUserID)
+	if err != nil {
+		fail("organized events", err)
+		return
+	}
+	participating, err := h.eventRepo.GetUserParticipatingEvents(requestedUserID)
+	if err != nil {
+		fail("participating events", err)
+		return
+	}
+
+	// The two sets never overlap: participating excludes the user's own events.
+	events := make([]*event.Event, 0, len(organized)+len(participating))
+	events = append(events, organized...)
+	events = append(events, participating...)
+	sort.SliceStable(events, func(i, j int) bool { return events[i].CreatedAt.After(events[j].CreatedAt) })
+
+	if len(events) == 0 {
+		c.JSON(http.StatusOK, gin.H{"data": []gin.H{}})
+		return
+	}
+
+	allIDs := make([]string, 0, len(events))
+	participantIDs := make([]string, 0, len(participating))
+	resultIDs := []string{}
+	for _, evt := range events {
+		allIDs = append(allIDs, evt.ID.String())
+		if evt.AuthorID != userID {
+			participantIDs = append(participantIDs, evt.ID.String())
+			if evt.Stage == event.StageResult {
+				resultIDs = append(resultIDs, evt.ID.String())
+			}
+		}
+	}
+
+	counts, err := h.eventRepo.CountParticipantsByEventIDs(allIDs)
+	if err != nil {
+		fail("participant counts", err)
+		return
+	}
+	attachments, err := h.attachmentRepo.GetByParticipantAndEventIDs(requestedUserID, participantIDs)
+	if err != nil {
+		fail("attachments", err)
+		return
+	}
+	assignments, err := h.voteRepo.GetAssignmentsByParticipantAndEventIDs(requestedUserID, participantIDs)
+	if err != nil {
+		fail("assignments", err)
+		return
+	}
+	results, err := h.resultsRepo.GetByEventIDs(resultIDs)
+	if err != nil {
+		fail("voting results", err)
+		return
+	}
+
+	attachmentByEvent := make(map[uuid.UUID]bool, len(attachments))
+	for _, att := range attachments {
+		attachmentByEvent[att.EventID] = true
+	}
+	assignmentByEvent := make(map[uuid.UUID]*vote.Assignment, len(assignments))
+	for _, a := range assignments {
+		assignmentByEvent[a.EventID] = a
+	}
+	resultsByEvent := make(map[uuid.UUID]*vote.VotingResults, len(results))
+	for _, r := range results {
+		resultsByEvent[r.EventID] = r
+	}
+
+	response := make([]gin.H, 0, len(events))
+	for _, evt := range events {
+		role := "creator"
+		var myStatus gin.H
+		if evt.AuthorID != userID {
+			role = "participant"
+			myStatus = buildMyStatus(evt, userID, attachmentByEvent[evt.ID], assignmentByEvent[evt.ID], resultsByEvent[evt.ID])
+		}
+
+		response = append(response, gin.H{
+			"id":                               evt.ID.String(),
+			"name":                             evt.Name,
+			"title":                            evt.Name,
+			"description":                      evt.Description,
+			"stage":                            evt.Stage.String(),
+			"start_date":                       evt.StartDate,
+			"date":                             evt.StartDate,
+			"end_date":                         evt.EndDate,
+			"organizer":                        evt.Organizer,
+			"author_id":                        evt.AuthorID.String(),
+			"creator_id":                       evt.AuthorID.String(),
+			"created_at":                       evt.CreatedAt,
+			"updated_at":                       evt.UpdatedAt,
+			"role":                             role,
+			"max_participants":                 evt.MaxParticipants,
+			"participants_count":               counts[evt.ID.String()],
+			"participation_estimated_end_date": formatDatePtr(evt.ParticipationEstimatedEndDate),
+			"voting_estimated_end_date":        formatDatePtr(evt.VotingEstimatedEndDate),
+			"is_paused":                        evt.IsPaused,
+			"is_cancelled":                     evt.IsCancelled,
+			"my_status":                        myStatus,
+		})
+	}
+
+	h.log.Info("user events (scope=all) retrieved successfully", "user_id", requestedUserID, "count", len(events))
+	c.JSON(http.StatusOK, gin.H{"data": response})
+}
+
+// buildMyStatus describes a participant's progress in evt. result_position and
+// result_total stay nil outside the results stage, without stored results, or
+// when the user does not appear in the adjusted ranking.
+func buildMyStatus(evt *event.Event, userID uuid.UUID, hasAttachment bool, assignment *vote.Assignment, results *vote.VotingResults) gin.H {
+	var position, total interface{}
+	if evt.Stage == event.StageResult && results != nil {
+		for _, item := range results.AdjustedRanking {
+			if item.ParticipantID == userID {
+				position = item.AdjustedRank
+				total = len(results.AdjustedRanking)
+				break
+			}
+		}
+	}
+	return gin.H{
+		"has_attachment":    hasAttachment,
+		"has_assignment":    assignment != nil,
+		"ranking_submitted": assignment != nil && assignment.IsCompleted,
+		"result_position":   position,
+		"result_total":      total,
+	}
 }
 
 type ForgotPasswordRequest struct {

@@ -224,8 +224,10 @@ Password con bcrypt (`DefaultCost`), mínimo 8 caracteres, validado en el domini
 | `is_cancelled` | `boolean` | NOT NULL, default `false` |
 | `is_paused` | `boolean` | NOT NULL, default `false` |
 
-CHECK `future_start_date` (`start_date >= now() - 1 día`) declarado `NOT VALID`: solo
-aplica a filas nuevas o modificadas, no a las existentes.
+CHECK `future_start_date` (`start_date >= now() - 1 día`) declarado `NOT VALID`: no se valida
+contra las filas existentes al crearse, pero PostgreSQL lo reevalúa en **todo** `UPDATE` de la fila,
+toque o no `start_date`. Un evento con `start_date` anterior a ayer no se puede editar, cambiar de
+etapa, pausar ni cancelar (error `future_start_date`, `500` en la API).
 
 `is_cancelled` e `is_paused` son independientes de `stage`: un evento puede estar pausado
 en cualquier etapa.

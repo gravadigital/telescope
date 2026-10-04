@@ -783,3 +783,25 @@ func (r *PostgresVoteRepository) ReplaceAssignmentVotes(assignmentID string, vot
 	}
 	return replaced, nil
 }
+
+// GetAssignmentsByParticipantAndEventIDs returns the participant's assignments in any of the events.
+func (r *PostgresVoteRepository) GetAssignmentsByParticipantAndEventIDs(participantID string, eventIDs []string) ([]*vote.Assignment, error) {
+	if len(eventIDs) == 0 {
+		return []*vote.Assignment{}, nil
+	}
+	participantUUID, err := uuid.Parse(participantID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid participant ID format: %w", err)
+	}
+	ids, err := parseUUIDs(eventIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	var assignments []*vote.Assignment
+	if err := r.db.Where("participant_id = ? AND event_id IN ?", participantUUID, ids).Find(&assignments).Error; err != nil {
+		r.log.Error("failed to retrieve assignments by participant and event IDs", "error", err)
+		return nil, fmt.Errorf("failed to retrieve assignments by participant and event IDs: %w", err)
+	}
+	return assignments, nil
+}

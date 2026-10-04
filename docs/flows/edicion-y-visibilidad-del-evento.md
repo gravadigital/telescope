@@ -2,18 +2,18 @@
 id: edicion-y-visibilidad-del-evento
 title: Edición y visibilidad del evento
 type: feature
-status: Draft
+status: Active
 created: 2026-10-02
-last_updated: 2026-10-02
+last_updated: 2026-10-04
 stories: [S-008, S-014]
 ---
 
 # Edición y visibilidad del evento
 
 **Tipo:** Feature
-**Status:** Draft (diseñado en REQ-003, pendiente de implementar)
+**Status:** Active (implementado en `api` por S-008; la parte de `web` es S-013 y S-014)
 **Creado:** 2026-10-02
-**Última actualización:** 2026-10-02
+**Última actualización:** 2026-10-04
 **Stories:** S-008, S-014
 
 ## Descripción
@@ -74,7 +74,7 @@ sequenceDiagram
 
 `auth.OptionalJWTAuthMiddleware()` en el grupo `eventsPublic`: con `Authorization` válido deja
 `user_id` y `user_role` en el contexto; si falta o es inválido sigue como anónimo y **nunca**
-responde 401 ni acepta un token inválido como identidad.
+responde 401 ni acepta un token inválido como identidad. Lo usa todo el grupo `eventsPublic`.
 
 ---
 
@@ -87,7 +87,7 @@ responde 401 ni acepta un token inválido como identidad.
   `POST /register` responden `404 EVENT_NOT_FOUND` si el evento está en `creation` y quien
   consulta no es su autor ni admin.
 - El autor ve sus eventos en `creation` con `GET /api/v1/users/{user_id}/events?scope=all`
-  (solo el propio usuario).
+  (solo el propio usuario, o un `admin`; otro usuario recibe `403 FORBIDDEN`).
 - Al abrir la inscripción (`creation → participation`) el evento pasa a ser público.
 
 ---
@@ -111,6 +111,14 @@ responde 401 ni acepta un token inválido como identidad.
 - **Response 200:** `{ "data": "EventDetail", "message": "string", "code": "EVENT_UPDATED" }`
 
 **Operación de BD:** `UPDATE events` vía `EventRepository.Update`. Las fechas no se editan acá.
+
+Orden de validaciones: id → body (`400 INVALID_PAYLOAD`) → evento (`404 EVENT_NOT_FOUND`) →
+etapa (`409`) → cupo (`400`) → nombre único (`409`) → `UPDATE`. Reenviar el nombre propio no es
+conflicto. `max_participants` se compara con los inscriptos sin contar al autor.
+
+> **Limitación conocida:** el CHECK `future_start_date` se reevalúa en todo `UPDATE` de la fila,
+> así que editar un evento con `start_date` anterior a ayer responde `500 DB_UPDATE_ERROR`.
+> Ver "Deuda técnica conocida" en `docs/architectures/api/overview.md`.
 
 ---
 

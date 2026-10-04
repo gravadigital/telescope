@@ -457,3 +457,25 @@ func (r *PostgresAttachmentRepository) UpdateVoteCount(id string, count int) err
 	r.log.Info("attachment vote count updated successfully", "attachment_id", id, "old_count", attachment.VoteCount, "new_count", count)
 	return nil
 }
+
+// GetByParticipantAndEventIDs returns the participant's attachments in any of the events.
+func (r *PostgresAttachmentRepository) GetByParticipantAndEventIDs(participantID string, eventIDs []string) ([]*attachmentDomain.Attachment, error) {
+	if len(eventIDs) == 0 {
+		return []*attachmentDomain.Attachment{}, nil
+	}
+	participantUUID, err := uuid.Parse(participantID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid participant ID format: %w", err)
+	}
+	ids, err := parseUUIDs(eventIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	var attachments []*attachmentDomain.Attachment
+	if err := r.db.Where("participant_id = ? AND event_id IN ?", participantUUID, ids).Find(&attachments).Error; err != nil {
+		r.log.Error("failed to retrieve attachments by participant and event IDs", "error", err)
+		return nil, fmt.Errorf("failed to retrieve attachments by participant and event IDs: %w", err)
+	}
+	return attachments, nil
+}

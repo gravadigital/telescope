@@ -170,3 +170,21 @@ func (r *PostgresVotingResultsRepository) Delete(eventID string) error {
 	r.log.Info("voting results deleted successfully", "event_id", eventID)
 	return nil
 }
+
+// GetByEventIDs returns the stored results of the given events; events without results are absent.
+func (r *PostgresVotingResultsRepository) GetByEventIDs(eventIDs []string) ([]*vote.VotingResults, error) {
+	if len(eventIDs) == 0 {
+		return []*vote.VotingResults{}, nil
+	}
+	ids, err := parseUUIDs(eventIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []*vote.VotingResults
+	if err := r.db.Where("event_id IN ?", ids).Find(&results).Error; err != nil {
+		r.log.Error("failed to retrieve voting results by event IDs", "error", err)
+		return nil, err
+	}
+	return results, nil
+}

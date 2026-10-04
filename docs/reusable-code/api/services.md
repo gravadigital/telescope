@@ -110,3 +110,64 @@ func (a *Assignment) PositionOf(attachmentID uuid.UUID) (int, bool)
 ```go
 n, ok := assignment.PositionOf(att.ID)
 ```
+
+---
+
+## Batch lookups
+
+**Location:** `internal/storage/postgres/event_repository.go`, `attachment_repository.go`, `vote_repository.go`, `voting_results_repository.go`
+**Description:** Read many events at once with a single `IN` query per table, to avoid N+1. All return an empty result without querying when the list is empty and fail on malformed UUIDs. `CountParticipantsByEventIDs` excludes the event author, like `UserRepository.GetEventParticipants`; events without participants may be absent from the map.
+
+**Signature:**
+```go
+CountParticipantsByEventIDs(eventIDs []string) (map[string]int, error)
+GetByParticipantAndEventIDs(participantID string, eventIDs []string) ([]*attachment.Attachment, error)
+GetAssignmentsByParticipantAndEventIDs(participantID string, eventIDs []string) ([]*vote.Assignment, error)
+GetByEventIDs(eventIDs []string) ([]*vote.VotingResults, error) // VotingResultsRepository
+```
+
+**Usage:**
+```go
+counts, err := h.eventRepo.CountParticipantsByEventIDs(ids)
+n := counts[evt.ID.String()] // 0 when absent
+```
+
+---
+
+## OptionalJWTAuthMiddleware
+
+**Location:** `internal/middleware/auth/jwt.go`
+**Description:** Gin middleware for public endpoints that behave differently for known users. A valid Bearer token sets `user_id`, `user_email` and `user_role`; anything else leaves the context untouched and continues. It never answers 401 and never calls `Abort`.
+
+**Signature:**
+```go
+func OptionalJWTAuthMiddleware() gin.HandlerFunc
+```
+
+**Usage:**
+```go
+eventsPublic := api.Group("/events")
+eventsPublic.Use(auth.OptionalJWTAuthMiddleware())
+```
+
+---
+
+## eventVisibleTo and buildEventDetail
+
+**Location:** `internal/handlers/event_visibility.go`, `internal/handlers/event_handler.go`
+**Description:** `eventVisibleTo` is the single visibility rule: an event outside `creation` is visible to everyone; in `creation` only to its author and admins (anonymous callers never see it). Callers answer `respondEventNotFound(c)`, the same `404 EVENT_NOT_FOUND` as a missing id. `buildEventDetail` builds the `EventDetail` payload and returns the participant count it reports.
+
+**Signature:**
+```go
+func eventVisibleTo(c *gin.Context, evt *event.Event) bool
+func respondEventNotFound(c *gin.Context)
+func (h *EventHandler) buildEventDetail(evt *event.Event) (gin.H, int)
+```
+
+**Usage:**
+```go
+if !eventVisibleTo(c, evt) {
+    respondEventNotFound(c)
+    return
+}
+```

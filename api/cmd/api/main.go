@@ -79,7 +79,7 @@ func main() {
 	votingSetupRepo := postgres.NewPostgresVotingSetupRepository(db)
 	eventHandler := handlers.NewEventHandler(eventRepo, userRepo, attachmentRepo, voteRepo, votingSetupRepo, emailService, distributedVoteHandler, cfg)
 	attachmentHandler := handlers.NewAttachmentHandler(attachmentRepo, eventRepo, userRepo, voteRepo, fileStorage, cfg)
-	userHandler := handlers.NewUserHandler(userRepo, eventRepo, emailService, cfg)
+	userHandler := handlers.NewUserHandler(userRepo, eventRepo, attachmentRepo, voteRepo, resultsRepo, emailService, cfg)
 	googleAuthHandler := handlers.NewGoogleAuthHandler(userRepo, cfg)
 
 	voteDraftRepo := postgres.NewPostgresVoteDraftRepository(db)
@@ -124,6 +124,7 @@ func main() {
 
 		// Event management - Public endpoints (no authentication required)
 		eventsPublic := api.Group("/events")
+		eventsPublic.Use(auth.OptionalJWTAuthMiddleware())
 		{
 			eventsPublic.GET("", eventHandler.GetAllEvents)                            // List all events
 			eventsPublic.GET("/:event_id", eventHandler.GetEvent)                      // Get event details
@@ -143,6 +144,11 @@ func main() {
 		{
 			// Create event - Any authenticated user can create events
 			events.POST("", eventHandler.CreateEvent)
+
+			// Edit event data - Only event owner or admin
+			events.PATCH("/:event_id",
+				auth.RequireEventOwner(eventRepo),
+				eventHandler.UpdateEvent)
 
 			// Update event stage - Only event owner or admin
 			events.PATCH("/:event_id/stage",

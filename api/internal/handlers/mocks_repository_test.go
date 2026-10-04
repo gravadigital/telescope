@@ -40,6 +40,12 @@ type mockEventRepository struct {
 	cancelErr         error
 	pauseErr          error
 	stageUpdates      int // calls to UpdateStageWithEstimatedDate
+	updateErr         error
+	updated           []*event.Event // events received by Update
+	participantCounts map[string]int // answers CountParticipantsByEventIDs
+	countCalls        [][]string     // arguments of each CountParticipantsByEventIDs call
+	countErr          error
+	listCalls         int // calls to GetByAuthor or GetUserParticipatingEvents
 }
 
 func newMockEventRepository() *mockEventRepository {
@@ -82,6 +88,7 @@ func (m *mockEventRepository) GetAllPaginated(params postgres.PaginationParams) 
 }
 
 func (m *mockEventRepository) GetByAuthor(authorID string) ([]*event.Event, error) {
+	m.listCalls++
 	var out []*event.Event
 	for _, e := range m.events {
 		if e.AuthorID.String() == authorID {
@@ -96,10 +103,29 @@ func (m *mockEventRepository) GetByParticipant(participantID string) ([]*event.E
 }
 
 func (m *mockEventRepository) GetUserParticipatingEvents(userID string) ([]*event.Event, error) {
+	m.listCalls++
 	return m.byParticipant[userID], nil
 }
 
+func (m *mockEventRepository) CountParticipantsByEventIDs(eventIDs []string) (map[string]int, error) {
+	m.countCalls = append(m.countCalls, eventIDs)
+	if m.countErr != nil {
+		return nil, m.countErr
+	}
+	out := make(map[string]int, len(eventIDs))
+	for _, id := range eventIDs {
+		if n, ok := m.participantCounts[id]; ok {
+			out[id] = n
+		}
+	}
+	return out, nil
+}
+
 func (m *mockEventRepository) Update(e *event.Event) error {
+	if m.updateErr != nil {
+		return m.updateErr
+	}
+	m.updated = append(m.updated, e)
 	m.events[e.ID.String()] = e
 	return nil
 }
@@ -343,6 +369,8 @@ func (m *mockUserRepository) ClearPasswordResetToken(u *participant.User) error 
 // ---------------------------------------------------------------------------
 
 type mockAttachmentRepository struct {
+	batchCalls    []batchCall // calls to GetByParticipantAndEventIDs
+	batchErr      error
 	attachments   map[string]*attachment.Attachment
 	byEvent       map[string][]*attachment.Attachment
 	getByEventErr error
@@ -386,6 +414,30 @@ func (m *mockAttachmentRepository) GetByEventID(eventID string) ([]*attachment.A
 
 func (m *mockAttachmentRepository) GetByEventIDPaginated(eventID string, params postgres.PaginationParams) (*postgres.PaginatedResult, error) {
 	return &postgres.PaginatedResult{}, nil
+}
+
+// batchCall records the arguments of a batch lookup.
+type batchCall struct {
+	participantID string
+	eventIDs      []string
+}
+
+func (m *mockAttachmentRepository) GetByParticipantAndEventIDs(participantID string, eventIDs []string) ([]*attachment.Attachment, error) {
+	m.batchCalls = append(m.batchCalls, batchCall{participantID, eventIDs})
+	if m.batchErr != nil {
+		return nil, m.batchErr
+	}
+	wanted := make(map[string]bool, len(eventIDs))
+	for _, id := range eventIDs {
+		wanted[id] = true
+	}
+	var out []*attachment.Attachment
+	for _, a := range m.attachments {
+		if a.ParticipantID.String() == participantID && wanted[a.EventID.String()] {
+			out = append(out, a)
+		}
+	}
+	return out, nil
 }
 
 func (m *mockAttachmentRepository) GetByParticipantID(participantID string) ([]*attachment.Attachment, error) {
@@ -433,6 +485,8 @@ type mockVoteRepository struct {
 	getAssignmentByPartErr error
 	replaceVotesErr        error
 	replaceCalls           []replaceVotesCall
+	batchCalls             []batchCall // calls to GetAssignmentsByParticipantAndEventIDs
+	batchErr               error
 }
 
 type replaceVotesCall struct {
@@ -567,6 +621,24 @@ func (m *mockVoteRepository) GetAssignmentByParticipant(eventID, participantID s
 	return nil, postgres.ErrAssignmentNotFound
 }
 
+func (m *mockVoteRepository) GetAssignmentsByParticipantAndEventIDs(participantID string, eventIDs []string) ([]*vote.Assignment, error) {
+	m.batchCalls = append(m.batchCalls, batchCall{participantID, eventIDs})
+	if m.batchErr != nil {
+		return nil, m.batchErr
+	}
+	wanted := make(map[string]bool, len(eventIDs))
+	for _, id := range eventIDs {
+		wanted[id] = true
+	}
+	var out []*vote.Assignment
+	for _, a := range m.assignments {
+		if a.ParticipantID.String() == participantID && wanted[a.EventID.String()] {
+			out = append(out, a)
+		}
+	}
+	return out, nil
+}
+
 // ReplaceAssignmentVotes mimics the repository plus the update_assignment_completion trigger.
 func (m *mockVoteRepository) ReplaceAssignmentVotes(assignmentID string, votes []*vote.Vote) (bool, error) {
 	if m.replaceVotesErr != nil {
@@ -688,10 +760,12 @@ func (m *mockVotingConfigurationRepository) ValidateConfiguration(config *vote.V
 // ---------------------------------------------------------------------------
 
 type mockVotingResultsRepository struct {
-	byEvent   map[string]*vote.VotingResults
-	getErr    error
-	createErr error
-	updateErr error
+	byEvent    map[string]*vote.VotingResults
+	getErr     error
+	createErr  error
+	updateErr  error
+	batchCalls [][]string // arguments of each GetByEventIDs call
+	batchErr   error
 }
 
 func newMockVotingResultsRepository() *mockVotingResultsRepository {
@@ -724,6 +798,20 @@ func (m *mockVotingResultsRepository) GetByEventID(eventID string) (*vote.Voting
 		return nil, fmt.Errorf("results not found for event: %s", eventID)
 	}
 	return r, nil
+}
+
+func (m *mockVotingResultsRepository) GetByEventIDs(eventIDs []string) ([]*vote.VotingResults, error) {
+	m.batchCalls = append(m.batchCalls, eventIDs)
+	if m.batchErr != nil {
+		return nil, m.batchErr
+	}
+	var out []*vote.VotingResults
+	for _, id := range eventIDs {
+		if r, ok := m.byEvent[id]; ok {
+			out = append(out, r)
+		}
+	}
+	return out, nil
 }
 
 func (m *mockVotingResultsRepository) Update(results *vote.VotingResults) error {

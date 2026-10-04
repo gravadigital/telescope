@@ -381,6 +381,11 @@ paths:
         `my_status`. La posición sale de `voting_results.adjusted_ranking`. Las consultas de
         estado personal se hacen por lote, sin N+1.
 
+        Los campos nuevos (`role`, `max_participants`, `participants_count`, fechas estimadas,
+        `is_paused`, `is_cancelled`, `my_status`) vienen **solo con `scope=all`**: sin `scope`
+        (o con `participating`) la respuesta es la histórica. `scope=all` sobre otro usuario
+        responde `403`, salvo que quien consulta sea `admin`.
+
         **Las fechas acá salen en RFC3339 completo**, no en `YYYY-MM-DD` como en el resto
         de los endpoints de eventos.
       parameters:
@@ -432,6 +437,9 @@ paths:
                             ranking_submitted: { type: boolean }
                             result_position: { type: integer, nullable: true, description: 'Posición en adjusted_ranking; null fuera de results' }
                             result_total: { type: integer, nullable: true }
+        '400':
+          description: '`INVALID_PAYLOAD` — `scope` inválido (`details`: `scope must be one of: participating, all`)'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '401':
           description: '`NO_AUTH_TOKEN`, `UNAUTHORIZED_ACCESS` (accediendo a eventos ajenos; semánticamente debería ser 403)'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
@@ -452,7 +460,8 @@ paths:
 
         **Nunca devuelve eventos en `creation`** (S-008); `stage=creation` → `data: []`.
         `stage_counts` se calcula sobre el conjunto filtrado por `q`, antes de filtrar por
-        `stage` y de paginar.
+        `stage` y de paginar, y siempre trae las tres claves (`participation`, `voting`,
+        `results`), aunque valgan 0. `q` ignora los espacios de los extremos; en blanco no filtra.
       security: []
       parameters:
         - name: page
@@ -615,6 +624,10 @@ paths:
       description: |
         S-008. Solo el autor (`RequireEventOwner`) y solo en `creation` o `participation`.
         Al menos un campo. Las fechas no se editan acá.
+
+        `RequireEventOwner` corre antes del handler: para un no-admin y un evento inexistente
+        responde la forma B `404 { error: NOT_FOUND }`, no `EVENT_NOT_FOUND`; un `admin` llega
+        al `404 EVENT_NOT_FOUND` del handler.
       parameters:
         - $ref: '#/components/parameters/EventId'
       requestBody:
@@ -650,6 +663,9 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '409':
           description: '`INVALID_UPDATE_STAGE` (+ `current_stage`), `DUPLICATE_EVENT_NAME`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`PARTICIPANT_CHECK_ERROR`, `DB_UPDATE_ERROR`, `RETRIEVAL_ERROR`'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
 
   /api/v1/events/{event_id}/share:
@@ -1183,6 +1199,9 @@ paths:
                         url: { type: string, example: '/api/v1/attachments/3fa85f64-5717-4562-b3fc-2c963f66afa6/download' }
                   count: { type: integer }
         '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '404':
+          description: '`EVENT_NOT_FOUND` — el evento existe, está en `creation` y quien consulta no es su autor ni `admin`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '500':
           description: '`RETRIEVAL_ERROR`'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
@@ -1792,6 +1811,9 @@ paths:
         '400':
           description: '`event_id` ausente'
           content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }
+        '404':
+          description: '`EVENT_NOT_FOUND` (forma A) — el evento existe, está en `creation` y quien consulta no es su autor ni `admin`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '500':
           description: Fallo al obtener votos o asignaciones
           content: { application/json: { schema: { $ref: '#/components/schemas/LegacyError' } } }

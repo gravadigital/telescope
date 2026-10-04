@@ -74,8 +74,9 @@ Reglas:
 Los permisos se componen declarándolos en la ruta, no dentro del handler:
 
 ```go
-// Público
+// Público, con autenticación opcional: identifica al usuario si hay token válido
 eventsPublic := api.Group("/events")
+eventsPublic.Use(auth.OptionalJWTAuthMiddleware())
 eventsPublic.GET("/:event_id", eventHandler.GetEvent)
 
 // Autenticado
@@ -96,6 +97,10 @@ Middlewares de permisos disponibles (`internal/middleware/auth/permissions.go`):
 | `RequireEventOwner(repo)` | El autor del evento, o un `admin` |
 | `RequireEventOwnerOrOrganizer(repo)` | Lo anterior, más cualquier `organizer` |
 | `RequireParticipantOrOwner(repo)` | El propio participante, el autor del evento, o un `admin` |
+
+`OptionalJWTAuthMiddleware` nunca rechaza: sin header o con un token inválido, vencido o mal
+formado el request sigue como anónimo, sin `user_id` ni `user_role` en el contexto. El handler
+decide qué ve un anónimo (por ejemplo `eventVisibleTo` oculta los eventos en `creation`).
 
 > **Cuidado al agregar rutas.** Un endpoint declarado en `api.Group("/api/v1")` en vez de
 > en el grupo que tiene `.Use(auth.JWTAuthMiddleware())` queda **público**. Así estuvo

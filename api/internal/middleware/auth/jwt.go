@@ -97,10 +97,8 @@ func JWTAuthMiddleware() gin.HandlerFunc {
 		}
 
 		// Expected format: "Bearer <token>"
-		var tokenString string
-		if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
-			tokenString = authHeader[7:]
-		} else {
+		tokenString, ok := bearerToken(authHeader)
+		if !ok {
 			c.JSON(401, gin.H{
 				"error": "UNAUTHORIZED",
 				"message": "Invalid Authorization header format. Expected: Bearer <token>",
@@ -125,6 +123,30 @@ func JWTAuthMiddleware() gin.HandlerFunc {
 		c.Set("user_email", claims.Email)
 		c.Set("user_role", claims.Role)
 
+		c.Next()
+	}
+}
+
+// bearerToken extracts the token from an "Authorization: Bearer <token>" header.
+func bearerToken(header string) (string, bool) {
+	if len(header) > 7 && header[:7] == "Bearer " {
+		return header[7:], true
+	}
+	return "", false
+}
+
+// OptionalJWTAuthMiddleware identifies the caller when a valid Bearer token is
+// present and otherwise continues as anonymous. It never rejects the request:
+// endpoints behind it decide what an anonymous caller may see.
+func OptionalJWTAuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if tokenString, ok := bearerToken(c.GetHeader("Authorization")); ok {
+			if claims, err := ValidateToken(tokenString); err == nil {
+				c.Set("user_id", claims.UserID)
+				c.Set("user_email", claims.Email)
+				c.Set("user_role", claims.Role)
+			}
+		}
 		c.Next()
 	}
 }

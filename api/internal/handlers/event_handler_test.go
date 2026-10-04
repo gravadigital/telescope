@@ -713,7 +713,7 @@ func TestRegisterParticipant_Success(t *testing.T) {
 func TestRegisterParticipant_RejectsWrongStage(t *testing.T) {
 	s := newTestEventHandlerSet()
 	e, _ := newRegisterableEvent()
-	e.Stage = event.StageCreation
+	e.Stage = event.StageVoting
 	s.eventRepo.addEvent(e)
 
 	body := map[string]interface{}{"participant_name": "New Person", "participant_email": "new@example.com"}
@@ -855,43 +855,8 @@ func TestRemoveParticipant_Success(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// UpdateEvent / DeleteEvent — always return 501, but only after validating
+// DeleteEvent — always returns 501, but only after validating
 // ---------------------------------------------------------------------------
-
-func TestUpdateEvent_ReturnsNotImplementedAfterValidation(t *testing.T) {
-	s := newTestEventHandlerSet()
-	e := event.NewEvent("Event", "desc", uuid.New(), time.Now(), time.Now().AddDate(0, 0, 5), "org")
-	e.Stage = event.StageCreation
-	s.eventRepo.addEvent(e)
-
-	body := map[string]interface{}{
-		"name": "Event", "description": "A sufficiently long description.",
-		"start_date": dateStr(time.Now().AddDate(0, 0, 5)),
-		"end_date":   dateStr(time.Now().AddDate(0, 0, 6)),
-	}
-	w := performRequest(t, http.MethodPut, s.handler.UpdateEvent,
-		gin.Params{{Key: "event_id", Value: e.ID.String()}}, "", body)
-
-	assert.Equal(t, http.StatusNotImplemented, w.Code)
-}
-
-func TestUpdateEvent_RejectsWrongStageBeforeNotImplemented(t *testing.T) {
-	s := newTestEventHandlerSet()
-	e := event.NewEvent("Event", "desc", uuid.New(), time.Now(), time.Now().AddDate(0, 0, 5), "org")
-	e.Stage = event.StageVoting
-	s.eventRepo.addEvent(e)
-
-	body := map[string]interface{}{
-		"name": "Event", "description": "A sufficiently long description.",
-		"start_date": dateStr(time.Now().AddDate(0, 0, 5)),
-		"end_date":   dateStr(time.Now().AddDate(0, 0, 6)),
-	}
-	w := performRequest(t, http.MethodPut, s.handler.UpdateEvent,
-		gin.Params{{Key: "event_id", Value: e.ID.String()}}, "", body)
-
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Equal(t, "INVALID_UPDATE_STAGE", jsonBody(t, w)["code"])
-}
 
 func TestDeleteEvent_ReturnsNotImplementedAfterValidation(t *testing.T) {
 	s := newTestEventHandlerSet()
@@ -988,6 +953,7 @@ func TestGetShareableEventInfo_TruncatesLongDescription(t *testing.T) {
 		longDesc[i] = 'a'
 	}
 	e := event.NewEvent("Event", string(longDesc), uuid.New(), time.Now(), time.Now().AddDate(0, 0, 5), "org")
+	e.Stage = event.StageParticipation
 	s.eventRepo.addEvent(e)
 
 	w := performRequest(t, http.MethodGet, s.handler.GetShareableEventInfo,
@@ -1003,6 +969,7 @@ func TestGetShareableEventInfo_TruncatesLongDescription(t *testing.T) {
 func TestGetShareableEventInfo_KeepsShortDescriptionUnchanged(t *testing.T) {
 	s := newTestEventHandlerSet()
 	e := event.NewEvent("Event", "short description", uuid.New(), time.Now(), time.Now().AddDate(0, 0, 5), "org")
+	e.Stage = event.StageParticipation
 	s.eventRepo.addEvent(e)
 
 	w := performRequest(t, http.MethodGet, s.handler.GetShareableEventInfo,
@@ -1045,6 +1012,7 @@ func TestGetAllEvents_PaginatesResults(t *testing.T) {
 	s := newTestEventHandlerSet()
 	for i := 0; i < 15; i++ {
 		e := event.NewEvent(uuid.NewString(), "desc", uuid.New(), time.Now(), time.Now().AddDate(0, 0, 5), "org")
+		e.Stage = event.StageParticipation
 		s.eventRepo.addEvent(e)
 	}
 

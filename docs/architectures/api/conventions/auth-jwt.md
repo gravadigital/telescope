@@ -100,6 +100,14 @@ tests lo prueban contra un servidor falso. El flujo tiene dos pasos: `verify` in
 (`status: "existing_user"` con JWT, o `status: "new_user"` con el perfil sugerido) y
 `register` crea la cuenta. Un usuario Google se vincula por `google_id` (único).
 
+## Autenticación opcional
+
+`auth.OptionalJWTAuthMiddleware()` (grupo `eventsPublic`) reutiliza `ValidateToken` y el mismo
+parseo de `Bearer ` que `JWTAuthMiddleware`. Con token válido deja `user_id`, `user_email` y
+`user_role` en el contexto; en cualquier otro caso sigue como anónimo y **nunca** responde 401 ni
+llama a `Abort`. Un token inválido jamás se acepta como identidad. Lo que un anónimo puede ver lo
+decide el handler, porque depende del estado del recurso (regla 3).
+
 ## Reglas al agregar endpoints
 
 1. **Verificá en qué grupo registrás la ruta.** Fuera del grupo con

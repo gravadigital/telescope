@@ -14,7 +14,7 @@ stories: [S-006, S-007, S-008, S-009, S-015]
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
 **Última actualización:** 2026-10-04
-**Stories:** S-006, S-007, S-008, S-009, S-015 (cambios planificados por REQ-003)
+**Stories:** S-006, S-007, S-008, S-009, S-015 (cambios planificados por REQ-003; S-008 ya implementado)
 
 ## Descripción
 
@@ -31,7 +31,6 @@ Solo ocurre durante la etapa `participation` y con el evento no pausado.
 
 | Paso | Cambio | Story |
 |---|---|---|
-| 1 | Un evento en `creation` responde `404 EVENT_NOT_FOUND` a quien no es su autor ni admin (autenticación opcional en los endpoints públicos) | S-008 |
 | 2 | Sin sesión, "Inscribirme" lleva a `/login?next=/events/{event_id}`. La inscripción emite `registration_confirmed` (al inscripto) y `participant_registered` agregada (al autor) | S-009, S-015 |
 | 3 | La validación del cliente pasa a vivir en `web/src/domain/files.ts` | S-010 |
 | 4 | La confirmación del archivo pasa del modal a la zona de carga (`FileDropzone`); el reemplazo no tiene modal aparte | S-015 |
@@ -63,9 +62,13 @@ sequenceDiagram
     participant S3 as MinIO
 
     U->>WEB: abre /events/{id} (link compartible)
-    WEB->>API: GET /api/v1/events/{event_id}
+    WEB->>API: GET /api/v1/events/{event_id} (token opcional)
     API->>DB: SELECT events
-    API-->>WEB: 200 { data: { stage, is_paused, max_participants, ... } }
+    alt stage = creation y no es autor ni admin
+        API-->>WEB: 404 EVENT_NOT_FOUND
+    else visible
+        API-->>WEB: 200 { data: { stage, is_paused, max_participants, ... } }
+    end
 
     alt stage != participation o is_paused
         WEB-->>U: bloquea la acción con aviso
@@ -98,10 +101,14 @@ sequenceDiagram
 
 - **Método:** GET
 - **Endpoint:** `/api/v1/events/{event_id}`
-- **Auth:** pública
+- **Auth:** pública, con autenticación opcional (`OptionalJWTAuthMiddleware`)
 
 **Response (éxito) — 200:** envelope `data` con el evento, incluyendo `stage`, `is_paused`,
-`is_cancelled`, `max_participants` y `participant_ids`.
+`is_cancelled`, `max_participants`, `participant_ids` y `participants_count`.
+
+**Response — 404 `EVENT_NOT_FOUND`:** también cuando el evento está en `creation` y quien consulta
+no es su autor ni `admin` (S-008). El registro (Paso 2) hace el mismo chequeo antes de validar la
+etapa, así que un evento oculto nunca responde `INVALID_REGISTRATION_STAGE`.
 
 **Operación de BD:** `SELECT` sobre `events`.
 
@@ -212,6 +219,7 @@ evento**; el creador no puede subir.
 
 | Paso | Condición | Respuesta | Qué ve el usuario |
 |---|---|---|---|
+| 1, 2 | Evento en `creation` ajeno | 404 `EVENT_NOT_FOUND` | Pantalla "No encontrada" |
 | 2 | Etapa distinta de `participation` | 400 | La UI no ofrece el botón de participar |
 | 2 | Evento pausado | 400 | `⏸ Registration and file submissions are not available while the event is paused.` |
 | 2 | Cupo completo | 400 | Mensaje de error de la API, crudo |

@@ -946,6 +946,13 @@ func (h *DistributedVoteHandler) GetVotingStatistics(c *gin.Context) {
 		return
 	}
 
+	// An unknown event keeps answering with empty statistics; an existing one in
+	// creation looks nonexistent to anyone but its author and admins.
+	if evt, err := h.eventRepo.GetByID(eventID); err == nil && !eventVisibleTo(c, evt) {
+		respondEventNotFound(c)
+		return
+	}
+
 	// Get basic voting statistics
 	votes, err := h.voteRepo.GetByEventID(eventID)
 	if err != nil {

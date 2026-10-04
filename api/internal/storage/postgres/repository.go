@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -53,6 +54,9 @@ type EventRepository interface {
 	GetByAuthor(authorID string) ([]*event.Event, error)
 	GetByParticipant(participantID string) ([]*event.Event, error)
 	GetUserParticipatingEvents(userID string) ([]*event.Event, error)
+	// CountParticipantsByEventIDs counts registered participants per event, the author excluded.
+	// Events without participants may be absent from the map.
+	CountParticipantsByEventIDs(eventIDs []string) (map[string]int, error)
 	Update(event *event.Event) error
 	Delete(id string) error
 	UpdateStage(eventID string, stage event.Stage) error
@@ -93,6 +97,7 @@ type AttachmentRepository interface {
 	GetByEventID(eventID string) ([]*attachment.Attachment, error)
 	GetByEventIDPaginated(eventID string, params PaginationParams) (*PaginatedResult, error)
 	GetByParticipantID(participantID string) ([]*attachment.Attachment, error)
+	GetByParticipantAndEventIDs(participantID string, eventIDs []string) ([]*attachment.Attachment, error)
 	Update(attachment *attachment.Attachment) error
 	UpdatePartial(id string, updates map[string]interface{}) error
 	Delete(id string) error
@@ -117,6 +122,7 @@ type VoteRepository interface {
 	GetAssignmentsByEventID(eventID string) ([]*vote.Assignment, error)
 	GetAssignmentsByEventIDPaginated(eventID string, params PaginationParams) (*PaginatedResult, error)
 	GetAssignmentByParticipant(eventID, participantID string) (*vote.Assignment, error)
+	GetAssignmentsByParticipantAndEventIDs(participantID string, eventIDs []string) ([]*vote.Assignment, error)
 	UpdateAssignment(assignment *vote.Assignment) error
 	ReplaceAssignmentVotes(assignmentID string, votes []*vote.Vote) (replaced bool, err error)
 	DeleteAssignment(id string) error
@@ -149,6 +155,7 @@ type VotingResultsRepository interface {
 	Create(results *vote.VotingResults) error
 	GetByID(id string) (*vote.VotingResults, error)
 	GetByEventID(eventID string) (*vote.VotingResults, error)
+	GetByEventIDs(eventIDs []string) ([]*vote.VotingResults, error)
 	Update(results *vote.VotingResults) error
 	Delete(eventID string) error
 	CalculateResults(eventID string) (*vote.VotingResults, error)
@@ -168,3 +175,16 @@ type RepositoryContainer interface {
 }
 
 // Aquí iría la configuración de la conexión a la DB (sqlx, gorm, etc.)
+
+// parseUUIDs parses every id, failing on the first malformed one.
+func parseUUIDs(ids []string) ([]uuid.UUID, error) {
+	parsed := make([]uuid.UUID, len(ids))
+	for i, id := range ids {
+		u, err := uuid.Parse(id)
+		if err != nil {
+			return nil, fmt.Errorf("invalid ID format %q: %w", id, err)
+		}
+		parsed[i] = u
+	}
+	return parsed, nil
+}

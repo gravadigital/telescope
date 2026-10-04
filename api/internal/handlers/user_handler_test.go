@@ -18,18 +18,24 @@ import (
 
 // testUserHandlerSet bundles the mock dependencies a UserHandler needs.
 type testUserHandlerSet struct {
-	userRepo  *mockUserRepository
-	eventRepo *mockEventRepository
-	handler   *UserHandler
+	userRepo       *mockUserRepository
+	eventRepo      *mockEventRepository
+	attachmentRepo *mockAttachmentRepository
+	voteRepo       *mockVoteRepository
+	resultsRepo    *mockVotingResultsRepository
+	handler        *UserHandler
 }
 
 func newTestUserHandlerSet() *testUserHandlerSet {
 	s := &testUserHandlerSet{
-		userRepo:  newMockUserRepository(),
-		eventRepo: newMockEventRepository(),
+		userRepo:       newMockUserRepository(),
+		eventRepo:      newMockEventRepository(),
+		attachmentRepo: newMockAttachmentRepository(),
+		voteRepo:       newMockVoteRepository(),
+		resultsRepo:    newMockVotingResultsRepository(),
 	}
 	cfg := &config.Config{}
-	s.handler = NewUserHandler(s.userRepo, s.eventRepo, email.NewEmailService(cfg), cfg)
+	s.handler = NewUserHandler(s.userRepo, s.eventRepo, s.attachmentRepo, s.voteRepo, s.resultsRepo, email.NewEmailService(cfg), cfg)
 	return s
 }
 
