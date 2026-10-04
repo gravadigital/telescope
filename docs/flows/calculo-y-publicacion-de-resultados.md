@@ -34,7 +34,6 @@ la pregunta abierta #1 del PRD.
 |---|---|---|
 | — | Sin cambio de cálculo | — |
 | Disparador | Se puede publicar con rankings faltantes (confirmación explícita en el diálogo de la gestión); quien no completó queda con `Q_i = 0` | S-016 |
-| 5 | Tras persistir, notificaciones `stage_changed { stage: "results", result_position, result_total }` por inscripto | S-009 |
 | Presentación | Puntaje `mbc_score × 10` con un decimal y separador según idioma; podio (1–3) + lista sobre `adjusted_ranking`; el propio participante resaltado | S-015 |
 
 ## Servicios Involucrados
@@ -87,6 +86,8 @@ El ranking se calcula y persiste **una vez**, al pasar el evento a la etapa `res
 `POST .../distributed-results/recalculate` (requiere sesión). El GET solo hace `SELECT` sobre
 `voting_results` — dejó de recalcular en cada llamada, por lo que ahora es seguro exponerlo
 (D-11 quedó aislado en el POST).
+
+**Notificaciones (S-009).** `CalculateAndPersistResults` devuelve los resultados que guardó y `UpdateEventStage` los usa para emitir `stage_changed { stage: "results", result_position, result_total }` a cada inscripto que figura en `adjusted_ranking`; el resto (o todos, si el cálculo falla) recibe `{ stage: "results" }`. Ver [notificaciones-in-app](notificaciones-in-app.md).
 
 Si no hay fila guardada responde `404 RESULTS_NOT_CALCULATED`; el panel de resultados intenta
 el recálculo autenticado como fallback y, si no hay sesión, muestra el mensaje.

@@ -6,7 +6,7 @@
 | **Extensiones** | `uuid-ossp` |
 | **Acceso** | GORM 1.30.2 (`gorm.io/driver/postgres`) |
 | **Servicio propietario** | [`api`](../architectures/api/index.md) |
-| **Migraciones** | 23 aplicadas + 1 planificada (024 — REQ-003), versionadas en Go (`internal/storage/migrations/`) |
+| **Migraciones** | 24 aplicadas (024 — S-009), versionadas en Go (`internal/storage/migrations/`) |
 
 Todo el estado del producto vive acá. Las claves primarias son UUID generadas por
 `uuid_generate_v4()` o por la aplicación en el hook `BeforeCreate`.
@@ -179,7 +179,7 @@ erDiagram
 | `event_stage` | `creation`, `participation`, `voting`, `results` | La migración 012 unificó `registration` y `attachment_upload` en `participation` |
 | `user_role` | `admin`, `participant`, `organizer` | Rol **global**. Nullable desde la migración 010 |
 | `event_participant_role` | `creator`, `participant` | Rol **dentro de un evento** |
-| `notification_type` | `stage_changed`, `event_cancelled`, `event_paused`, `deadline_changed`, `participant_registered`, `registration_confirmed`, `ranking_submitted`, `file_reminder`, `vote_reminder` | **Planificado** — migración 024 (S-009) |
+| `notification_type` | `stage_changed`, `event_cancelled`, `event_paused`, `deadline_changed`, `participant_registered`, `registration_confirmed`, `ranking_submitted`, `file_reminder`, `vote_reminder` | Migración 024 (S-009) |
 
 El modelo de roles tiene dos niveles: `users.role` para capacidades del sistema y
 `event_participants.role` para quién manda en cada evento. Un usuario puede ser `creator`
@@ -380,7 +380,7 @@ Forma de cada elemento de los rankings:
 > `valid_evaluator_counts` referencia `good_evaluator_count` y `bad_evaluator_count`:
 > esas columnas quedan en 0 y el CHECK pasa trivialmente.
 
-### `notifications` — planificada (S-009, migración 024)
+### `notifications` (S-009, migración 024)
 
 Avisos in-app por usuario (ADR-009). Se guarda `type` + `data`, no texto: la web compone el
 mensaje en el idioma del usuario con el nombre vigente del evento. Creada con SQL explícito
@@ -551,7 +551,7 @@ Migraciones en Go, no en SQL, con `Up` y `Down` registradas en orden en
 | 021 | `add_description_to_attachments` | Descripción opcional de la propuesta |
 | 022 | `fix_uuid_comparison_in_triggers` | Recrea las funciones de validación comparando `uuid` con `uuid` (la 004 comparaba `text` contra `uuid[]` y fallaba todo insert en `assignments` y `votes`) |
 | 023 | `relax_voting_results_vote_count` | CHECK `valid_participant_counts` pasa a `total_participants > 0 AND total_votes >= 0`. `Down` restaura `total_votes >= total_participants` |
-| 024 | `add_notifications` | **Planificada (S-009).** Enum `notification_type`, tabla `notifications` e índices |
+| 024 | `add_notifications` | Enum `notification_type`, tabla `notifications` e índices |
 
 Notas:
 

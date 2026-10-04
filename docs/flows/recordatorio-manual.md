@@ -2,18 +2,18 @@
 id: recordatorio-manual
 title: Recordatorio manual del organizador
 type: feature
-status: Draft
+status: Active
 created: 2026-10-02
-last_updated: 2026-10-02
+last_updated: 2026-10-04
 stories: [S-009, S-016]
 ---
 
 # Recordatorio manual del organizador
 
 **Tipo:** Feature
-**Status:** Draft (diseñado en REQ-003, pendiente de implementar)
+**Status:** Active en `api` (S-009 implementada); la web queda pendiente en S-016
 **Creado:** 2026-10-02
-**Última actualización:** 2026-10-02
+**Última actualización:** 2026-10-04
 **Stories:** S-009, S-016
 
 ## Descripción
@@ -91,6 +91,9 @@ muestra con N = 0.
 - `file` solo en `participation` → destinatarios = inscriptos sin propuesta.
 - `vote` solo en `voting` → destinatarios = asignaciones con `is_completed = false`.
 - Evento pausado o cancelado → `409 EVENT_PAUSED_OR_CANCELLED`.
+- Orden de validaciones en la api: `event_id` (`400 INVALID_EVENT_ID`) → body (`400 INVALID_PAYLOAD`) → evento (`404 EVENT_NOT_FOUND`) → pausado o cancelado (`409`) → etapa (`409 INVALID_EVENT_STAGE` con `current_stage`) → pendientes (`409 NO_PENDING_RECIPIENTS`). Pausa y cancelación van antes que la etapa porque bloquean cualquier acción.
+- Una falla al leer los pendientes devuelve `500 RETRIEVAL_ERROR` y no se emite nada.
+- `recipients_count` es la cantidad de pendientes calculados; no depende de que la inserción de notificaciones funcione.
 
 ---
 

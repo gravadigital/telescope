@@ -2,18 +2,18 @@
 id: notificaciones-in-app
 title: Notificaciones in-app
 type: feature
-status: Draft
+status: Active
 created: 2026-10-02
-last_updated: 2026-10-02
+last_updated: 2026-10-04
 stories: [S-009, S-018]
 ---
 
 # Notificaciones in-app
 
 **Tipo:** Feature
-**Status:** Draft (diseñado en REQ-003, pendiente de implementar)
+**Status:** Active en `api` (S-009 implementada); la web queda pendiente en S-018
 **Creado:** 2026-10-02
-**Última actualización:** 2026-10-02
+**Última actualización:** 2026-10-04
 **Stories:** S-009, S-018
 
 ## Descripción
@@ -89,6 +89,8 @@ WHERE read_at IS NULL AND type = 'participant_registered' DO UPDATE SET data =
 jsonb_set(data, '{count}', …), created_at = now()`. Si la anterior ya estaba leída, se crea una
 nueva con `count: 1`.
 
+**Orden de destinatarios:** los inscriptos se obtienen de `GetEventParticipants` (excluye al autor). Si esa lectura o la inserción fallan, se registra un `Warn` y la respuesta del handler no cambia.
+
 **Anonimato:** `data` nunca incluye quién subió qué propuesta.
 
 **Ref:** `docs/db-schemas/telescopio_db.md` → `notifications`
@@ -115,7 +117,8 @@ y después de cada navegación. Usa el índice parcial `idx_notifications_unread
 
 - **Método:** GET
 - **Endpoint:** `/api/v1/notifications`
-- **Query:** `limit` (1..50, default 20), `before` (date-time, cursor por `created_at`)
+- **Query:** `limit` (1..50, default 20), `before` (date-time, cursor por `created_at`, exclusivo). Un `limit` o un `before` inválidos devuelven `400 INVALID_PAYLOAD`; no se recortan en silencio.
+- **Cursor:** orden `created_at DESC, id DESC`. `next_cursor` es el `created_at` del último ítem devuelto, en UTC con precisión de microsegundos (RFC3339 con fracción, por ejemplo `2026-09-30T08:15:30.000123Z`); es `null` en la última página. Hay que enviarlo tal cual en `before`.
 - **Response 200:**
   ```json
   {
@@ -141,7 +144,7 @@ La web compone título, cuerpo y acción con `type` + `data` + `event` en el idi
 
 **Origen:** `web` · **Destino:** `api` · **Tipo:** REST
 
-- `PATCH /api/v1/notifications/{notification_id}/read` → `200 { data: { id, read_at }, code: NOTIFICATION_READ }` (idempotente; ajena → `404 NOTIFICATION_NOT_FOUND`)
+- `PATCH /api/v1/notifications/{notification_id}/read` → `200 { data: { id, read_at }, code: NOTIFICATION_READ }` (idempotente; ajena, inexistente, vencida o con id mal formado → `404 NOTIFICATION_NOT_FOUND`)
 - `POST /api/v1/notifications/read-all` → `200 { data: { updated }, code: NOTIFICATIONS_READ }`
 
 ---
@@ -152,7 +155,7 @@ La web compone título, cuerpo y acción con `type` + `data` + `event` en el idi
 |---|---|---|---|
 | 1 | Falla la inserción | — (log) | Nada; la operación principal se confirma igual (best effort, como los emails) |
 | 2 | Falla el polling | — | El contador conserva el último valor; reintenta en el próximo ciclo |
-| 3 | Falla el listado | 5xx | "No pudimos cargar tus notificaciones." con "Reintentar" |
+| 3 | Falla el listado | `500 RETRIEVAL_ERROR` | "No pudimos cargar tus notificaciones." con "Reintentar" |
 | 4 | Notificación ajena o inexistente | 404 | Igual navega; el contador se corrige en el próximo polling |
 
 ## Estado Resultante

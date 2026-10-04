@@ -1,6 +1,6 @@
 # ADR-009: Notificaciones in-app persistidas en la base y consultadas por polling
 
-**Estado:** Aceptado (pendiente de implementar)
+**Estado:** Aceptado (lado `api` implementado en S-009; la web queda pendiente en S-018)
 **Fecha:** 2026-10-02
 **Origen:** REQ-003 (DA-1, DA-2) · **Stories:** S-009, S-018
 **Tags:** backend, frontend, notificaciones, comunicación

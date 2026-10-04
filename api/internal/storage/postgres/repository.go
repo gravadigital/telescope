@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gravadigital/telescopio-api/internal/domain/attachment"
 	"github.com/gravadigital/telescopio-api/internal/domain/event"
+	"github.com/gravadigital/telescopio-api/internal/domain/notification"
 	"github.com/gravadigital/telescopio-api/internal/domain/participant"
 	"github.com/gravadigital/telescopio-api/internal/domain/vote"
 )
@@ -148,6 +149,18 @@ type VotingSetupRepository interface {
 type VoteDraftRepository interface {
 	Upsert(draft *vote.VoteDraft) error
 	GetByAssignmentAndParticipant(assignmentID, participantID uuid.UUID) (*vote.VoteDraft, error)
+}
+
+// NotificationRepository persists and queries in-app notifications. Every read and update
+// is scoped to the recipient and to the retention window (ADR-009).
+type NotificationRepository interface {
+	CreateBatch(notifications []*notification.Notification) error
+	UpsertParticipantRegistered(recipientID, eventID string) error
+	ListByRecipient(recipientID string, before *time.Time, limit int) ([]*notification.Item, error)
+	CountUnread(recipientID string) (int64, error)
+	MarkRead(id, recipientID string) (*notification.Notification, error)
+	MarkAllRead(recipientID string) (int64, error)
+	DeleteExpired(recipientID string) (int64, error)
 }
 
 // VotingResultsRepository define los métodos para interactuar con resultados de votación

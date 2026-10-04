@@ -107,6 +107,32 @@ func (s *EmailService) SendPauseNotification(eventName string, recipients []stri
 	return s.send(recipients, pauseSubject(eventName), pauseBody(eventName))
 }
 
+// SendFileReminder recuerda a los inscriptos sin propuesta que deben subirla.
+func (s *EmailService) SendFileReminder(eventName, deadline string, recipients []string) error {
+	if !s.cfg.Email.Enabled {
+		s.log.Debug("email disabled, skipping file reminder",
+			"event", eventName, "recipients", len(recipients))
+		return nil
+	}
+	if len(recipients) == 0 {
+		return nil
+	}
+	return s.send(recipients, fileReminderSubject(eventName), fileReminderBody(eventName, deadline))
+}
+
+// SendVoteReminder recuerda a los evaluadores con ranking pendiente que deben enviarlo.
+func (s *EmailService) SendVoteReminder(eventName, deadline string, recipients []string) error {
+	if !s.cfg.Email.Enabled {
+		s.log.Debug("email disabled, skipping vote reminder",
+			"event", eventName, "recipients", len(recipients))
+		return nil
+	}
+	if len(recipients) == 0 {
+		return nil
+	}
+	return s.send(recipients, voteReminderSubject(eventName), voteReminderBody(eventName, deadline))
+}
+
 // SendPasswordResetEmail envía el enlace de recuperación de contraseña al usuario.
 func (s *EmailService) SendPasswordResetEmail(toEmail, resetURL string) error {
 	if !s.cfg.Email.Enabled {

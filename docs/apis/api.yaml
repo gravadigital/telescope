@@ -1826,7 +1826,9 @@ paths:
         S-009. Solo el autor (`RequireEventOwner`). `file` solo en `participation`
         (destinatarios = inscriptos sin propuesta); `vote` solo en `voting` (destinatarios =
         asignaciones sin completar). Envía email en segundo plano y una notificación
-        `file_reminder` / `vote_reminder` por destinatario.
+        `file_reminder` / `vote_reminder` por destinatario. Orden de validaciones: `event_id`,
+        body, evento, pausado o cancelado, etapa, pendientes. `recipients_count` es la cantidad
+        de pendientes; no depende de que la inserción de notificaciones funcione.
       parameters:
         - $ref: '#/components/parameters/EventId'
       requestBody:
@@ -1864,6 +1866,9 @@ paths:
         '409':
           description: '`INVALID_EVENT_STAGE` (+ `current_stage`), `NO_PENDING_RECIPIENTS`, `EVENT_PAUSED_OR_CANCELLED`'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`RETRIEVAL_ERROR (falla al leer inscriptos, propuestas o asignaciones)`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
 
   /api/v1/notifications:
     get:
@@ -1879,7 +1884,7 @@ paths:
         - name: before
           in: query
           schema: { type: string, format: date-time }
-          description: Cursor por `created_at` (exclusivo)
+          description: Cursor por `created_at` (exclusivo). Se envía tal cual el `next_cursor` recibido.
       responses:
         '200':
           description: Notificaciones
@@ -1892,11 +1897,18 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/Notification' }
                   unread_count: { type: integer }
-                  next_cursor: { type: string, format: date-time, nullable: true }
+                  next_cursor:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: '`created_at` del último ítem devuelto, en UTC con precisión de microsegundos (por ejemplo `2026-09-30T08:15:30.000123Z`); `null` en la última página'
         '400':
-          description: '`INVALID_PAYLOAD` (`limit` o `before` inválidos)'
+          description: '`INVALID_PAYLOAD` (`limit` o `before` inválidos; no se recortan en silencio)'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '500':
+          description: '`RETRIEVAL_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
 
   /api/v1/notifications/unread-count:
     get:
@@ -1916,12 +1928,15 @@ paths:
                     properties:
                       unread_count: { type: integer }
         '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '500':
+          description: '`RETRIEVAL_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
 
   /api/v1/notifications/{notification_id}/read:
     patch:
       tags: [Notificaciones]
       summary: Marcar una notificación como leída
-      description: 'S-009. Idempotente. Una notificación ajena responde 404, no 403.'
+      description: 'S-009. Idempotente: repetir devuelve el mismo `read_at`. Una notificación ajena, inexistente, con más de 90 días o con un id mal formado responde 404 (`NOTIFICATION_NOT_FOUND`), no 400 ni 403.'
       parameters:
         - name: notification_id
           in: path
@@ -1945,6 +1960,9 @@ paths:
         '404':
           description: '`NOTIFICATION_NOT_FOUND`'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`DB_UPDATE_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
 
   /api/v1/notifications/read-all:
     post:
@@ -1964,6 +1982,9 @@ paths:
                       updated: { type: integer }
                   code: { type: string, example: NOTIFICATIONS_READ }
         '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '500':
+          description: '`DB_UPDATE_ERROR`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
 
 components:
 

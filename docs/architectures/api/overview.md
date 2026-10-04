@@ -21,7 +21,8 @@ la comunicación es siempre entrante desde el frontend.
 | `participant` | `internal/domain/participant` | Usuario, roles globales, password (bcrypt), token de recuperación |
 | `attachment` | `internal/domain/attachment` | Propuesta subida por un participante |
 | `vote` | `internal/domain/vote` | Asignación, voto, borrador, configuración y resultados. Contiene `VotingService` |
-| `email` | `internal/email` | Notificaciones SMTP (cambio de etapa, cancelación, reset de password) |
+| `notification` | `internal/domain/notification` | Notificaciones in-app persistidas (`type` + `data`): entidad, tipos, `Service` de emisión best effort y retención de 90 días (ADR-009) |
+| `email` | `internal/email` | Notificaciones SMTP (cambio de etapa, cancelación, recordatorios, reset de password) |
 
 La organización es por capacidad de dominio, coincidiendo con lo que pide `_base`.
 La diferencia con el catálogo es que las entidades viven en `internal/domain/{módulo}`
@@ -90,7 +91,7 @@ no conocen cuál está activo. Ver la convención custom `file-storage`.
 |---|---|---|
 | PostgreSQL | Todo el estado. Pool de 100 conexiones, reintentos con backoff al arrancar | `DB_*` |
 | MinIO | Almacenamiento de propuestas (opcional) | `STORAGE_PROVIDER=minio`, `MINIO_*` |
-| SMTP | Notificaciones. Implementa AUTH LOGIN a mano porque el `net/smtp` de Go solo hace AUTH PLAIN | `EMAIL_ENABLED`, `SMTP_*` |
+| SMTP | Notificaciones por email (las notificaciones in-app se persisten en PostgreSQL, no pasan por SMTP). Implementa AUTH LOGIN a mano porque el `net/smtp` de Go solo hace AUTH PLAIN | `EMAIL_ENABLED`, `SMTP_*` |
 | Google OAuth | Verificación de tokens de identidad | `GOOGLE_CLIENT_ID` |
 
 ## Deuda técnica conocida

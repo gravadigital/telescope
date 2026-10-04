@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gravadigital/telescopio-api/internal/config"
 	"github.com/gravadigital/telescopio-api/internal/domain/event"
+	"github.com/gravadigital/telescopio-api/internal/domain/notification"
 	"github.com/gravadigital/telescopio-api/internal/domain/participant"
 	"github.com/gravadigital/telescopio-api/internal/domain/vote"
 	"github.com/gravadigital/telescopio-api/internal/email"
@@ -24,6 +26,7 @@ type EventHandler struct {
 	eventRepo      postgres.EventRepository
 	userRepo       postgres.UserRepository
 	attachmentRepo postgres.AttachmentRepository
+	voteRepo       postgres.VoteRepository
 	// votingSetupRepo writes the stage change, configuration and assignments of
 	// the participation → voting transition in one transaction.
 	votingSetupRepo postgres.VotingSetupRepository
@@ -32,11 +35,13 @@ type EventHandler struct {
 	// voteHandler recalculates and stores the ranking when the event enters
 	// the results stage; may be nil in tests that never reach that stage.
 	voteHandler *DistributedVoteHandler
-	config      *config.Config
-	log         *log.Logger
+	// notifier emits in-app notifications, best effort (ADR-009); may be nil.
+	notifier *notification.Service
+	config   *config.Config
+	log      *log.Logger
 }
 
-func NewEventHandler(eventRepo postgres.EventRepository, userRepo postgres.UserRepository, attachmentRepo postgres.AttachmentRepository, voteRepo postgres.VoteRepository, votingSetupRepo postgres.VotingSetupRepository, emailService *email.EmailService, voteHandler *DistributedVoteHandler, cfg *config.Config) *EventHandler {
+func NewEventHandler(eventRepo postgres.EventRepository, userRepo postgres.UserRepository, attachmentRepo postgres.AttachmentRepository, voteRepo postgres.VoteRepository, votingSetupRepo postgres.VotingSetupRepository, emailService *email.EmailService, voteHandler *DistributedVoteHandler, cfg *config.Config, notifier *notification.Service) *EventHandler {
 	votingService := vote.NewVotingService(
 		NewVoteRepositoryAdapter(voteRepo),
 		NewAttachmentRepositoryAdapter(attachmentRepo),
@@ -47,13 +52,181 @@ func NewEventHandler(eventRepo postgres.EventRepository, userRepo postgres.UserR
 		eventRepo:       eventRepo,
 		userRepo:        userRepo,
 		attachmentRepo:  attachmentRepo,
+		voteRepo:        voteRepo,
 		votingSetupRepo: votingSetupRepo,
 		votingService:   votingService,
 		emailService:    emailService,
 		voteHandler:     voteHandler,
+		notifier:        notifier,
 		config:          cfg,
 		log:             logger.Handler("event"),
 	}
+}
+
+// SendReminderRequest is the body of POST /events/{event_id}/reminders.
+type SendReminderRequest struct {
+	Type string `json:"type" binding:"required,oneof=file vote"`
+}
+
+// SendReminder handles POST /api/v1/events/{event_id}/reminders: the organizer reminds the
+// participants who still owe a proposal (file, participation) or a ranking (vote, voting).
+func (h *EventHandler) SendReminder(c *gin.Context) {
+	eventID := c.Param("event_id")
+	eventUUID, err := uuid.Parse(eventID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event_id format", "code": "INVALID_EVENT_ID"})
+		return
+	}
+
+	var req SendReminderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.log.Warn("invalid request payload for reminder", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request payload",
+			"code":    "INVALID_PAYLOAD",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	evt, err := h.eventRepo.GetByID(eventID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Event not found", "code": "EVENT_NOT_FOUND"})
+		return
+	}
+
+	if evt.IsPaused || evt.IsCancelled {
+		c.JSON(http.StatusConflict, gin.H{"error": "Event is paused or cancelled", "code": "EVENT_PAUSED_OR_CANCELLED"})
+		return
+	}
+
+	wantStage, notificationType, deadlineDate := event.StageParticipation, notification.TypeFileReminder, evt.ParticipationEstimatedEndDate
+	if req.Type == "vote" {
+		wantStage, notificationType, deadlineDate = event.StageVoting, notification.TypeVoteReminder, evt.VotingEstimatedEndDate
+	}
+	if evt.Stage != wantStage {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":         "Reminder type does not match the event stage",
+			"code":          "INVALID_EVENT_STAGE",
+			"current_stage": evt.Stage.String(),
+		})
+		return
+	}
+
+	pending, err := h.pendingRecipients(eventID, req.Type)
+	if err != nil {
+		h.log.Error("failed to compute pending recipients", "event_id", eventID, "type", req.Type, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve pending participants", "code": "RETRIEVAL_ERROR"})
+		return
+	}
+	if len(pending) == 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "There are no pending recipients", "code": "NO_PENDING_RECIPIENTS"})
+		return
+	}
+
+	ids := make([]uuid.UUID, 0, len(pending))
+	emails := make([]string, 0, len(pending))
+	for _, p := range pending {
+		ids = append(ids, p.ID)
+		emails = append(emails, p.Email)
+	}
+	deadline := formatDatePtr(deadlineDate)
+	h.notify(eventUUID, notificationType, ids, func(uuid.UUID) notification.Data {
+		return notification.Data{"deadline": deadline}
+	})
+
+	deadlineText, _ := deadline.(string)
+	eventName := evt.Name
+	go func() {
+		var err error
+		if req.Type == "file" {
+			err = h.emailService.SendFileReminder(eventName, deadlineText, emails)
+		} else {
+			err = h.emailService.SendVoteReminder(eventName, deadlineText, emails)
+		}
+		if err != nil {
+			h.log.Warn("failed to send reminder emails", "event_id", eventID, "type", req.Type, "error", err)
+		}
+	}()
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":    gin.H{"type": req.Type, "recipients_count": len(pending)},
+		"message": "Reminder sent successfully",
+		"code":    "REMINDER_SENT",
+	})
+}
+
+// pendingRecipients returns the registered participants who still have no proposal (file)
+// or whose assignment is not completed (vote).
+func (h *EventHandler) pendingRecipients(eventID, reminderType string) ([]*participant.UserWithEventRole, error) {
+	participants, err := h.userRepo.GetEventParticipants(eventID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get participants: %w", err)
+	}
+
+	if reminderType == "file" {
+		attachments, err := h.attachmentRepo.GetByEventID(eventID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get attachments: %w", err)
+		}
+		uploaded := make(map[uuid.UUID]bool, len(attachments))
+		for _, a := range attachments {
+			uploaded[a.ParticipantID] = true
+		}
+		pending := make([]*participant.UserWithEventRole, 0, len(participants))
+		for _, p := range participants {
+			if !uploaded[p.ID] {
+				pending = append(pending, p)
+			}
+		}
+		return pending, nil
+	}
+
+	assignments, err := h.voteRepo.GetAssignmentsByEventID(eventID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get assignments: %w", err)
+	}
+	byID := make(map[uuid.UUID]*participant.UserWithEventRole, len(participants))
+	for _, p := range participants {
+		byID[p.ID] = p
+	}
+	pending := make([]*participant.UserWithEventRole, 0, len(assignments))
+	for _, a := range assignments {
+		if a.IsCompleted {
+			continue
+		}
+		p, ok := byID[a.ParticipantID]
+		if !ok {
+			h.log.Warn("assignment participant is not a registered participant", "event_id", eventID, "participant_id", a.ParticipantID)
+			continue
+		}
+		pending = append(pending, p)
+	}
+	return pending, nil
+}
+
+// notify emits in-app notifications; a failure is logged and never reaches the response.
+func (h *EventHandler) notify(eventID uuid.UUID, t notification.Type, recipients []uuid.UUID, dataFor func(uuid.UUID) notification.Data) {
+	if h.notifier == nil {
+		return
+	}
+	if err := h.notifier.Send(eventID, t, recipients, dataFor); err != nil {
+		h.log.Warn("failed to create notifications", "event_id", eventID, "type", t, "error", err)
+	}
+}
+
+// participantIDs returns the ids of the event's registered participants (author excluded).
+func (h *EventHandler) participantIDs(eventID string) ([]uuid.UUID, bool) {
+	participants, err := h.userRepo.GetEventParticipants(eventID)
+	if err != nil {
+		h.log.Warn("failed to get participants for notifications", "event_id", eventID, "error", err)
+		return nil, false
+	}
+	ids := make([]uuid.UUID, 0, len(participants))
+	for _, p := range participants {
+		ids = append(ids, p.ID)
+	}
+	return ids, true
 }
 
 type CreateEventRequest struct {
@@ -458,13 +631,18 @@ func (h *EventHandler) UpdateEventStage(c *gin.Context) {
 
 	// Entering the results stage: calculate and store the ranking once, so the
 	// public read-only endpoint has something to serve to visitors.
+	var results *vote.VotingResults
 	if updatedEvent.Stage == event.StageResult && h.voteHandler != nil {
-		if err := h.voteHandler.CalculateAndPersistResults(eventID); err != nil {
-			h.log.Warn("failed to calculate results on stage change", "event_id", eventID, "error", err)
+		var calcErr error
+		if results, calcErr = h.voteHandler.CalculateAndPersistResults(eventID); calcErr != nil {
+			results = nil
+			h.log.Warn("failed to calculate results on stage change", "event_id", eventID, "error", calcErr)
 		} else {
 			h.log.Info("voting results calculated and stored", "event_id", eventID)
 		}
 	}
+
+	h.notifyStageChanged(updatedEvent, req.EstimatedEndDate, voting, results)
 
 	// Notify participants asynchronously — errors are logged but don't fail the request
 	go func() {
@@ -510,6 +688,42 @@ func (h *EventHandler) UpdateEventStage(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, response)
+}
+
+// notifyStageChanged emits stage_changed to the registered participants (author excluded),
+// with data tailored to each recipient for the voting and results stages.
+func (h *EventHandler) notifyStageChanged(evt *event.Event, deadline string, voting *votingSetup, results *vote.VotingResults) {
+	ids, ok := h.participantIDs(evt.ID.String())
+	if !ok {
+		return
+	}
+	assigned := map[uuid.UUID]int{}
+	if voting != nil {
+		for _, a := range voting.assignments {
+			assigned[a.ParticipantID] = len(a.AttachmentIDs)
+		}
+	}
+	h.notify(evt.ID, notification.TypeStageChanged, ids, func(recipient uuid.UUID) notification.Data {
+		data := notification.Data{"stage": evt.Stage.String()}
+		switch evt.Stage {
+		case event.StageParticipation:
+			data["deadline"] = deadline
+		case event.StageVoting:
+			data["deadline"] = deadline
+			if n, has := assigned[recipient]; has {
+				data["can_vote"] = true
+				data["assigned_count"] = n
+			} else {
+				data["can_vote"] = false
+			}
+		case event.StageResult:
+			if pos, total, found := resultPosition(results, recipient); found {
+				data["result_position"] = pos
+				data["result_total"] = total
+			}
+		}
+		return data
+	})
 }
 
 // votingSetup is what the participation → voting transition writes.
@@ -736,6 +950,12 @@ func (h *EventHandler) UpdateEstimatedEndDate(c *gin.Context) {
 		"stage", req.Stage,
 		"new_date", req.EstimatedEndDate)
 
+	if ids, ok := h.participantIDs(eventID); ok {
+		h.notify(existingEvent.ID, notification.TypeDeadlineChanged, ids, func(uuid.UUID) notification.Data {
+			return notification.Data{"stage": req.Stage, "new_date": req.EstimatedEndDate}
+		})
+	}
+
 	// Notify participants asynchronously
 	go func() {
 		participants, err := h.userRepo.GetEventParticipants(eventID)
@@ -959,6 +1179,13 @@ func (h *EventHandler) RegisterParticipant(c *gin.Context) {
 		"event_id", eventID,
 		"user_id", existingUser.ID.String(),
 		"email", existingUser.Email)
+
+	h.notify(eventUUID, notification.TypeRegistrationConfirmed, []uuid.UUID{existingUser.ID}, nil)
+	if h.notifier != nil {
+		if err := h.notifier.ParticipantRegistered(eventObj.AuthorID, eventUUID); err != nil {
+			h.log.Warn("failed to aggregate participant_registered notification", "event_id", eventID, "error", err)
+		}
+	}
 
 	c.JSON(http.StatusCreated, gin.H{
 		"data": gin.H{
@@ -1766,6 +1993,10 @@ func (h *EventHandler) CancelEvent(c *gin.Context) {
 
 	h.log.Info("event cancelled successfully", "event_id", eventID)
 
+	if ids, ok := h.participantIDs(eventID); ok {
+		h.notify(existingEvent.ID, notification.TypeEventCancelled, ids, nil)
+	}
+
 	// Notify participants asynchronously
 	go func() {
 		participants, err := h.userRepo.GetEventParticipants(eventID)
@@ -1840,6 +2071,12 @@ func (h *EventHandler) PauseEvent(c *gin.Context) {
 	}
 
 	h.log.Info("event pause toggled", "event_id", eventID, "is_paused", newPausedState)
+
+	if newPausedState {
+		if ids, ok := h.participantIDs(eventID); ok {
+			h.notify(existingEvent.ID, notification.TypeEventPaused, ids, nil)
+		}
+	}
 
 	// Notify participants when pausing (not when unpausing)
 	if newPausedState {
