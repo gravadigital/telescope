@@ -90,6 +90,45 @@ El equipo de Telescopio
 `, eventName)
 }
 
+func deadlineLine(deadline string) string {
+	if deadline == "" {
+		return ""
+	}
+	return fmt.Sprintf("Fecha estimada de cierre: %s\n\n", deadline)
+}
+
+func fileReminderSubject(eventName string) string {
+	return fmt.Sprintf("[Telescopio] Falta tu propuesta en el evento «%s»", eventName)
+}
+
+func fileReminderBody(eventName, deadline string) string {
+	return fmt.Sprintf(`Hola,
+
+Te recordamos que todavía no subiste tu propuesta al evento «%s».
+
+%sIngresa a Telescopio para subirla.
+
+Saludos,
+El equipo de Telescopio
+`, eventName, deadlineLine(deadline))
+}
+
+func voteReminderSubject(eventName string) string {
+	return fmt.Sprintf("[Telescopio] Falta tu ranking en el evento «%s»", eventName)
+}
+
+func voteReminderBody(eventName, deadline string) string {
+	return fmt.Sprintf(`Hola,
+
+Te recordamos que todavía no enviaste tu ranking en el evento «%s».
+
+%sIngresa a Telescopio para completarlo.
+
+Saludos,
+El equipo de Telescopio
+`, eventName, deadlineLine(deadline))
+}
+
 func stageLabel(stage string) string {
 	labels := map[string]string{
 		"creation":      "Creación",

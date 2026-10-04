@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gravadigital/telescopio-api/internal/domain/attachment"
 	"github.com/gravadigital/telescopio-api/internal/domain/event"
+	"github.com/gravadigital/telescopio-api/internal/domain/notification"
 	"github.com/gravadigital/telescopio-api/internal/domain/participant"
 	"github.com/gravadigital/telescopio-api/internal/domain/vote"
 	"github.com/gravadigital/telescopio-api/internal/storage/postgres"
@@ -24,6 +25,7 @@ var (
 	_ postgres.VotingConfigurationRepository = (*mockVotingConfigurationRepository)(nil)
 	_ postgres.VotingResultsRepository       = (*mockVotingResultsRepository)(nil)
 	_ postgres.VoteDraftRepository           = (*mockVoteDraftRepository)(nil)
+	_ postgres.NotificationRepository        = (*mockNotificationRepository)(nil)
 )
 
 // ---------------------------------------------------------------------------
@@ -882,6 +884,115 @@ func (m *mockVoteDraftRepository) GetByAssignmentAndParticipant(assignmentID, pa
 		return nil, gorm.ErrRecordNotFound
 	}
 	return d, nil
+}
+
+// ---------------------------------------------------------------------------
+// mockNotificationRepository
+// ---------------------------------------------------------------------------
+
+type mockNotificationRepository struct {
+	// created holds every notification received by CreateBatch.
+	created []*notification.Notification
+	// registeredUpserts holds (recipientID, eventID) of UpsertParticipantRegistered calls.
+	registeredUpserts [][2]string
+	batchCalls        int
+
+	items       []*notification.Item
+	unreadCount int64
+	markResult  *notification.Notification
+	markAll     int64
+
+	// arguments received
+	listRecipient string
+	listBefore    *time.Time
+	listLimit     int
+	listCalls     int
+	countRecipent string
+	markID        string
+	markRecipient string
+	markCalls     int
+	markAllCalls  int
+
+	// calls records the order of repository calls.
+	calls []string
+
+	createErr, upsertErr, listErr, countErr, markErr, markAllErr, deleteErr error
+}
+
+func newMockNotificationRepository() *mockNotificationRepository {
+	return &mockNotificationRepository{}
+}
+
+func (m *mockNotificationRepository) CreateBatch(n []*notification.Notification) error {
+	m.batchCalls++
+	if m.createErr != nil {
+		return m.createErr
+	}
+	m.created = append(m.created, n...)
+	return nil
+}
+
+func (m *mockNotificationRepository) UpsertParticipantRegistered(recipientID, eventID string) error {
+	if m.upsertErr != nil {
+		return m.upsertErr
+	}
+	m.registeredUpserts = append(m.registeredUpserts, [2]string{recipientID, eventID})
+	return nil
+}
+
+func (m *mockNotificationRepository) ListByRecipient(recipientID string, before *time.Time, limit int) ([]*notification.Item, error) {
+	m.calls = append(m.calls, "list")
+	m.listCalls++
+	m.listRecipient, m.listBefore, m.listLimit = recipientID, before, limit
+	if m.listErr != nil {
+		return nil, m.listErr
+	}
+	return m.items, nil
+}
+
+func (m *mockNotificationRepository) CountUnread(recipientID string) (int64, error) {
+	m.countRecipent = recipientID
+	if m.countErr != nil {
+		return 0, m.countErr
+	}
+	return m.unreadCount, nil
+}
+
+func (m *mockNotificationRepository) MarkRead(id, recipientID string) (*notification.Notification, error) {
+	m.markCalls++
+	m.markID, m.markRecipient = id, recipientID
+	if m.markErr != nil {
+		return nil, m.markErr
+	}
+	return m.markResult, nil
+}
+
+func (m *mockNotificationRepository) MarkAllRead(recipientID string) (int64, error) {
+	m.markAllCalls++
+	m.markRecipient = recipientID
+	if m.markAllErr != nil {
+		return 0, m.markAllErr
+	}
+	return m.markAll, nil
+}
+
+func (m *mockNotificationRepository) DeleteExpired(recipientID string) (int64, error) {
+	m.calls = append(m.calls, "delete")
+	if m.deleteErr != nil {
+		return 0, m.deleteErr
+	}
+	return 0, nil
+}
+
+// byRecipient returns the data of the created notifications of a type, keyed by recipient.
+func (m *mockNotificationRepository) byRecipient(t notification.Type) map[uuid.UUID]notification.Data {
+	out := map[uuid.UUID]notification.Data{}
+	for _, n := range m.created {
+		if n.Type == t {
+			out[n.RecipientID] = n.Data
+		}
+	}
+	return out
 }
 
 // ---------------------------------------------------------------------------

@@ -7,6 +7,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/gravadigital/telescopio-api/internal/config"
+	"github.com/gravadigital/telescopio-api/internal/domain/notification"
 	"github.com/gravadigital/telescopio-api/internal/email"
 	"github.com/gravadigital/telescopio-api/internal/handlers"
 	"github.com/gravadigital/telescopio-api/internal/logger"
@@ -74,13 +75,17 @@ func main() {
 
 	configRepo := postgres.NewPostgresVotingConfigurationRepository(db)
 	resultsRepo := postgres.NewPostgresVotingResultsRepository(db)
-	distributedVoteHandler := handlers.NewDistributedVoteHandler(voteRepo, eventRepo, attachmentRepo, userRepo, configRepo, resultsRepo, cfg)
+	notificationRepo := postgres.NewPostgresNotificationRepository(db)
+	notifier := notification.NewService(notificationRepo)
+	distributedVoteHandler := handlers.NewDistributedVoteHandler(voteRepo, eventRepo, attachmentRepo, userRepo, configRepo, resultsRepo, cfg, notifier)
 
 	votingSetupRepo := postgres.NewPostgresVotingSetupRepository(db)
-	eventHandler := handlers.NewEventHandler(eventRepo, userRepo, attachmentRepo, voteRepo, votingSetupRepo, emailService, distributedVoteHandler, cfg)
+	eventHandler := handlers.NewEventHandler(eventRepo, userRepo, attachmentRepo, voteRepo, votingSetupRepo, emailService, distributedVoteHandler, cfg, notifier)
 	attachmentHandler := handlers.NewAttachmentHandler(attachmentRepo, eventRepo, userRepo, voteRepo, fileStorage, cfg)
 	userHandler := handlers.NewUserHandler(userRepo, eventRepo, attachmentRepo, voteRepo, resultsRepo, emailService, cfg)
 	googleAuthHandler := handlers.NewGoogleAuthHandler(userRepo, cfg)
+
+	notificationHandler := handlers.NewNotificationHandler(notificationRepo)
 
 	voteDraftRepo := postgres.NewPostgresVoteDraftRepository(db)
 	voteDraftHandler := handlers.NewVoteDraftHandler(voteDraftRepo, voteRepo)
@@ -120,6 +125,16 @@ func main() {
 		{
 			usersProtected.GET("/:user_id", userHandler.GetUser)
 			usersProtected.GET("/:user_id/events", userHandler.GetUserEvents) // Get events where user participates
+		}
+
+		// In-app notifications - the authenticated user's own (ADR-009)
+		notifications := api.Group("/notifications")
+		notifications.Use(auth.JWTAuthMiddleware())
+		{
+			notifications.GET("", notificationHandler.ListNotifications)
+			notifications.GET("/unread-count", notificationHandler.GetUnreadCount)
+			notifications.PATCH("/:notification_id/read", notificationHandler.MarkAsRead)
+			notifications.POST("/read-all", notificationHandler.MarkAllAsRead)
 		}
 
 		// Event management - Public endpoints (no authentication required)
@@ -169,6 +184,11 @@ func main() {
 			events.PATCH("/:event_id/pause",
 				auth.RequireEventOwner(eventRepo),
 				eventHandler.PauseEvent)
+
+			// Remind pending participants (file or ranking) - Only event owner or admin
+			events.POST("/:event_id/reminders",
+				auth.RequireEventOwner(eventRepo),
+				eventHandler.SendReminder)
 
 			// Get event participants - Any authenticated user
 			events.GET("/:event_id/participants", eventHandler.GetEventParticipants)

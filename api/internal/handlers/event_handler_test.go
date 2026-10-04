@@ -14,6 +14,7 @@ import (
 	"github.com/gravadigital/telescopio-api/internal/config"
 	"github.com/gravadigital/telescopio-api/internal/domain/attachment"
 	"github.com/gravadigital/telescopio-api/internal/domain/event"
+	"github.com/gravadigital/telescopio-api/internal/domain/notification"
 	"github.com/gravadigital/telescopio-api/internal/domain/participant"
 	"github.com/gravadigital/telescopio-api/internal/domain/vote"
 	"github.com/gravadigital/telescopio-api/internal/email"
@@ -28,6 +29,7 @@ type testEventHandlerSet struct {
 	attachmentRepo *mockAttachmentRepository
 	voteRepo       *mockVoteRepository
 	setupRepo      *mockVotingSetupRepository
+	notifRepo      *mockNotificationRepository
 	handler        *EventHandler
 }
 
@@ -37,11 +39,12 @@ func newTestEventHandlerSet() *testEventHandlerSet {
 		userRepo:       newMockUserRepository(),
 		attachmentRepo: newMockAttachmentRepository(),
 		voteRepo:       newMockVoteRepository(),
+		notifRepo:      newMockNotificationRepository(),
 	}
 	s.setupRepo = &mockVotingSetupRepository{eventRepo: s.eventRepo}
 	// Email disabled by default config, so goroutine-fired notifications are
 	// no-ops and won't panic or block on a real SMTP connection.
-	s.handler = NewEventHandler(s.eventRepo, s.userRepo, s.attachmentRepo, s.voteRepo, s.setupRepo, email.NewEmailService(&config.Config{}), nil, &config.Config{})
+	s.handler = NewEventHandler(s.eventRepo, s.userRepo, s.attachmentRepo, s.voteRepo, s.setupRepo, email.NewEmailService(&config.Config{}), nil, &config.Config{}, notification.NewService(s.notifRepo))
 	return s
 }
 
@@ -1044,7 +1047,7 @@ func TestUpdateEventStage_CalculatesAndStoresResultsOnTransition(t *testing.T) {
 	voteRepo := newMockVoteRepository()
 	s.handler.voteHandler = NewDistributedVoteHandler(
 		voteRepo, s.eventRepo, s.attachmentRepo, s.userRepo, configRepo, resultsRepo,
-		&config.Config{},
+		&config.Config{}, nil,
 	)
 
 	e := event.NewEvent("Event", "desc", uuid.New(), time.Now(), time.Now().AddDate(0, 0, 5), "org")
@@ -1094,7 +1097,7 @@ func TestUpdateEventStage_StoresResultsWithMissingRankings(t *testing.T) {
 	resultsRepo := newMockVotingResultsRepository()
 	s.handler.voteHandler = NewDistributedVoteHandler(
 		s.voteRepo, s.eventRepo, s.attachmentRepo, s.userRepo, configRepo, resultsRepo,
-		&config.Config{},
+		&config.Config{}, nil,
 	)
 
 	e := event.NewEvent("Event", "desc", uuid.New(), time.Now(), time.Now().AddDate(0, 0, 5), "org")

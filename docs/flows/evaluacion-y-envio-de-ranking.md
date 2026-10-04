@@ -34,7 +34,6 @@ Ocurre durante la etapa `voting`, después de que se generaron las asignaciones.
 | Paso | Cambio | Story |
 |---|---|---|
 | 3 | La web guarda el borrador con debounce desde `SortableRankList` | S-017 |
-| 4 | Emite `ranking_submitted` con `{replaced}` | S-009 |
 | Web | Lista ordenable ↑↓ (posición siempre única) en lugar de selects; solo lectura en `results`; copy del mecanismo real (la propia propuesta sube o baja) | S-017 |
 
 ## Servicios Involucrados
@@ -216,6 +215,8 @@ guardar un ranking parcial o inconsistente: es un guardado de progreso, no una e
 `replaced` es `true` si se borraron votos previos. ⚠️ **respuesta plana, sin envelope `data` ni
 `code`** — a diferencia del resto de la API. Es una de las cuatro formas de respuesta que el
 cliente tiene que normalizar.
+
+**Notificación in-app (S-009).** Tras confirmar la transacción, el handler emite `ranking_submitted` con `data: { replaced }` al participante (best effort: si falla, `Warn` y la respuesta no cambia). No incluye ids de propuestas.
 
 **Operación de BD:** en una sola transacción, `DELETE FROM votes WHERE assignment_id = ?` y luego
 `INSERT` sobre `votes` — **`m` filas**, una por propuesta evaluada, con `event_id`,

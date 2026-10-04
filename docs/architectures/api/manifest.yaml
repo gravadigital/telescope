@@ -22,4 +22,5 @@ modules:
   - participant      # usuarios, roles, autenticación, recuperación de password
   - attachment       # carga y descarga de propuestas
   - vote             # asignación distribuida, MBC, calidad e incentivos
+  - notification     # notificaciones in-app persistidas, emisión best effort y retención
   - email            # notificaciones SMTP

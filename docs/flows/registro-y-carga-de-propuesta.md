@@ -31,7 +31,7 @@ Solo ocurre durante la etapa `participation` y con el evento no pausado.
 
 | Paso | Cambio | Story |
 |---|---|---|
-| 2 | Sin sesión, "Inscribirme" lleva a `/login?next=/events/{event_id}`. La inscripción emite `registration_confirmed` (al inscripto) y `participant_registered` agregada (al autor) | S-009, S-015 |
+| 2 | Sin sesión, "Inscribirme" lleva a `/login?next=/events/{event_id}` | S-015 |
 | 3 | La validación del cliente pasa a vivir en `web/src/domain/files.ts` | S-010 |
 | 4 | La confirmación del archivo pasa del modal a la zona de carga (`FileDropzone`); el reemplazo no tiene modal aparte | S-015 |
 
@@ -160,6 +160,8 @@ etapa, así que un evento oculto nunca responde `INVALID_REGISTRATION_STAGE`.
 - Solo durante la etapa `participation`.
 - El creador del evento no puede registrarse.
 - Cupo: se rechaza si se alcanzó `max_participants` (default 20).
+
+**Notificaciones in-app (S-009).** Después del `INSERT` en `event_participants`, y sin cambiar la respuesta, el handler emite `registration_confirmed` (`data: {}`) al inscripto y suma una inscripción a la notificación `participant_registered` no leída del autor para ese evento (`data: { count }`, agregada con `INSERT … ON CONFLICT`). Si la inserción falla se registra un `Warn`. Ver [notificaciones-in-app](notificaciones-in-app.md).
 
 **Ref:** `docs/apis/api.yaml` → `/api/v1/events/{event_id}/register`
 

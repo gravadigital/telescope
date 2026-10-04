@@ -4,7 +4,7 @@ title: Avance de etapa del evento
 type: event
 status: Active
 created: 2026-09-18
-last_updated: 2026-10-02
+last_updated: 2026-10-04
 stories: [S-006, S-009, S-015, S-016]
 ---
 
@@ -13,7 +13,7 @@ stories: [S-006, S-009, S-015, S-016]
 **Tipo:** Evento
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-10-02
+**Última actualización:** 2026-10-04
 **Stories:** S-006, S-009, S-015, S-016 (cambios planificados por REQ-003)
 
 ## Descripción
@@ -35,8 +35,7 @@ según desde qué pantalla se ejecute.** Está documentada en el Paso 1.
 |---|---|---|
 | 1 | Se reemplaza la doble validación de `ManageEventPage`/`EventDetailPage` por un único módulo `web/src/domain/stages.ts`, usado **solo desde la gestión**. Se elimina "todos votaron". `EventDetailPage` deja de avanzar etapas. Cierra D-05 | S-015, S-016 |
 | 2 | El modal pasa a `Dialog` + `DateQuickPicker` (atajos 3 días / 1 semana / 2 semanas). Para `voting` el diálogo incluye la configuración (`GET /api/v1/events/{event_id}/voting-config/preview`) | S-016 |
-| 4 | Además del email, notificaciones in-app `stage_changed` (ver [notificaciones-in-app](notificaciones-in-app.md)) | S-009 |
-| Acciones | Cancelar, pausar (solo al pausar) y posponer emiten `event_cancelled`, `event_paused` y `deadline_changed`. "Posponer deadline" también se valida en el cliente (cierra D-06) | S-009, S-016 |
+| Acciones | "Posponer deadline" también se valida en el cliente (cierra D-06) | S-016 |
 
 **Tabla de transiciones resultante:**
 
@@ -207,6 +206,8 @@ Se disparan **en segundo plano**, sin bloquear la respuesta HTTP: el avance de e
 al organizador aunque el envío falle.
 
 **Destinatarios:** los participantes registrados del evento.
+
+**Notificaciones in-app (S-009).** Además del email, y antes de lanzar la goroutine de email, el handler inserta una notificación `stage_changed` por inscripto (el autor queda excluido), con `data` según la etapa destino: `{ stage, deadline }` en `participation` y `voting` (`deadline` = `estimated_end_date`), más `can_vote` y `assigned_count` en `voting` (según la asignación recién creada de cada destinatario), y `result_position` y `result_total` en `results` cuando el destinatario figura en el ranking ajustado. Es best effort: si falla, se registra un `Warn` y la respuesta no cambia. Del mismo modo, `CancelEvent`, `PauseEvent` (solo al pausar) y `UpdateEstimatedEndDate` emiten `event_cancelled`, `event_paused` y `deadline_changed { stage, new_date }`. Ver [notificaciones-in-app](notificaciones-in-app.md).
 
 ⚠️ **Sin reintentos ni cola.** Si el envío falla, el email se pierde y nadie se entera — ni el
 organizador ni el participante. Es relevante porque el email es el mecanismo por el que un

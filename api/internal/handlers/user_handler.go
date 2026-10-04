@@ -465,12 +465,8 @@ func (h *UserHandler) getAllUserEvents(c *gin.Context, authenticatedUserID, requ
 func buildMyStatus(evt *event.Event, userID uuid.UUID, hasAttachment bool, assignment *vote.Assignment, results *vote.VotingResults) gin.H {
 	var position, total interface{}
 	if evt.Stage == event.StageResult && results != nil {
-		for _, item := range results.AdjustedRanking {
-			if item.ParticipantID == userID {
-				position = item.AdjustedRank
-				total = len(results.AdjustedRanking)
-				break
-			}
+		if pos, tot, ok := resultPosition(results, userID); ok {
+			position, total = pos, tot
 		}
 	}
 	return gin.H{

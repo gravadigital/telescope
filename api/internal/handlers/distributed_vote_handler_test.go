@@ -14,6 +14,7 @@ import (
 	"github.com/gravadigital/telescopio-api/internal/config"
 	"github.com/gravadigital/telescopio-api/internal/domain/attachment"
 	"github.com/gravadigital/telescopio-api/internal/domain/event"
+	"github.com/gravadigital/telescopio-api/internal/domain/notification"
 	"github.com/gravadigital/telescopio-api/internal/domain/participant"
 	"github.com/gravadigital/telescopio-api/internal/domain/vote"
 	"github.com/gravadigital/telescopio-api/internal/middleware/auth"
@@ -34,6 +35,7 @@ type testHandlerSet struct {
 	voteRepo       *mockVoteRepository
 	configRepo     *mockVotingConfigurationRepository
 	resultsRepo    *mockVotingResultsRepository
+	notifRepo      *mockNotificationRepository
 	handler        *DistributedVoteHandler
 }
 
@@ -45,10 +47,11 @@ func newTestHandlerSet() *testHandlerSet {
 		voteRepo:       newMockVoteRepository(),
 		configRepo:     newMockVotingConfigurationRepository(),
 		resultsRepo:    newMockVotingResultsRepository(),
+		notifRepo:      newMockNotificationRepository(),
 	}
 	s.handler = NewDistributedVoteHandler(
 		s.voteRepo, s.eventRepo, s.attachmentRepo, s.userRepo, s.configRepo, s.resultsRepo,
-		&config.Config{},
+		&config.Config{}, notification.NewService(s.notifRepo),
 	)
 	return s
 }
@@ -733,8 +736,8 @@ func TestCalculateAndPersistResults_StoresRankingForVisitors(t *testing.T) {
 		AttachmentID: attachments[1].ID, RankPosition: 1,
 	})
 
-	require.NoError(t, s.handler.CalculateAndPersistResults(e.ID.String()),
-		"stage change must leave a stored ranking behind")
+	_, calcErr := s.handler.CalculateAndPersistResults(e.ID.String())
+	require.NoError(t, calcErr, "stage change must leave a stored ranking behind")
 
 	stored, err := s.resultsRepo.GetByEventID(e.ID.String())
 	require.NoError(t, err)
@@ -748,7 +751,8 @@ func TestCalculateAndPersistResults_StoresRankingForVisitors(t *testing.T) {
 func TestCalculateAndPersistResults_RejectsUnknownEvent(t *testing.T) {
 	s := newTestHandlerSet()
 
-	assert.Error(t, s.handler.CalculateAndPersistResults(uuid.NewString()))
+	_, err := s.handler.CalculateAndPersistResults(uuid.NewString())
+	assert.Error(t, err)
 }
 
 // ---------------------------------------------------------------------------

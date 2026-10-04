@@ -12,6 +12,7 @@ import (
 	"github.com/gravadigital/telescopio-api/internal/config"
 	"github.com/gravadigital/telescopio-api/internal/domain/attachment"
 	"github.com/gravadigital/telescopio-api/internal/domain/event"
+	"github.com/gravadigital/telescopio-api/internal/domain/notification"
 	"github.com/gravadigital/telescopio-api/internal/domain/vote"
 	"github.com/gravadigital/telescopio-api/internal/logger"
 	"github.com/gravadigital/telescopio-api/internal/storage/postgres"
@@ -25,8 +26,20 @@ type DistributedVoteHandler struct {
 	configRepo     postgres.VotingConfigurationRepository
 	resultsRepo    postgres.VotingResultsRepository
 	votingService  *vote.VotingService
-	config         *config.Config
-	log            *log.Logger
+	// notifier emits in-app notifications, best effort (ADR-009); may be nil.
+	notifier *notification.Service
+	config   *config.Config
+	log      *log.Logger
+}
+
+// notify emits in-app notifications; a failure is logged and never reaches the response.
+func (h *DistributedVoteHandler) notify(eventID uuid.UUID, t notification.Type, recipients []uuid.UUID, dataFor func(uuid.UUID) notification.Data) {
+	if h.notifier == nil {
+		return
+	}
+	if err := h.notifier.Send(eventID, t, recipients, dataFor); err != nil {
+		h.log.Warn("failed to create notifications", "event_id", eventID, "type", t, "error", err)
+	}
 }
 
 func NewDistributedVoteHandler(
@@ -37,6 +50,7 @@ func NewDistributedVoteHandler(
 	configRepo postgres.VotingConfigurationRepository,
 	resultsRepo postgres.VotingResultsRepository,
 	cfg *config.Config,
+	notifier *notification.Service,
 ) *DistributedVoteHandler {
 	// Create adapters to bridge interface differences
 	voteAdapter := NewVoteRepositoryAdapter(voteRepo)
@@ -53,6 +67,7 @@ func NewDistributedVoteHandler(
 		configRepo:     configRepo,
 		resultsRepo:    resultsRepo,
 		votingService:  votingService,
+		notifier:       notifier,
 		config:         cfg,
 		log:            logger.Handler("distributed_vote"),
 	}
@@ -715,6 +730,10 @@ func (h *DistributedVoteHandler) SubmitRankingVotes(c *gin.Context) {
 		return
 	}
 
+	h.notify(eventUUID, notification.TypeRankingSubmitted, []uuid.UUID{participantUUID}, func(uuid.UUID) notification.Data {
+		return notification.Data{"replaced": replaced}
+	})
+
 	c.JSON(http.StatusCreated, gin.H{
 		"message":        "Ranking votes submitted successfully",
 		"event_id":       eventID,
@@ -777,27 +796,26 @@ func (h *DistributedVoteHandler) calculateAndPersist(eventID string, eventUUID u
 // It is called when the organizer moves the event into the results stage, so
 // anonymous visitors can read the stored results without triggering a
 // recalculation (the public endpoint is read-only).
-func (h *DistributedVoteHandler) CalculateAndPersistResults(eventID string) error {
+func (h *DistributedVoteHandler) CalculateAndPersistResults(eventID string) (*vote.VotingResults, error) {
 	eventUUID, err := uuid.Parse(eventID)
 	if err != nil {
-		return fmt.Errorf("invalid event_id format: %w", err)
+		return nil, fmt.Errorf("invalid event_id format: %w", err)
 	}
 
 	eventObj, err := h.eventRepo.GetByID(eventID)
 	if err != nil {
-		return fmt.Errorf("event not found: %w", err)
+		return nil, fmt.Errorf("event not found: %w", err)
 	}
 	if eventObj.Stage != event.StageVoting && eventObj.Stage != event.StageResult {
-		return fmt.Errorf("results can only be calculated during voting or results stage (current: %s)", eventObj.Stage.String())
+		return nil, fmt.Errorf("results can only be calculated during voting or results stage (current: %s)", eventObj.Stage.String())
 	}
 
 	config, err := h.configRepo.GetByEventID(eventID)
 	if err != nil {
-		return fmt.Errorf("voting configuration not found: %w", err)
+		return nil, fmt.Errorf("voting configuration not found: %w", err)
 	}
 
-	_, err = h.calculateAndPersist(eventID, eventUUID, config)
-	return err
+	return h.calculateAndPersist(eventID, eventUUID, config)
 }
 
 // GetStoredResults handles GET /api/events/{event_id}/distributed-results

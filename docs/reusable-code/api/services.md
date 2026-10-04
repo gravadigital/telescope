@@ -96,6 +96,69 @@ replaced, err := h.voteRepo.ReplaceAssignmentVotes(assignment.ID.String(), votes
 
 ---
 
+## notification.Service
+
+**Location:** `internal/domain/notification/service.go`
+**Description:** Emits in-app notifications (ADR-009). Depends on its own `Writer` interface (`CreateBatch`, `UpsertParticipantRegistered`), which `postgres.NotificationRepository` satisfies, so the domain package does not import `postgres`. `Send` builds one `Notification` per recipient, taking its `data` from `dataFor` (nil means `{}`), and does nothing for an empty recipient list. Errors are wrapped with `%w`; handlers treat them as best effort (log a `Warn`, never change the response).
+
+**Signature:**
+```go
+func NewService(writer Writer) *Service
+func (s *Service) Send(eventID uuid.UUID, t Type, recipients []uuid.UUID, dataFor func(recipient uuid.UUID) Data) error
+func (s *Service) ParticipantRegistered(authorID, eventID uuid.UUID) error
+```
+
+**Usage:**
+```go
+h.notify(evt.ID, notification.TypeStageChanged, ids, func(r uuid.UUID) notification.Data {
+    return notification.Data{"stage": evt.Stage.String()}
+})
+```
+
+---
+
+## NotificationRepository
+
+**Location:** `internal/storage/postgres/notification_repository.go`
+**Description:** Persists `notifications`. `UpsertParticipantRegistered` uses explicit SQL because `clause.OnConflict` cannot target the partial unique index `uq_notifications_registered_unread`: it adds 1 to `data.count` of the unread aggregate (or creates it with `count: 1`) and refreshes `created_at`. `ListByRecipient` joins `events` for the current name and stage and orders by `created_at DESC, id DESC`. Every read and update filters by recipient and `created_at >= now() - interval '90 days'`. `MarkRead` is idempotent and returns `notification.ErrNotFound` for a missing, foreign or expired notification.
+
+**Signature:**
+```go
+CreateBatch(notifications []*notification.Notification) error
+UpsertParticipantRegistered(recipientID, eventID string) error
+ListByRecipient(recipientID string, before *time.Time, limit int) ([]*notification.Item, error)
+CountUnread(recipientID string) (int64, error)
+MarkRead(id, recipientID string) (*notification.Notification, error)
+MarkAllRead(recipientID string) (int64, error)
+DeleteExpired(recipientID string) (int64, error)
+```
+
+**Usage:**
+```go
+items, err := repo.ListByRecipient(userID, before, limit+1) // one extra row tells whether there is a next page
+```
+
+---
+
+## resultPosition
+
+**Location:** `internal/handlers/notification_payloads.go`
+**Description:** Looks a participant up in `results.AdjustedRanking` and returns its `AdjustedRank` and the ranking size. `ok` is false for nil results or a participant that is not in the ranking.
+
+**Signature:**
+```go
+func resultPosition(results *vote.VotingResults, userID uuid.UUID) (position, total int, ok bool)
+```
+
+**Usage:**
+```go
+if pos, total, ok := resultPosition(results, userID); ok {
+    data["result_position"], data["result_total"] = pos, total
+}
+```
+
+---
+
 ## Assignment.PositionOf
 
 **Location:** `internal/domain/vote/vote.go`

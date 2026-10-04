@@ -156,6 +156,12 @@ func GetMigrations() []Migration {
 			Up:   migration023Up,
 			Down: migration023Down,
 		},
+		{
+			ID:   "024",
+			Name: "add_notifications",
+			Up:   migration024Up,
+			Down: migration024Down,
+		},
 	}
 }
 
