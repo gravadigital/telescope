@@ -1,0 +1,299 @@
+/* ========================================================================
+   TOKENS — Design System `web` v2.0.0 (única fuente de tokens, ADR-007 / DA-7)
+
+   Regla de nombres (D-1): el nombre CSS es la ruta del token con "." -> "-".
+   - Tier 1 (reference) lleva prefijo --ref-
+   - Tier 2 (semantic) y tier 3 (component) sin prefijo
+   Los componentes consumen colores, bordes, radios de superficie/control y
+   sombras solo vía tier 2/3. Nunca --ref-color-* desde un componente.
+   ======================================================================== */
+:root {
+  /* ======================================================================
+     Tier 1 — reference
+     ====================================================================== */
+
+  /* Color */
+  --ref-color-black: #000000;
+  --ref-color-white: #ffffff;
+  --ref-color-ink-900: #0b1020;
+  --ref-color-ink-800: #141a2e;
+  --ref-color-gray-700: #39414d;
+  --ref-color-gray-600: #575e6b;
+  --ref-color-gray-500: #6e7687;
+  --ref-color-gray-400: #8892a8;
+  --ref-color-gray-300: #d3d9e2;
+  --ref-color-gray-200: #e1e5ec;
+  --ref-color-gray-150: #e8ecf2;
+  --ref-color-gray-100: #f1f3f6;
+  --ref-color-gray-50: #fafbfc;
+  --ref-color-violet-700: #4B3FA8;
+  --ref-color-violet-500: #6e5bf2;
+  --ref-color-violet-200: #cfc9f7;
+  --ref-color-violet-100: #eae7f9;
+  --ref-color-violet-50: #f8f7ff;
+  --ref-color-cyan-400: #35D6F2;
+  --ref-color-green-700: #16744a;
+  --ref-color-green-600: #1f9d62;
+  --ref-color-green-100: #e1f1e8;
+  --ref-color-amber-700: #8a6212;
+  --ref-color-amber-500: #e9a227;
+  --ref-color-amber-100: #f7edd6;
+  --ref-color-red-700: #b8381f;
+
+  /* Tipografía (tamaños en rem, base 16px) */
+  --ref-font-family-base: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --ref-font-family-mono: 'JetBrains Mono', monospace;
+  --ref-font-size-2xs: 0.75rem;
+  --ref-font-size-xs: 0.8125rem;
+  --ref-font-size-sm: 0.875rem;
+  --ref-font-size-md: 0.9375rem;
+  --ref-font-size-lg: 1rem;
+  --ref-font-size-xl: 1.125rem;
+  --ref-font-size-2xl: 1.25rem;
+  --ref-font-size-3xl: 1.75rem;
+  --ref-font-size-4xl: 2.25rem;
+  --ref-font-size-5xl: 2.75rem;
+  --ref-font-weight-regular: 400;
+  --ref-font-weight-medium: 500;
+  --ref-font-weight-semibold: 600;
+  --ref-font-weight-bold: 700;
+  --ref-font-weight-extrabold: 800;
+  --ref-font-leading-tight: 1;
+  --ref-font-leading-snug: 1.35;
+  --ref-font-leading-normal: 1.55;
+  --ref-font-leading-relaxed: 1.6;
+  --ref-font-tracking-tight: -0.02em;
+  --ref-font-tracking-wide: 0.12em;
+
+  /* Espaciado y forma */
+  --ref-space-xs: 4px;
+  --ref-space-sm: 8px;
+  --ref-space-ms: 12px;
+  --ref-space-md: 16px;
+  --ref-space-lg: 24px;
+  --ref-space-lx: 28px;
+  --ref-space-xl: 32px;
+  --ref-space-2xl: 48px;
+  --ref-radius-xs: 6px;
+  --ref-radius-sm: 8px;
+  --ref-radius-md: 10px;
+  --ref-radius-lg: 12px;
+  --ref-radius-xl: 14px;
+  --ref-radius-2xl: 18px;
+  --ref-radius-full: 999px;
+
+  /* Elevación */
+  --ref-shadow-1: 0 10px 30px rgba(11, 16, 32, 0.08);
+  --ref-shadow-2: 0 20px 60px rgba(11, 16, 32, 0.18);
+  --ref-shadow-3: 0 30px 80px rgba(0, 0, 0, 0.35);
+  --ref-shadow-4: 0 24px 60px rgba(11, 16, 32, 0.28);
+
+  /* Breakpoint (en @media se escribe el literal 768px con min-width) */
+  --ref-bp-desktop: 768px;
+
+  /* Transición (spacing.md) */
+  --ref-motion-fast: 150ms ease;
+  --ref-motion-base: 200ms ease;
+  --ref-motion-slow: 300ms ease;
+
+  /* Z-index (elevation.md) */
+  --ref-z-raised: 10;
+  --ref-z-popover: 30;
+  --ref-z-dialog: 40;
+  --ref-z-toast: 50;
+
+  /* ======================================================================
+     Tier 2 — semantic
+     ====================================================================== */
+
+  /* Background */
+  --bg-canvas: var(--ref-color-gray-100);
+  --bg-surface: var(--ref-color-white);
+  --bg-surface-subtle: var(--ref-color-gray-50);
+  --bg-band: var(--ref-color-black);
+  --bg-band-raised: var(--ref-color-ink-800);
+  --bg-action-primary: var(--ref-color-violet-700);
+  /* Pendiente DS: el diseño no define hover. El primario no cambia de color hasta que se defina. */
+  --bg-action-primary-hover: var(--bg-action-primary);
+  --bg-action-subtle: var(--ref-color-violet-100);
+  --bg-accent: var(--ref-color-violet-500);
+  --bg-unread: var(--ref-color-violet-50);
+  --bg-success: var(--ref-color-green-600);
+  --bg-success-subtle: var(--ref-color-green-100);
+  --bg-warning: var(--ref-color-amber-500);
+  --bg-warning-subtle: var(--ref-color-amber-100);
+  --bg-neutral-subtle: var(--ref-color-gray-150);
+  --bg-disabled: var(--ref-color-gray-200);
+  --bg-backdrop: rgba(11, 16, 32, 0.55);
+
+  /* Text */
+  --text-primary: var(--ref-color-ink-900);
+  --text-secondary: var(--ref-color-gray-600);
+  --text-muted: var(--ref-color-gray-500);
+  --text-disabled: var(--ref-color-gray-400);
+  --text-inverse: var(--ref-color-white);
+  --text-inverse-secondary: var(--ref-color-violet-200);
+  --text-signal: var(--ref-color-cyan-400);
+  --text-action: var(--ref-color-violet-700);
+  --text-success: var(--ref-color-green-700);
+  --text-warning: var(--ref-color-amber-700);
+  --text-error: var(--ref-color-red-700);
+
+  /* Border */
+  --border-default: var(--ref-color-gray-200);
+  --border-strong: var(--ref-color-gray-300);
+  --border-focus: var(--ref-color-violet-500);
+  --border-error: var(--ref-color-red-700);
+  --border-inverse: rgba(255, 255, 255, 0.12);
+
+  /* Forma y elevación */
+  --radius-control: var(--ref-radius-md);
+  --radius-field: var(--ref-radius-lg);
+  --radius-surface: var(--ref-radius-2xl);
+  --radius-area: var(--ref-radius-xl);
+  --radius-pill: var(--ref-radius-full);
+  --shadow-raised: var(--ref-shadow-1);
+  --shadow-popover: var(--ref-shadow-2);
+  --shadow-dialog: var(--ref-shadow-3);
+  --shadow-toast: var(--ref-shadow-4);
+  --focus-ring: 0 0 0 4px var(--ref-color-violet-100);
+
+  /* Spacing */
+  --space-inline-sm: var(--ref-space-sm);
+  --space-inline-md: var(--ref-space-ms);
+  --space-stack-sm: var(--ref-space-sm);
+  --space-stack-md: var(--ref-space-md);
+  --space-stack-lg: var(--ref-space-lx);
+  --space-padding-compact: var(--ref-space-md);
+  --space-padding-default: var(--ref-space-lg);
+  --space-padding-spacious: var(--ref-space-lx);
+
+  /* Z-index */
+  --z-popover: var(--ref-z-popover);
+  --z-dialog: var(--ref-z-dialog);
+  --z-toast: var(--ref-z-toast);
+
+  /* Breakpoint: alias documental (DA-7). En @media se usa el literal. */
+  --bp-mobile: 768px;
+
+  /* Tipografía semántica (font shorthand). El shorthand no incluye
+     letter-spacing ni text-transform: ver --type-tracking-*. */
+  --type-display: var(--ref-font-weight-extrabold) var(--ref-font-size-5xl)/var(--ref-font-leading-snug) var(--ref-font-family-base);
+  --type-heading-l: var(--ref-font-weight-extrabold) var(--ref-font-size-4xl)/var(--ref-font-leading-snug) var(--ref-font-family-base);
+  --type-heading-m: var(--ref-font-weight-bold) var(--ref-font-size-2xl)/var(--ref-font-leading-snug) var(--ref-font-family-base);
+  --type-heading-s: var(--ref-font-weight-bold) var(--ref-font-size-xl)/var(--ref-font-leading-snug) var(--ref-font-family-base);
+  --type-body: var(--ref-font-weight-regular) var(--ref-font-size-md)/var(--ref-font-leading-normal) var(--ref-font-family-base);
+  --type-ui: var(--ref-font-weight-semibold) var(--ref-font-size-sm)/var(--ref-font-leading-normal) var(--ref-font-family-base);
+  --type-caption: var(--ref-font-weight-medium) var(--ref-font-size-xs)/var(--ref-font-leading-normal) var(--ref-font-family-base);
+  --type-eyebrow: var(--ref-font-weight-semibold) var(--ref-font-size-2xs)/var(--ref-font-leading-snug) var(--ref-font-family-mono);
+  --type-metric: var(--ref-font-weight-extrabold) var(--ref-font-size-3xl)/var(--ref-font-leading-tight) var(--ref-font-family-base);
+  --type-tracking-tight: var(--ref-font-tracking-tight);
+  --type-tracking-wide: var(--ref-font-tracking-wide);
+
+  /* ======================================================================
+     Tier 3 — component
+     ====================================================================== */
+
+  /* Button */
+  --button-primary-bg: var(--bg-action-primary);
+  --button-primary-bg-hover: var(--bg-action-primary-hover);
+  --button-primary-fg: var(--text-inverse);
+  --button-secondary-bg: var(--bg-surface);
+  --button-secondary-fg: var(--text-action);
+  --button-secondary-border: var(--border-strong);
+  --button-tertiary-fg: var(--text-action);
+  --button-on-band-bg: var(--bg-band-raised);
+  --button-on-band-fg: var(--text-inverse);
+  --button-on-band-border: var(--border-inverse);
+  --button-disabled-bg: var(--bg-disabled);
+  --button-disabled-fg: var(--text-disabled);
+  --button-radius: var(--radius-control);
+  --button-focus: var(--focus-ring);
+
+  /* TextField */
+  --text-field-bg: var(--bg-surface);
+  --text-field-border: var(--border-strong);
+  --text-field-border-focus: var(--border-focus);
+  --text-field-border-error: var(--border-error);
+  --text-field-fg: var(--text-primary);
+  --text-field-placeholder: var(--text-disabled);
+  --text-field-help: var(--text-muted);
+  --text-field-error: var(--text-error);
+  --text-field-radius: var(--radius-field);
+
+  /* Dialog */
+  --dialog-bg: var(--bg-surface);
+  --dialog-backdrop: var(--bg-backdrop);
+  --dialog-radius: var(--radius-surface);
+  --dialog-shadow: var(--shadow-dialog);
+  --dialog-eyebrow: var(--text-muted);
+
+  /* Card */
+  --card-bg: var(--bg-surface);
+  --card-border: var(--border-default);
+  --card-radius: var(--radius-surface);
+  --card-subtle-bg: var(--bg-surface-subtle);
+  --card-raised-shadow: var(--shadow-raised);
+  --card-feature-bg: var(--bg-band);
+  --card-feature-fg: var(--text-inverse);
+
+  /* StatusPill */
+  --status-pill-success-bg: var(--bg-success-subtle);
+  --status-pill-success-fg: var(--text-success);
+  --status-pill-warning-bg: var(--bg-warning-subtle);
+  --status-pill-warning-fg: var(--text-warning);
+  --status-pill-action-bg: var(--bg-action-subtle);
+  --status-pill-action-fg: var(--text-action);
+  --status-pill-neutral-bg: var(--bg-neutral-subtle);
+  --status-pill-neutral-fg: var(--text-secondary);
+  --status-pill-on-band-bg: var(--bg-band-raised);
+  --status-pill-on-band-fg: var(--text-inverse);
+  --status-pill-radius: var(--radius-pill);
+
+  /* DataTable */
+  --data-table-bg: var(--bg-surface);
+  --data-table-border: var(--border-default);
+  --data-table-header-fg: var(--text-muted);
+  --data-table-row-hover: var(--bg-surface-subtle);
+  --data-table-row-highlight: var(--bg-unread);
+  --data-table-radius: var(--radius-surface);
+
+  /* FilterTabs */
+  --filter-tabs-fg: var(--text-secondary);
+  --filter-tabs-selected-bg: var(--bg-band);
+  --filter-tabs-selected-fg: var(--text-inverse);
+  --filter-tabs-hover-bg: var(--bg-neutral-subtle);
+  --filter-tabs-radius: var(--radius-pill);
+
+  /* ProgressBar */
+  --progress-bar-track: var(--bg-disabled);
+  --progress-bar-fill-action: var(--bg-accent);
+  --progress-bar-fill-success: var(--bg-success);
+  --progress-bar-fill-warning: var(--bg-warning);
+
+  /* StatTile / Callout / EmptyState */
+  --stat-tile-value: var(--text-primary);
+  --stat-tile-label: var(--text-muted);
+  --callout-info-bg: var(--bg-surface-subtle);
+  --callout-warning-bg: var(--bg-warning-subtle);
+  --callout-warning-fg: var(--text-warning);
+  --callout-error-border: var(--border-error);
+  --callout-error-fg: var(--text-error);
+  --callout-success-bg: var(--bg-success-subtle);
+  --callout-success-fg: var(--text-success);
+  --empty-state-icon: var(--text-muted);
+  --empty-state-text: var(--text-secondary);
+
+  /* DateQuickPicker / NumberStepper / FileDropzone / Menu */
+  --date-picker-preset-selected-bg: var(--bg-action-subtle);
+  --date-picker-preset-selected-fg: var(--text-action);
+  --number-stepper-border: var(--border-strong);
+  --file-dropzone-bg: var(--bg-surface-subtle);
+  --file-dropzone-border: var(--border-strong);
+  --file-dropzone-border-dragover: var(--border-focus);
+  --file-dropzone-bg-dragover: var(--bg-action-subtle);
+  --file-dropzone-radius: var(--radius-area);
+  --menu-bg: var(--bg-surface);
+  --menu-shadow: var(--shadow-popover);
+  --menu-item-hover: var(--bg-surface-subtle);
+}

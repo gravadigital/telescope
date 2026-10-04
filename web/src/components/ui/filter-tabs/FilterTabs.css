@@ -1,0 +1,41 @@
+/* En mobile la fila hace scroll horizontal dentro de su contenedor, nunca la página. */
+.ui-filter-tabs {
+  display: flex;
+  gap: var(--ref-space-xs);
+  max-width: 100%;
+  overflow-x: auto;
+}
+.ui-filter-tabs__tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ref-space-xs);
+  min-height: 36px;
+  padding: var(--ref-space-sm) 14px;
+  border: 0;
+  border-radius: var(--filter-tabs-radius);
+  background: transparent;
+  color: var(--filter-tabs-fg);
+  font: var(--type-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ui-filter-tabs__tab:hover {
+  background: var(--filter-tabs-hover-bg);
+}
+.ui-filter-tabs__tab--selected,
+.ui-filter-tabs__tab--selected:hover {
+  background: var(--filter-tabs-selected-bg);
+  color: var(--filter-tabs-selected-fg);
+  font-weight: var(--ref-font-weight-semibold);
+}
+.ui-filter-tabs__tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ui-filter-tabs__skeleton {
+  width: 16px;
+  height: 12px;
+  background: var(--bg-disabled);
+  border-radius: var(--ref-radius-xs);
+}

@@ -1,0 +1,68 @@
+.ui-number-stepper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ref-space-sm);
+  font: var(--type-body);
+}
+.ui-number-stepper__label {
+  font: var(--type-ui);
+  color: var(--text-primary);
+}
+.ui-number-stepper__row {
+  display: flex;
+  align-items: center;
+  gap: var(--ref-space-sm);
+}
+.ui-number-stepper__button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--number-stepper-border);
+}
+.ui-number-stepper__input {
+  box-sizing: border-box;
+  width: 4.5em;
+  min-height: 44px;
+  text-align: center;
+  background: var(--text-field-bg);
+  color: var(--text-field-fg);
+  border: 1px solid var(--number-stepper-border);
+  border-radius: var(--radius-field);
+  font: var(--type-ui);
+  font-size: var(--ref-font-size-lg);
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.ui-number-stepper__input::-webkit-outer-spin-button,
+.ui-number-stepper__input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.ui-number-stepper__input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: var(--focus-ring);
+}
+.ui-number-stepper--error .ui-number-stepper__input {
+  border-color: var(--border-error);
+}
+.ui-number-stepper__unit {
+  color: var(--text-secondary);
+}
+.ui-number-stepper__badge {
+  padding: 2px var(--ref-space-sm);
+  background: var(--bg-action-subtle);
+  color: var(--text-action);
+  border-radius: var(--radius-pill);
+  font: var(--type-caption);
+}
+.ui-number-stepper__help,
+.ui-number-stepper__error {
+  margin: 0;
+  font: var(--type-caption);
+}
+.ui-number-stepper__help {
+  color: var(--text-field-help);
+}
+.ui-number-stepper__error {
+  color: var(--text-field-error);
+}

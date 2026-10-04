@@ -1,0 +1,89 @@
+.ev-hero {
+  background: var(--bg-band);
+  color: var(--text-inverse);
+}
+.ev-hero__inner {
+  box-sizing: border-box;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--ref-space-lg) var(--ref-space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ref-space-md);
+}
+.ev-hero__back {
+  align-self: flex-start;
+  color: var(--text-inverse-secondary);
+  font: var(--type-ui);
+  text-decoration: none;
+}
+.ev-hero__back:hover {
+  color: var(--text-inverse);
+}
+.ev-hero__back:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--ref-radius-xs);
+}
+.ev-hero__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ref-space-md);
+}
+.ev-hero__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ref-space-ms);
+  min-width: 0;
+}
+.ev-hero__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ref-space-sm);
+}
+.ev-hero__title {
+  margin: 0;
+  font: var(--type-heading-l);
+  font-size: var(--ref-font-size-3xl);
+  letter-spacing: var(--type-tracking-tight);
+  overflow-wrap: anywhere;
+}
+.ev-hero__meta {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-inverse-secondary);
+}
+/* Mobile: las acciones ocupan el ancho completo */
+.ev-hero__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ref-space-ms);
+}
+.ev-hero__actions > * {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .ev-hero__inner {
+    padding: var(--ref-space-xl);
+  }
+  .ev-hero__title {
+    font: var(--type-display);
+    letter-spacing: var(--type-tracking-tight);
+  }
+  .ev-hero__row {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+  .ev-hero__main {
+    flex: 1;
+  }
+  .ev-hero__actions {
+    flex: none;
+    flex-direction: row;
+  }
+  .ev-hero__actions > * {
+    width: auto;
+  }
+}

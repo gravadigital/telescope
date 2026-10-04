@@ -1,0 +1,134 @@
+/* Mobile-first: la tabla se apila (cada fila es un bloque con etiqueta por valor).
+   No se usa display none: la semántica de tabla se mantiene para lectores de pantalla. */
+.ui-data-table {
+  display: block;
+  width: 100%;
+  background: var(--data-table-bg);
+  border: 1px solid var(--data-table-border);
+  border-radius: var(--data-table-radius);
+  font: var(--type-ui);
+  color: var(--text-primary);
+}
+.ui-data-table tbody {
+  display: block;
+}
+.ui-data-table__caption {
+  display: block;
+  padding: var(--space-padding-compact);
+  font: var(--type-heading-s);
+  text-align: left;
+}
+
+/* Cabecera visualmente oculta, legible por lectores de pantalla */
+.ui-data-table__head {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.ui-data-table__row {
+  display: block;
+  padding: var(--space-padding-compact);
+  border-top: 1px solid var(--data-table-border);
+}
+.ui-data-table__row--highlighted {
+  background: var(--data-table-row-highlight);
+}
+
+.ui-data-table__cell {
+  display: block;
+  padding: var(--ref-space-xs) 0;
+}
+.ui-data-table__cell::before {
+  content: attr(data-label);
+  display: block;
+  font: var(--type-eyebrow);
+  letter-spacing: var(--type-tracking-wide);
+  text-transform: uppercase;
+  color: var(--data-table-header-fg);
+}
+.ui-data-table__cell--action::before {
+  display: none;
+}
+.ui-data-table__cell--action .ui-button {
+  width: 100%;
+  margin-top: var(--ref-space-sm);
+}
+
+.ui-data-table__text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.ui-data-table__skeleton {
+  display: block;
+  width: 60%;
+  height: 16px;
+  background: var(--bg-disabled);
+  border-radius: var(--ref-radius-xs);
+}
+
+@media (min-width: 768px) {
+  .ui-data-table {
+    display: table;
+    border-collapse: separate;
+    border-spacing: 0;
+    overflow: hidden;
+  }
+  .ui-data-table tbody {
+    display: table-row-group;
+  }
+  .ui-data-table__caption {
+    display: table-caption;
+  }
+  .ui-data-table__head {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    display: table-header-group;
+  }
+  .ui-data-table__th {
+    padding: var(--ref-space-ms) var(--ref-space-md);
+    font: var(--type-eyebrow);
+    letter-spacing: var(--type-tracking-wide);
+    text-transform: uppercase;
+    color: var(--data-table-header-fg);
+    text-align: left;
+  }
+  .ui-data-table__row {
+    display: table-row;
+    height: 56px;
+    padding: 0;
+  }
+  .ui-data-table__row:hover {
+    background: var(--data-table-row-hover);
+  }
+  .ui-data-table__row--highlighted,
+  .ui-data-table__row--highlighted:hover {
+    background: var(--data-table-row-highlight);
+  }
+  .ui-data-table__cell {
+    display: table-cell;
+    padding: var(--ref-space-md);
+    vertical-align: middle;
+    border-top: 1px solid var(--data-table-border);
+  }
+  .ui-data-table__cell::before {
+    display: none;
+  }
+  .ui-data-table__cell--end,
+  .ui-data-table__cell--action {
+    text-align: right;
+  }
+  .ui-data-table__cell--action .ui-button {
+    width: auto;
+    margin-top: 0;
+  }
+}

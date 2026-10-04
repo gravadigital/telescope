@@ -1,0 +1,35 @@
+.ui-stat-tile {
+  box-sizing: border-box;
+  min-width: 140px;
+  padding: var(--space-padding-default);
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
+}
+.ui-stat-tile--compact {
+  min-width: 0;
+  padding: var(--space-padding-compact);
+}
+.ui-stat-tile__label {
+  margin: 0 0 var(--ref-space-xs);
+  font: var(--type-caption);
+  color: var(--stat-tile-label);
+}
+.ui-stat-tile__value {
+  margin: 0;
+  font: var(--type-metric);
+  color: var(--stat-tile-value);
+}
+.ui-stat-tile--compact .ui-stat-tile__value {
+  font-size: var(--ref-font-size-2xl);
+}
+.ui-stat-tile__total {
+  font: var(--type-body);
+  color: var(--text-secondary);
+}
+.ui-stat-tile__skeleton {
+  width: 48px;
+  height: 28px;
+  background: var(--bg-disabled);
+  border-radius: var(--ref-radius-xs);
+}
