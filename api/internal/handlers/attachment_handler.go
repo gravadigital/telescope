@@ -383,12 +383,20 @@ func (h *AttachmentHandler) GetEventAttachments(c *gin.Context) {
 		return
 	}
 
+	// An unknown event keeps answering 200 with an empty list; an existing one in
+	// creation looks nonexistent to anyone but its author and admins.
+	evt, evtErr := h.eventRepo.GetByID(eventID)
+	if evtErr == nil && !eventVisibleTo(c, evt) {
+		respondEventNotFound(c)
+		return
+	}
+
 	// Only the event author and admins see every proposal (with authorship); anyone else
 	// gets their own. A failed event lookup is treated as "not the author".
 	canSeeAll := false
 	if role, roleErr := auth.GetUserRoleFromContext(c); roleErr == nil && role == participant.RoleAdmin {
 		canSeeAll = true
-	} else if evt, evtErr := h.eventRepo.GetByID(eventID); evtErr == nil {
+	} else if evtErr == nil {
 		canSeeAll = evt.AuthorID == userID
 	}
 

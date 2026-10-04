@@ -111,7 +111,7 @@ Relevada del código, para que no se confunda con decisión de diseño:
    cualquier otro usuario.
 6. **Paginación en memoria con N+1**: `GET /events` trae todo y pagina después, haciendo
    una consulta de participantes por evento.
-7. **Handlers implementados sin rutas**: `UpdateEvent`/`DeleteEvent` (devuelven 501),
+7. **Handlers implementados sin rutas**: `DeleteEvent` (devuelve 501),
    `GetVotingConfiguration`, `UpdateVotingConfiguration`, `DeleteVotingConfiguration`,
    `GetAttachment`, `RemoveParticipant`. (`PreviewVotingConfiguration` ya tiene ruta:
    `GET /events/:event_id/voting-config/preview`, desde S-006.)
@@ -120,3 +120,8 @@ Relevada del código, para que no se confunda con decisión de diseño:
    parece rota). `_base` exige `gofumpt`.
 9. **JWT secret con default hardcodeado**: si falta `JWT_SECRET` arranca igual con
    `"telescopio-dev-secret-change-in-production"` y solo imprime un warning.
+10. **El CHECK `future_start_date` bloquea editar eventos viejos**: se reevalúa en todo `UPDATE`
+    de la fila (aunque sea `NOT VALID`), así que `PATCH /events/:event_id` —y también el cambio
+    de etapa, pausar y cancelar— responde `500` si `start_date` es anterior a ayer. Verificado por
+    `TestEventUpdate_FutureStartDateCheckOnOldEvent`. Requiere decidir en producto/diseño si se
+    elimina el CHECK o se restringe a `INSERT`.
