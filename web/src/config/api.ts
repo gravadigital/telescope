@@ -71,6 +71,20 @@ export const DEFAULT_HEADERS: Record<string, string> = {
   'Accept': 'application/json',
 };
 
+// Error lanzado por apiRequest: conserva el status HTTP y el code estable del backend
+export interface ApiRequestError extends Error {
+  status: number;
+  code?: string;
+}
+
+export const getErrorCode = (err: unknown): string | undefined => {
+  if (err instanceof Error) {
+    const code = (err as Partial<ApiRequestError>).code;
+    if (typeof code === 'string') return code;
+  }
+  return undefined;
+};
+
 // Función helper para hacer peticiones a la API con JSON
 export const apiRequest = async <T = any>(
   endpoint: string,
@@ -127,7 +141,14 @@ export const apiRequest = async <T = any>(
         // sin perder el contexto de navegación
       }
       
-      throw new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`);
+      const requestError: ApiRequestError = Object.assign(
+        new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`),
+        {
+          status: response.status,
+          code: typeof errorData.code === 'string' ? (errorData.code as string) : undefined,
+        }
+      );
+      throw requestError;
     }
 
     const data = await response.json();

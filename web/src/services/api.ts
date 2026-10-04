@@ -1,14 +1,33 @@
-import { apiRequest, checkApiHealth, downloadFile, API_CONFIG } from "../config/api";
+import { apiRequest, checkApiHealth, downloadFile, getErrorCode, API_CONFIG } from "../config/api";
 import {
   Event,
   User,
   VotingConfiguration,
-  Assignment,
+  AnonymousAssignment,
   RankingVote,
   VotingResults,
   VotingStatistics,
   Attachment
 } from "../types";
+
+// Mantener en sync con `neutralExtensions` de api/internal/handlers/attachment_handler.go
+export const NEUTRAL_EXTENSIONS: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'application/pdf': 'pdf',
+  'text/plain': 'txt',
+  'application/msword': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+};
+
+export const extensionForMime = (mimeType: string): string =>
+  NEUTRAL_EXTENSIONS[mimeType] ?? 'bin';
+
+export const neutralFilename = (position: number, mimeType: string): string =>
+  `propuesta-${position}.${extensionForMime(mimeType)}`;
+
 
 interface CreateEventRequest {
   name: string;
@@ -522,6 +541,20 @@ export const AttachmentService = {
     await downloadFile(API_CONFIG.ENDPOINTS.DOWNLOAD_ATTACHMENT(attachmentId), filename);
   },
 
+  /**
+   * Descarga de una propuesta asignada al evaluador, con nombre neutro (anonimato).
+   */
+  async downloadAssignedAttachment(
+    attachmentId: string,
+    position: number,
+    mimeType: string
+  ): Promise<void> {
+    await downloadFile(
+      API_CONFIG.ENDPOINTS.DOWNLOAD_ATTACHMENT(attachmentId),
+      neutralFilename(position, mimeType)
+    );
+  },
+
   async deleteAttachment(attachmentId: string): Promise<void> {
     await apiRequest(API_CONFIG.ENDPOINTS.DELETE_ATTACHMENT(attachmentId), {
       method: "DELETE",
@@ -591,14 +624,20 @@ export const DistributedVotingService = {
   async getParticipantAssignment(
     eventId: string,
     participantId: string
-  ): Promise<Assignment> {
+  ): Promise<AnonymousAssignment | null> {
     try {
-      const response = await apiRequest<{ assignment: Assignment }>(
-        API_CONFIG.ENDPOINTS.GET_ASSIGNMENT(eventId, participantId)
-      );
+      const response = await apiRequest<{
+        assignment: AnonymousAssignment;
+        event_name: string;
+        participant_id: string;
+      }>(API_CONFIG.ENDPOINTS.GET_ASSIGNMENT(eventId, participantId));
       console.log('✅ Assignment loaded for participant:', participantId);
       return response.assignment;
     } catch (error) {
+      // Inscripto sin propuesta: no es un error, simplemente no evalúa
+      if (getErrorCode(error) === 'NO_ASSIGNMENT') {
+        return null;
+      }
       console.error('Failed to get participant assignment:', error);
       throw error;
     }
