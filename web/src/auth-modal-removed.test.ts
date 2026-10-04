@@ -19,3 +19,32 @@ describe('fin del modal de autenticación', () => {
     expect(offenders.map((f) => path.relative(SRC, f))).toEqual([]);
   });
 });
+
+describe('fin de los modales de autenticación (S-012)', () => {
+  const exists = (rel: string): boolean => fs.existsSync(path.join(SRC, rel));
+  // Nombres armados por partes para que este archivo no cuente como referencia.
+  const removedNames = ['Username' + 'Modal', 'ForgotPassword' + 'Form', 'Auth' + 'Form', 'TAuth' + 'Form', 'Auth' + 'Props'];
+
+  it('TS-59: los archivos del modal ya no existen y nada los referencia', () => {
+    [
+      'components/auth/Auth.tsx',
+      'components/auth/Auth.css',
+      'components/auth/ForgotPasswordForm.tsx',
+      'components/auth/UsernameModal.tsx',
+      'components/auth/GoogleLoginButton.tsx',
+      'components/auth-form/AuthForm.tsx',
+      'pages/auth-page/AuthPage.tsx',
+    ].forEach((rel) => expect(exists(rel)).toBe(false));
+
+    const offenders = walk(SRC)
+      .filter((f) => /\.(ts|tsx)$/.test(f))
+      .filter((f) => f !== __filename)
+      .filter((f) => removedNames.some((n) => new RegExp(`\\b${n}\\b`).test(fs.readFileSync(f, 'utf8'))));
+    expect(offenders.map((f) => path.relative(SRC, f))).toEqual([]);
+  });
+
+  it('TS-59: Modal y LinkButton siguen existiendo (los usa EventDetailPage)', () => {
+    expect(exists('components/modal/Modal.tsx')).toBe(true);
+    expect(exists('components/link-button/LinkButton.tsx')).toBe(true);
+  });
+});

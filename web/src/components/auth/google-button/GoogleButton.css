@@ -1,0 +1,24 @@
+.au-google {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-inline-md);
+  width: 100%;
+  min-height: 46px;
+  padding: 0 var(--space-padding-default);
+  background: var(--button-secondary-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--button-secondary-border);
+  border-radius: var(--radius-control);
+  font: var(--type-ui);
+  cursor: pointer;
+}
+.au-google:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.au-google:disabled {
+  background: var(--bg-disabled);
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}

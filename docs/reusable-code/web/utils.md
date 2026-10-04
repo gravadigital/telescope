@@ -69,3 +69,25 @@ addDays(date: string, days: number): string
 safeNextPath(raw: string | null | undefined): string
 loginPathFor(path: string): string
 ```
+
+---
+
+## domain/auth and scopedMessageKeyForError
+
+**Location:** `src/domain/auth.ts`, `src/i18n/errors.ts`
+**Description:** Pure form validation returning translation keys per field (`FieldErrors<K>`); display name is validated by length (3..100), not by character set. `scopedMessageKeyForError` translates an API error only if its `code` is in the page's allowed list (`errors.<code>`), network errors as `errors.network`, anything else as the page's own fallback key.
+
+**Signature:**
+```ts
+isValidEmail(value: string): boolean
+validateLogin({ email, password }): FieldErrors<'email' | 'password'>
+validateRegister({ name, email, password }): FieldErrors<'name' | 'email' | 'password'>
+validateNewPassword({ password, confirm }): FieldErrors<'password' | 'confirm'>
+validateDisplayName(name: string): TranslationKey | undefined
+scopedMessageKeyForError(err: unknown, codes: readonly string[], fallback: TranslationKey): TranslationKey
+```
+
+**Usage:**
+```ts
+setFormError(scopedMessageKeyForError(err, ['INVALID_PAYLOAD'], 'auth.register.error'));
+```

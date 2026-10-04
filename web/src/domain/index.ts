@@ -4,3 +4,4 @@ export * from './dates';
 export * from './score';
 export * from './voting';
 export * from './redirect';
+export * from './auth';

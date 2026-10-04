@@ -18,7 +18,12 @@ export const sampleUser: User = {
 
 export const LocationDisplay: React.FC = () => {
   const location = useLocation();
-  return <div data-testid="location">{location.pathname + location.search}</div>;
+  return (
+    <>
+      <div data-testid="location">{location.pathname + location.search}</div>
+      <div data-testid="location-state">{JSON.stringify(location.state ?? null)}</div>
+    </>
+  );
 };
 
 export interface ProviderOptions {
@@ -26,6 +31,8 @@ export interface ProviderOptions {
   /** Valores para el `useAuth` mockeado (el test debe hacer `jest.mock('.../context/AuthContext')`). */
   auth?: Partial<AuthContextType>;
   route?: string;
+  /** Alternativa a `route` para entradas con `state` (se lee en `location-state`). */
+  initialEntry?: { pathname: string; search?: string; state?: unknown };
 }
 
 export const buildAuth = (auth: Partial<AuthContextType> = {}): AuthContextType => ({
@@ -42,7 +49,7 @@ export const buildAuth = (auth: Partial<AuthContextType> = {}): AuthContextType 
 
 export const renderWithProviders = (
   ui: React.ReactElement,
-  { locale = 'es', auth, route = '/' }: ProviderOptions = {}
+  { locale = 'es', auth, route = '/', initialEntry }: ProviderOptions = {}
 ): RenderResult & { auth: AuthContextType } => {
   const authValue = buildAuth({ isAuthenticated: Boolean(auth?.user), ...auth });
   if (jest.isMockFunction(useAuth)) {
@@ -50,7 +57,7 @@ export const renderWithProviders = (
   }
   const result = render(
     <I18nProvider initialLocale={locale}>
-      <MemoryRouter initialEntries={[route]}>
+      <MemoryRouter initialEntries={[initialEntry ?? route]}>
         {ui}
         <LocationDisplay />
       </MemoryRouter>

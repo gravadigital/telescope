@@ -1,0 +1,143 @@
+/* Mobile-first: franja de marca arriba, formulario a ancho completo. */
+.ly-auth {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg-surface);
+}
+.ly-auth__brand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-sm);
+  padding: var(--space-padding-compact);
+  background: var(--bg-band);
+  color: var(--text-inverse);
+}
+.ly-auth__logo {
+  margin: 0;
+  font: var(--type-eyebrow);
+  letter-spacing: var(--type-tracking-wide);
+  color: var(--text-signal);
+}
+.ly-auth__brand-title {
+  margin: 0;
+  font: var(--type-heading-m);
+  letter-spacing: var(--type-tracking-tight);
+}
+.ly-auth__benefits {
+  display: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ly-auth__benefit {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-inline-sm);
+  font: var(--type-body);
+  color: var(--text-inverse-secondary);
+}
+.ly-auth__panel {
+  flex: 1;
+  padding: var(--space-padding-default) var(--space-padding-compact);
+  background: var(--bg-surface);
+}
+.ly-auth__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-md);
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.ly-auth__title {
+  margin: 0;
+  font: var(--type-heading-m);
+  color: var(--text-primary);
+  letter-spacing: var(--type-tracking-tight);
+}
+.ly-auth__title:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Apoyos para las páginas */
+.ly-auth__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-md);
+  margin: 0;
+}
+.ly-auth__text {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-secondary);
+}
+.ly-auth__separator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-inline-md);
+  font: var(--type-caption);
+  color: var(--text-secondary);
+}
+.ly-auth__separator::before,
+.ly-auth__separator::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--border-default);
+}
+.ly-auth__alt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-inline-sm);
+  margin: 0;
+  font: var(--type-ui);
+  color: var(--text-secondary);
+}
+.ly-auth__alt a,
+.ly-auth__back,
+.ly-auth__aside-link {
+  color: var(--text-action);
+  font: var(--type-ui);
+  text-decoration: none;
+}
+.ly-auth__alt a:hover,
+.ly-auth__back:hover,
+.ly-auth__aside-link:hover {
+  text-decoration: underline;
+}
+.ly-auth__back {
+  align-self: flex-start;
+}
+.ly-auth__aside-link {
+  align-self: flex-end;
+}
+
+@media (min-width: 768px) {
+  .ly-auth {
+    display: grid;
+    grid-template-columns: 5fr 7fr;
+    min-height: 100vh;
+  }
+  .ly-auth__brand {
+    justify-content: center;
+    gap: var(--space-stack-lg);
+    padding: var(--space-padding-spacious);
+  }
+  .ly-auth__brand-title {
+    font: var(--type-heading-l);
+  }
+  .ly-auth__benefits {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-stack-sm);
+  }
+  .ly-auth__panel {
+    display: flex;
+    align-items: center;
+    padding: var(--space-padding-spacious);
+  }
+  .ly-auth__title {
+    font: var(--type-heading-l);
+  }
+}

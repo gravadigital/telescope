@@ -21,7 +21,7 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint --max-warnings=0 --ext .ts,.tsx --ignore-pattern '*.test.*' --ignore-pattern '__tests__' src/i18n src/domain src/components/ui src/components/layout src/pages/not-found src/pages/auth-page"
+    "lint": "eslint --max-warnings=0 --ext .ts,.tsx --ignore-pattern '*.test.*' --ignore-pattern '__tests__' src/i18n src/domain src/components/ui src/components/layout src/pages/not-found src/pages/login src/pages/register src/pages/forgot-password src/pages/reset-password src/pages/complete-profile src/components/auth src/hooks/useGoogleSignIn.ts"
   },
   "eslintConfig": {
     "extends": [
@@ -34,7 +34,12 @@
           "src/components/ui/**/*.tsx",
           "src/components/layout/**/*.tsx",
           "src/pages/not-found/**/*.tsx",
-          "src/pages/auth-page/**/*.tsx"
+          "src/pages/login/**/*.tsx",
+          "src/pages/register/**/*.tsx",
+          "src/pages/forgot-password/**/*.tsx",
+          "src/pages/reset-password/**/*.tsx",
+          "src/pages/complete-profile/**/*.tsx",
+          "src/components/auth/**/*.tsx"
         ],
         "excludedFiles": [
           "**/*.test.tsx",

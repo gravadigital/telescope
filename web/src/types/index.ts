@@ -93,12 +93,6 @@ export interface ApiConfig {
   };
 }
 
-export interface FormData {
-  name: string;
-  email: string;
-  password?: string;
-}
-
 export interface ApiResponse<T = any> {
   data?: T;
   events?: T;
@@ -107,22 +101,6 @@ export interface ApiResponse<T = any> {
 }
 
 // Props para componentes
-export interface AuthProps {
-  onClose?: () => void;
-  initialMode?: 'login' | 'register';
-}
-
-export interface TAuthForm {
-  mode: 'login' | 'register';
-  setMode: (mode: 'login' | 'register') => void;
-  formData: FormData;
-  setFormData: (formData: FormData) => void;
-  error: string;
-  setError: (error: string) => void;
-  apiAvailable: boolean;
-  onLoginSuccess?: () => void;
-}
-
 export interface EventsProps {}
 
 export interface EventDetailProps {

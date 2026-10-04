@@ -18,7 +18,8 @@ export const findVoseo = (text: string): string[] =>
 
 const GENDER_PATTERNS: readonly RegExp[] = [
   /\b\w+(?:o\/a|a\/o|os\/as|as\/os)\b/gi,
-  /\w@\w/g,
+  // `l@s`, `tod@s`; no las direcciones de email (`nombre@correo.com`).
+  /\w@(?![\w-]+\.\w)\w/g,
   /\b(?:todxs|inscriptxs|participantxs)\b/gi,
 ];
 

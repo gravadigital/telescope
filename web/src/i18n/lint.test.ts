@@ -49,4 +49,10 @@ describe('react/jsx-no-literals', () => {
   it('TS-32: fuera del alcance no dispara', async () => {
     expect(await literalErrors(HOLA, 'src/pages/event-detail/Fake.tsx')).toHaveLength(0);
   });
+
+  it('TS-60: dispara en las carpetas de las páginas de auth', async () => {
+    expect(await literalErrors(HOLA, 'src/pages/login/Fake.tsx')).toHaveLength(1);
+    expect(await literalErrors(HOLA, 'src/pages/complete-profile/Fake.tsx')).toHaveLength(1);
+    expect(await literalErrors(HOLA, 'src/components/auth/fake/Fake.tsx')).toHaveLength(1);
+  });
 });

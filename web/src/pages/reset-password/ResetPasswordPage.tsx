@@ -1,111 +1,148 @@
-import React, { useState, FormEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { UserService } from "../../services/api";
-import "./ResetPasswordPage.css";
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import AuthLayout from '../../components/layout/auth-layout/AuthLayout';
+import { Button, Callout, TextField } from '../../components/ui';
+import { validateNewPassword } from '../../domain';
+import type { FieldErrors } from '../../domain';
+import { ApiError } from '../../config/api';
+import { useT } from '../../i18n';
+import type { TranslationKey } from '../../i18n';
+import { UserService } from '../../services/api';
 
-export default function ResetPasswordPage() {
-  const [searchParams] = useSearchParams();
+type View = 'form' | 'success' | 'invalid';
+type ResetField = 'password' | 'confirm';
+type InputRef = HTMLInputElement | HTMLTextAreaElement;
+
+const TOKEN_ERRORS = ['INVALID_RESET_TOKEN', 'EXPIRED_RESET_TOKEN'];
+
+const ResetPasswordPage: React.FC = () => {
+  const { t } = useT();
   const navigate = useNavigate();
-  const token = searchParams.get("token") ?? "";
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token') ?? '';
 
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [done, setDone] = useState(false);
+  const [view, setView] = useState<View>(token ? 'form' : 'invalid');
+  const [formData, setFormData] = useState({ password: '', confirm: '' });
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors<ResetField>>({});
+  const [formError, setFormError] = useState<TranslationKey | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = async (e: FormEvent) => {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const passwordRef = useRef<InputRef>(null);
+  const confirmRef = useRef<InputRef>(null);
+
+  useEffect(() => {
+    if (view === 'form') passwordRef.current?.focus();
+    else headingRef.current?.focus();
+  }, [view]);
+
+  const handleChange = (e: React.ChangeEvent<InputRef>): void => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFieldErrors((prev) => ({ ...prev, [name]: undefined }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    setError("");
-
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+    setFormError(null);
+    const errors = validateNewPassword(formData);
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      (errors.password ? passwordRef : confirmRef).current?.focus();
       return;
     }
-    if (password !== confirm) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (!token) {
-      setError("Invalid or missing reset token.");
-      return;
-    }
-
-    setLoading(true);
+    setSubmitting(true);
     try {
-      await UserService.resetPassword(token, password);
-      setDone(true);
-    } catch (err: any) {
-      setError(err.message || "Something went wrong. The link may have expired.");
+      await UserService.resetPassword(token, formData.password);
+      setView('success');
+    } catch (err) {
+      const code = err instanceof ApiError ? err.code : undefined;
+      if (code && TOKEN_ERRORS.includes(code)) {
+        setView('invalid');
+      } else if (code === 'INVALID_PASSWORD') {
+        setFieldErrors({ password: 'errors.INVALID_PASSWORD' });
+        passwordRef.current?.focus();
+      } else {
+        setFormError('auth.reset.error');
+      }
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  if (!token) {
-    return (
-      <div className="reset-password-page">
-        <div className="reset-password-card">
-          <h2 className="reset-password-title">🔭 Reset Password</h2>
-          <div className="error-message">Invalid or missing reset token.</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (done) {
-    return (
-      <div className="reset-password-page">
-        <div className="reset-password-card">
-          <h2 className="reset-password-title">🔭 Password Updated</h2>
-          <p className="reset-password-success">
-            Your password has been updated successfully.
-          </p>
-          <button
-            className="auth-submit-btn"
-            onClick={() => navigate("/")}
-          >
-            Go to home
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const titles: Record<View, TranslationKey> = {
+    form: 'auth.reset.title',
+    success: 'auth.reset.successTitle',
+    invalid: 'auth.reset.invalidTitle',
+  };
 
   return (
-    <div className="reset-password-page">
-      <div className="reset-password-card">
-        <h2 className="reset-password-title">🔭 Reset Password</h2>
-        <form onSubmit={handleSubmit} className="auth-form">
-          <div className="form-group">
-            <label htmlFor="new-password">New password</label>
-            <input
+    <AuthLayout
+      brandTitle={t('auth.reset.brandTitle')}
+      title={t(titles[view])}
+      headingRef={headingRef}
+    >
+      <div className="ly-auth__form" aria-live="polite">
+        {view === 'form' && (
+          <form className="ly-auth__form" onSubmit={handleSubmit} noValidate>
+            <TextField
+              ref={passwordRef}
               type="password"
-              id="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters"
+              name="password"
+              size="lg"
+              label={t('auth.reset.newPassword')}
+              placeholder={t('auth.fields.newPasswordPlaceholder')}
+              showPasswordLabel={t('auth.fields.showPassword')}
+              hidePasswordLabel={t('auth.fields.hidePassword')}
+              autoComplete="new-password"
               required
-              minLength={8}
+              value={formData.password}
+              onChange={handleChange}
+              error={fieldErrors.password && t(fieldErrors.password)}
             />
-          </div>
-          <div className="form-group">
-            <label htmlFor="confirm-password">Confirm password</label>
-            <input
+            <TextField
+              ref={confirmRef}
               type="password"
-              id="confirm-password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              placeholder="Repeat your new password"
+              name="confirm"
+              size="lg"
+              label={t('auth.reset.repeatPassword')}
+              autoComplete="new-password"
               required
+              value={formData.confirm}
+              onChange={handleChange}
+              error={fieldErrors.confirm && t(fieldErrors.confirm)}
             />
-          </div>
-          {error && <div className="error-message">{error}</div>}
-          <button type="submit" className="auth-submit-btn" disabled={loading}>
-            {loading ? "Updating..." : "Set new password"}
-          </button>
-        </form>
+            {formError && <Callout tone="error">{t(formError)}</Callout>}
+            <Button
+              type="submit"
+              size="lg"
+              fullWidth
+              loading={submitting}
+              loadingLabel={t('auth.reset.submitting')}
+            >
+              {t('auth.reset.submit')}
+            </Button>
+          </form>
+        )}
+        {view === 'success' && (
+          <>
+            <p className="ly-auth__text">{t('auth.reset.successBody')}</p>
+            <Button size="lg" fullWidth onClick={() => navigate('/login')}>
+              {t('auth.reset.goToLogin')}
+            </Button>
+          </>
+        )}
+        {view === 'invalid' && (
+          <>
+            <p className="ly-auth__text">{t('auth.reset.invalidBody')}</p>
+            <Button size="lg" fullWidth onClick={() => navigate('/forgot-password')}>
+              {t('auth.reset.requestNew')}
+            </Button>
+          </>
+        )}
       </div>
-    </div>
+    </AuthLayout>
   );
-}
+};
+
+export default ResetPasswordPage;
