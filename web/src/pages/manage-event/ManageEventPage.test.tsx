@@ -114,7 +114,6 @@ describe('ManageEventPage', () => {
       joinEvent: jest.fn(),
       isAuthenticated: true,
       loading: false,
-      openAuthModal: jest.fn(),
     } as any);
   });
 

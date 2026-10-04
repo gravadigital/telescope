@@ -22,7 +22,6 @@ beforeEach(() => {
     joinEvent: jest.fn(),
     isAuthenticated: false,
     loading: false,
-    openAuthModal: jest.fn(),
   });
 });
 

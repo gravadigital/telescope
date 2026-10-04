@@ -1,10 +1,13 @@
-import React, { JSX, useState } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useParams, Link } from 'react-router-dom';
+import React, { JSX } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import './App.css';
 import Events from './components/events/Events';
-import Auth from './components/auth/Auth';
-import Modal from './components/modal/Modal';
+import AppLayout from './components/layout/app-layout/AppLayout';
+import RequireAuth from './components/layout/require-auth/RequireAuth';
+import AuthPage from './pages/auth-page/AuthPage';
+import NotFoundPage from './pages/not-found/NotFoundPage';
+import { I18nProvider } from './i18n';
 import EventDetailPage from './pages/event-detail/EventDetailPage';
 import CreateEventPage from './pages/create-event/CreateEventPage';
 import ManageEventPage from './pages/manage-event/ManageEventPage';
@@ -17,12 +20,10 @@ if (process.env.NODE_ENV === 'development') {
   import('./utils/testData.js');
 }
 
-type AuthAction = 'login' | 'register' | 'logout';
-
 // Home Page Component
 function HomePage(): JSX.Element {
   return (
-    <main className="main-content">
+    <div className="main-content">
       {/* Section 1: WHY? */}
       <section id="why" className="section">
         <div className="section-container">
@@ -52,7 +53,7 @@ function HomePage(): JSX.Element {
           </div>
         </div>
       </section>
-    </main>
+    </div>
   );
 }
 
@@ -86,7 +87,6 @@ function EventDetailPageWrapper(): JSX.Element {
         
         if (event && user && event.creator_id === user.id) {
           // User is the creator, redirect to manage page
-          console.log('🔄 Redirecting organizer to manage page');
           navigate(`/events/${eventId}/manage`, { replace: true });
           return;
         }
@@ -119,89 +119,38 @@ function EventDetailPageWrapper(): JSX.Element {
   return <EventDetailPage eventId={eventId} onBack={handleBack} />;
 }
 
-// Main App Content with Navigation
-function AppContent(): JSX.Element {
-  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const { user, logout, isAuthenticated, registerAuthModalHandler } = useAuth();
-
-  const handleAuthAction = (action: AuthAction): void => {
-    if (action === 'logout') {
-      logout();
-    } else {
-      setAuthMode(action);
-      setShowAuthModal(true);
-    }
-  };
-
-  // Register the auth modal handler in the context
-  React.useEffect(() => {
-    if (registerAuthModalHandler) {
-      registerAuthModalHandler((mode: 'login' | 'register') => {
-        setAuthMode(mode);
-        setShowAuthModal(true);
-      });
-    }
-  }, [registerAuthModalHandler]);
-
+// Rutas de la app (sin router ni providers, para poder probarlas)
+export function AppRoutes(): JSX.Element {
   return (
-    <div className="App">
-      {/* Navbar */}
-      <nav className="navbar">
-        <div className="nav-container">
-          <div className="nav-logo">
-            <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-              <h2 style={{ cursor: 'pointer' }}>TELESCOPIO</h2>
-            </Link>
-          </div>
-          <div className="nav-menu">
-            <Link to="/" className="nav-link">About</Link>
-            <Link to="/" className="nav-link">See Demo</Link>
-            <Link to="/events" className="nav-link">Events</Link>
-
-            {isAuthenticated ? (
-              <>
-                <span className="user-greeting">Hello, {user?.name}</span>
-                <button onClick={() => handleAuthAction('logout')} className="nav-link nav-button">Logout</button>
-              </>
-            ) : (
-              <>
-                <button onClick={() => handleAuthAction('register')} className="nav-link nav-button">Register</button>
-                <button onClick={() => handleAuthAction('login')} className="nav-link nav-button">Login</button>
-              </>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      {/* Routes */}
-      <Routes>
+    <Routes>
+      <Route element={<AppLayout />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/events" element={<EventsPage />} />
-        <Route path="/events/create" element={<CreateEventPage />} />
-        <Route path="/events/:eventId/manage" element={<ManageEventPage />} />
+        <Route path="/events/create" element={<RequireAuth><CreateEventPage /></RequireAuth>} />
+        <Route path="/events/:eventId/manage" element={<RequireAuth><ManageEventPage /></RequireAuth>} />
         <Route path="/events/:eventId" element={<EventDetailPageWrapper />} />
+        <Route path="/login" element={<AuthPage mode="login" />} />
+        <Route path="/register" element={<AuthPage mode="register" />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-      </Routes>
-
-      {showAuthModal && (
-        <Modal onClose={() => setShowAuthModal(false)}>
-          <Auth initialMode={authMode} onClose={() => setShowAuthModal(false)} />
-        </Modal>
-      )}
-    </div>
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
+    </Routes>
   );
 }
 
 function App(): JSX.Element {
   return (
-    <GoogleOAuthProvider clientId={RUNTIME_CONFIG.GOOGLE_CLIENT_ID}>
-      <AuthProvider>
-        <BrowserRouter>
-          <AppContent />
-        </BrowserRouter>
-      </AuthProvider>
-    </GoogleOAuthProvider>
+    <I18nProvider>
+      <GoogleOAuthProvider clientId={RUNTIME_CONFIG.GOOGLE_CLIENT_ID}>
+        <AuthProvider>
+          <BrowserRouter>
+            <div className="App">
+              <AppRoutes />
+            </div>
+          </BrowserRouter>
+        </AuthProvider>
+      </GoogleOAuthProvider>
+    </I18nProvider>
   );
 }
 

@@ -19,8 +19,9 @@ export const stageIndex = (stage: EventStage): number => STAGE_ORDER.indexOf(sta
 export const getNextStage = (stage: EventStage): EventStage | null =>
   STAGE_ORDER[stageIndex(stage) + 1] ?? null;
 
-/** Clave i18n del nombre de la etapa (el catálogo `stages.*` lo crea S-011). */
-export const stageNameKey = (stage: EventStage): string => `stages.${stage}.name`;
+
+/** Clave i18n del nombre de la etapa (catálogo `stages.*`). */
+export const stageNameKey = (stage: EventStage): `stages.${EventStage}.name` => `stages.${stage}.name`;
 
 export const stageStatus = (stage: EventStage, current: EventStage): StageStatus => {
   const diff = stageIndex(stage) - stageIndex(current);

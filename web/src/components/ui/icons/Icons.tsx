@@ -72,3 +72,9 @@ export const DotIcon: React.FC<IconProps> = (props) => (
     <circle cx="12" cy="12" r="4" fill="currentColor" />
   </BaseIcon>
 );
+
+export const MenuIcon: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M4 7h16M4 12h16M4 17h16" />
+  </BaseIcon>
+);

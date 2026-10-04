@@ -20,7 +20,6 @@ const setAuthenticated = (isAuthenticated: boolean): void => {
     joinEvent: jest.fn(),
     isAuthenticated,
     loading: false,
-    openAuthModal: jest.fn(),
   });
 };
 

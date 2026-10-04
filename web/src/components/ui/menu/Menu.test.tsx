@@ -71,4 +71,27 @@ describe('Menu', () => {
     userEvent.click(screen.getByText('Afuera'));
     expect(screen.queryByRole('menu')).toBeNull();
   });
+
+  it('TS-45: ítems radio dentro de un menú de acciones', () => {
+    render(
+      <Menu
+        trigger={<button type="button">Abrir</button>}
+        label="Menú"
+        items={[
+          { id: 'a', label: 'Acción', onSelect: jest.fn() },
+          { id: 'es', label: 'Español', selected: true, onSelect: jest.fn() },
+          { id: 'en', label: 'English', selected: false, onSelect: jest.fn() },
+        ]}
+      />
+    );
+    userEvent.click(screen.getByRole('button', { name: 'Abrir' }));
+    const action = screen.getByRole('menuitem', { name: 'Acción' });
+    expect(action).not.toHaveAttribute('aria-checked');
+    const es = screen.getByRole('menuitemradio', { name: 'Español' });
+    const en = screen.getByRole('menuitemradio', { name: 'English' });
+    expect(es).toHaveAttribute('aria-checked', 'true');
+    expect(en).toHaveAttribute('aria-checked', 'false');
+    expect(es.querySelector('.ui-menu__check')).not.toBeNull();
+    expect(en.querySelector('.ui-menu__check')).toBeNull();
+  });
 });

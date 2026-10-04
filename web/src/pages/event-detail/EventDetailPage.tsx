@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { Event, Attachment } from '../../types';
 import { EventService, ApiHealthService, AttachmentService } from '../../services/api';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { loginPathFor } from '../../domain/redirect';
 import Participants from '../../components/participants/Participants';
 import VotingConfigurationPanel from '../../components/voting-configuration-panel/VotingConfigurationPanel';
 import RankingVotePanel from '../../components/ranking-vote-panel/RankingVotePanel';
@@ -20,7 +22,8 @@ interface EventDetailPageProps {
 }
 
 const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBack }) => {
-  const { user, isAuthenticated, joinEvent, openAuthModal } = useAuth();
+  const { user, isAuthenticated, joinEvent } = useAuth();
+  const navigate = useNavigate();
 
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -360,7 +363,7 @@ const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBack }) =>
                   <p>Register to participate and upload your file.</p>
                   <button
                     className="primary-btn"
-                    onClick={() => isAuthenticated ? handleRegister() : openAuthModal('login')}
+                    onClick={() => isAuthenticated ? handleRegister() : navigate(loginPathFor(`/events/${eventId}`))}
                     disabled={loading}
                   >
                     {loading ? 'Registering...' : 'Participate'}
