@@ -30,7 +30,7 @@ header. **Si tocás esto, respetá la asimetría**: `apiRequest` lee el token co
 `src/context/AuthContext.tsx` es la fuente de verdad de la sesión. Se consume con `useAuth()`:
 
 ```tsx
-const { user, token, isAuthenticated, loading, login, logout, updateUser, joinEvent, openAuthModal } = useAuth();
+const { user, token, isAuthenticated, loading, login, logout, updateUser, joinEvent } = useAuth();
 ```
 
 | Miembro | Para qué |
@@ -40,7 +40,6 @@ const { user, token, isAuthenticated, loading, login, logout, updateUser, joinEv
 | `loading` | `true` mientras se restaura la sesión al arrancar |
 | `login(user, token)` | Persiste y sincroniza los eventos del usuario |
 | `logout()` | Limpia todo y redirige a `/` con `window.location.href` |
-| `openAuthModal(mode)` | Abre el modal de login/registro desde cualquier componente |
 
 Al montar, restaura la sesión desde `localStorage` y llama a `syncUserEvents` para traer
 los eventos del usuario desde el backend.
@@ -68,8 +67,9 @@ El flujo tiene dos pasos porque el backend los separa:
 
 1. `GoogleAuthService.verify(token)` — si el usuario existe devuelve `status: "existing_user"`
    con el JWT; si no, `status: "new_user"` con el perfil sugerido.
-2. En el segundo caso se abre `UsernameModal` para completar el nombre, y luego
-   `GoogleAuthService.register(token, username)`.
+2. En el segundo caso navega a `/complete-profile` con la credencial en el estado del router (la
+   página la borra del historial al montar; nunca va a `localStorage`), y allí se completa el
+   nombre con `GoogleAuthService.register(token, username)`.
 
 ## Falta: rutas protegidas
 

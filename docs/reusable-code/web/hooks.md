@@ -19,3 +19,22 @@ const { t } = useT();
 <p>{t('common.participants', { count: 3 })}</p>
 <Callout>{t(messageKeyForError(err))}</Callout>
 ```
+
+---
+
+## useGoogleSignIn
+
+**Location:** `src/hooks/useGoogleSignIn.ts`
+**Description:** Runs `GoogleAuthService.verify`. Existing user: `login` and `navigate(safeNextPath(next))`. New user: `navigate('/complete-profile', { state: { googleToken, suggestedName, next } })`; the credential is never written to storage.
+
+**Signature:**
+```ts
+useGoogleSignIn(next: string | null): { busy: boolean; error: TranslationKey | null;
+  onToken(accessToken: string): Promise<void>; onError(): void }
+```
+
+**Usage:**
+```tsx
+const google = useGoogleSignIn(next);
+<GoogleButton label={t('auth.google.continue')} onToken={google.onToken} onError={google.onError} disabled={google.busy} />
+```

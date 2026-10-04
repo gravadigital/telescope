@@ -5,7 +5,11 @@ import './App.css';
 import Events from './components/events/Events';
 import AppLayout from './components/layout/app-layout/AppLayout';
 import RequireAuth from './components/layout/require-auth/RequireAuth';
-import AuthPage from './pages/auth-page/AuthPage';
+import RedirectIfAuthenticated from './components/layout/redirect-if-authenticated/RedirectIfAuthenticated';
+import LoginPage from './pages/login/LoginPage';
+import RegisterPage from './pages/register/RegisterPage';
+import ForgotPasswordPage from './pages/forgot-password/ForgotPasswordPage';
+import CompleteProfilePage from './pages/complete-profile/CompleteProfilePage';
 import NotFoundPage from './pages/not-found/NotFoundPage';
 import { I18nProvider } from './i18n';
 import EventDetailPage from './pages/event-detail/EventDetailPage';
@@ -129,11 +133,14 @@ export function AppRoutes(): JSX.Element {
         <Route path="/events/create" element={<RequireAuth><CreateEventPage /></RequireAuth>} />
         <Route path="/events/:eventId/manage" element={<RequireAuth><ManageEventPage /></RequireAuth>} />
         <Route path="/events/:eventId" element={<EventDetailPageWrapper />} />
-        <Route path="/login" element={<AuthPage mode="login" />} />
-        <Route path="/register" element={<AuthPage mode="register" />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
+      {/* Páginas de autenticación: layout propio, sin barra global ni pie */}
+      <Route path="/login" element={<RedirectIfAuthenticated><LoginPage /></RedirectIfAuthenticated>} />
+      <Route path="/register" element={<RedirectIfAuthenticated><RegisterPage /></RedirectIfAuthenticated>} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/complete-profile" element={<CompleteProfilePage />} />
     </Routes>
   );
 }

@@ -65,4 +65,42 @@ describe('rutas', () => {
     await screen.findByRole('banner');
     expect(screen.queryByText('No encontramos esta página')).toBeNull();
   });
+
+  it('TS-55: auth fuera del chrome global', () => {
+    renderWithProviders(<AppRoutes />, { route: '/login', auth: guest });
+    expect(screen.getByRole('heading', { level: 1, name: 'Iniciar sesión' })).toBeInTheDocument();
+    expect(screen.queryByRole('banner')).toBeNull();
+    expect(screen.queryByText('Telescopio · evaluación distribuida entre pares')).toBeNull();
+  });
+
+  it('TS-56: con sesión no se ven login ni registro', () => {
+    const signedIn = { user: sampleUser, isAuthenticated: true, loading: false };
+    const view = renderWithProviders(<AppRoutes />, { route: '/login?next=%2Fevents%2Fabc', auth: signedIn });
+    expect(screen.getByTestId('location')).toHaveTextContent('/events/abc');
+    view.unmount();
+    renderWithProviders(<AppRoutes />, { route: '/register', auth: signedIn });
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/events$/);
+  });
+
+  it('TS-57: rutas nuevas resueltas', () => {
+    const cases: Array<[string, string, string]> = [
+      ['/forgot-password', 'Recuperar contraseña', '/forgot-password'],
+      ['/reset-password?token=t1', 'Define tu nueva contraseña', '/reset-password?token=t1'],
+      ['/complete-profile', 'Iniciar sesión', '/login'],
+      ['/register', 'Crear cuenta', '/register'],
+    ];
+    cases.forEach(([route, heading, location]) => {
+      const view = renderWithProviders(<AppRoutes />, { route, auth: guest });
+      expect(screen.getByRole('heading', { level: 1, name: heading })).toBeInTheDocument();
+      expect(screen.getByTestId('location')).toHaveTextContent(location);
+      expect(screen.queryByText('No encontramos esta página')).toBeNull();
+      view.unmount();
+    });
+  });
+
+  it('TS-58b: ruta protegida termina en el login nuevo', () => {
+    renderWithProviders(<AppRoutes />, { route: '/events/create', auth: guest });
+    expect(screen.getByTestId('location')).toHaveTextContent('/login?next=%2Fevents%2Fcreate');
+    expect(screen.getByRole('heading', { level: 2, name: 'Inicia sesión para continuar.' })).toBeInTheDocument();
+  });
 });

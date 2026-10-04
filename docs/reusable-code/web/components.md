@@ -84,3 +84,23 @@ All text reaches the components through props (no embedded copy); CSS uses only 
 ## Menu (selectable items in actions)
 
 An item with `selected` defined in `variant="actions"` renders as `menuitemradio` with `aria-checked` and a check mark; items without it stay `menuitem`.
+
+---
+
+## AuthLayout, RedirectIfAuthenticated, GoogleButton
+
+**Location:** `src/components/layout/{auth-layout,redirect-if-authenticated}/`, `src/components/auth/google-button/`
+**Description:** `AuthLayout` renders the split layout of the auth pages (brand `aside` 5/12 + form `section` 7/12 from 768px; compact brand strip without benefits on mobile) and exports helper classes `.ly-auth__form`, `__separator`, `__alt`, `__back`, `__aside-link`, `__text`. `RedirectIfAuthenticated` is the inverse of `RequireAuth`. `GoogleButton` has no text of its own; pages mount it only when `RUNTIME_CONFIG.GOOGLE_CLIENT_ID` is set.
+
+**Signature:**
+```ts
+AuthLayout({ brandTitle: string; benefits?: string[]; backLink?: { to: string; label: string; state?: unknown };
+  title: string; headingRef?: React.Ref<HTMLHeadingElement>; children })
+GoogleButton({ label: string; onToken(accessToken: string): void; onError(): void; disabled?: boolean })
+```
+
+**Usage:**
+```tsx
+<Route path="/login" element={<RedirectIfAuthenticated><LoginPage /></RedirectIfAuthenticated>} />
+<AuthLayout brandTitle={t('auth.login.brandTitle')} title={t('auth.login.title')}>...</AuthLayout>
+```

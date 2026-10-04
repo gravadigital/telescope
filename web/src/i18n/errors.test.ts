@@ -1,5 +1,5 @@
 import { ApiError } from '../config/api';
-import { messageKeyForError } from './errors';
+import { messageKeyForError, scopedMessageKeyForError } from './errors';
 import { es } from './catalogs/es';
 
 describe('messageKeyForError', () => {
@@ -41,5 +41,21 @@ describe('messageKeyForError', () => {
   it('un code heredado de Object.prototype no cuenta como traducido', () => {
     const err = new ApiError({ status: 400, body: { error: 'x', code: 'toString' } });
     expect(messageKeyForError(err)).toBe('errors.generic');
+  });
+});
+
+describe('scopedMessageKeyForError', () => {
+  const apiErr = (status: number, code?: string) =>
+    new ApiError({ status, body: { error: 'server text', ...(code ? { code } : {}) } });
+
+  it('TS-6: error acotado por página', () => {
+    expect(scopedMessageKeyForError(apiErr(401, 'INVALID_CREDENTIALS'), ['INVALID_CREDENTIALS'], 'auth.login.error')).toBe(
+      'errors.INVALID_CREDENTIALS'
+    );
+    expect(scopedMessageKeyForError(apiErr(500, 'CREATION_ERROR'), ['INVALID_PAYLOAD'], 'auth.register.error')).toBe(
+      'auth.register.error'
+    );
+    expect(scopedMessageKeyForError(new TypeError('Failed to fetch'), [], 'auth.forgot.error')).toBe('errors.network');
+    expect(scopedMessageKeyForError(apiErr(500), ['INVALID_PAYLOAD'], 'auth.reset.error')).toBe('auth.reset.error');
   });
 });

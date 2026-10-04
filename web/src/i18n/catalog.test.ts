@@ -98,6 +98,21 @@ describe('catálogo', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('TS-7: namespace auth neutro y con los ejemplos de CA-13', () => {
+    expect(es.auth.login.noAccount).toBe('¿No tienes cuenta?');
+    expect(es.auth.login.createOne).toBe('Crea una gratis');
+    expect(es.auth.login.brandTitle).toBe('Vuelve a donde dejaste tus eventos.');
+    expect(es.auth.completeProfile.title).toBe('Elige tu nombre');
+    expect(en.auth.login.createOne).toBe('Create one for free');
+    const leaves = flattenLeaves(es.auth);
+    expect(leaves.length).toBe(75);
+    leaves.forEach(([key, text]) => {
+      expect(findVoseo(text)).toEqual([]);
+      expect(findGenderMarks(text)).toEqual([]);
+      expect(key).toBeTruthy();
+    });
+  });
+
   it('es y en tienen las mismas hojas', () => {
     expect(flattenLeaves(en).map(([k]) => k)).toEqual(flattenLeaves(es).map(([k]) => k));
   });
