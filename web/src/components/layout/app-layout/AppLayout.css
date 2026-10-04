@@ -1,0 +1,25 @@
+.ly-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg-canvas);
+}
+.ly-layout__main {
+  flex: 1;
+}
+.ly-footer {
+  border-top: 1px solid var(--border-default);
+  padding: var(--space-padding-compact);
+}
+.ly-footer__text {
+  max-width: 1200px;
+  margin: 0 auto;
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+@media (min-width: 768px) {
+  .ly-footer {
+    padding: var(--space-padding-compact) var(--ref-space-xl);
+  }
+}

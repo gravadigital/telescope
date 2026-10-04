@@ -1,0 +1,11 @@
+.ap-page {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-padding-compact);
+}
+
+@media (min-width: 768px) {
+  .ap-page {
+    padding: var(--space-padding-spacious) var(--space-padding-default);
+  }
+}

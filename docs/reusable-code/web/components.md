@@ -64,3 +64,23 @@ All text reaches the components through props (no embedded copy); CSS uses only 
 
 **Location:** `src/components/events/{event-hero,stage-timeline,next-step-card,progress-checklist}/`
 **Description:** Presentational structure shared by the event detail and management screens. `StageTimeline` shows only the current stage on mobile (`variant="compact"` always shows the four names).
+
+---
+
+## Global layout (AppHeader, AppLayout, UserMenu, LanguageSelect, RequireAuth)
+
+**Location:** `src/components/layout/{app-header,app-layout,user-menu,language-select,require-auth}/`
+**Description:** Global chrome. `AppLayout` is the parent route (`<Outlet />` inside `<main id="main">`, footer from `footer.tagline`). `AppHeader` shows nothing while `loading`; visitors get `LanguageSelect` plus links to `/login` and `/register`; signed-in users get a reserved `[data-slot="notifications"]` and `UserMenu`. On mobile the links move into a `Menu`. `RequireAuth` wraps protected routes.
+
+**Usage:**
+```tsx
+<Route element={<AppLayout />}>
+  <Route path="/events/create" element={<RequireAuth><CreateEventPage /></RequireAuth>} />
+</Route>
+```
+
+---
+
+## Menu (selectable items in actions)
+
+An item with `selected` defined in `variant="actions"` renders as `menuitemradio` with `aria-checked` and a check mark; items without it stay `menuitem`.

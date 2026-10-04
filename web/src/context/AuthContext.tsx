@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, AuthContextType, AuthProviderProps } from '../types';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { UserService } from '../services/api';
@@ -22,7 +22,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [authModalCallback, setAuthModalCallback] = useState<((mode: 'login' | 'register') => void) | null>(null);
 
   useEffect(() => {
     // Check if there's a saved user and token in localStorage
@@ -136,17 +135,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setItem(TELESCOPIO_USER_KEY, JSON.stringify(updatedUser));
   };
 
-  const openAuthModal = useCallback((mode: 'login' | 'register'): void => {
-    if (authModalCallback) {
-      authModalCallback(mode);
-    }
-  }, [authModalCallback]);
-
-  // Function to register the modal callback from App component
-  const registerAuthModalHandler = useCallback((handler: (mode: 'login' | 'register') => void): void => {
-    setAuthModalCallback(() => handler);
-  }, []);
-
   const value: AuthContextType = {
     user,
     token,
@@ -156,11 +144,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     joinEvent,
     isAuthenticated: !!user,
     loading,
-    openAuthModal
   };
 
   return (
-    <AuthContext.Provider value={{ ...value, registerAuthModalHandler }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

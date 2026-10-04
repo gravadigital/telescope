@@ -6,6 +6,11 @@ export interface MenuItem {
   id: string;
   label: string;
   icon?: React.ReactNode;
+  /**
+   * Marca el ítem como opción elegida. En `variant="select"` todos los ítems son opciones;
+   * en `actions`, un ítem con `selected` definido (`true` o `false`) se vuelve una opción
+   * (`menuitemradio`) y el resto sigue siendo una acción.
+   */
   selected?: boolean;
   onSelect: () => void;
 }
@@ -117,15 +122,17 @@ const Menu: React.FC<MenuProps> = ({ trigger, variant = 'actions', items, align 
           aria-label={label}
           className={`ui-menu__panel ui-menu__panel--${align}`}
         >
-          {items.map((item, index) => (
+          {items.map((item, index) => {
+            const isRadio = variant === 'select' || item.selected !== undefined;
+            return (
             <button
               key={item.id}
               ref={(el) => {
                 itemRefs.current[index] = el;
               }}
               type="button"
-              role={variant === 'select' ? 'menuitemradio' : 'menuitem'}
-              aria-checked={variant === 'select' ? Boolean(item.selected) : undefined}
+              role={isRadio ? 'menuitemradio' : 'menuitem'}
+              aria-checked={isRadio ? Boolean(item.selected) : undefined}
               tabIndex={-1}
               className="ui-menu__item"
               onKeyDown={(event) => handleKeyDown(event, index)}
@@ -136,9 +143,10 @@ const Menu: React.FC<MenuProps> = ({ trigger, variant = 'actions', items, align 
             >
               {item.icon && <span className="ui-menu__icon">{item.icon}</span>}
               <span className="ui-menu__label">{item.label}</span>
-              {variant === 'select' && item.selected && <CheckIcon className="ui-menu__check" />}
+              {isRadio && item.selected && <CheckIcon className="ui-menu__check" />}
             </button>
-          ))}
+            );
+          })}
         </div>
       )}
     </span>

@@ -33,7 +33,6 @@ function renderAuthForm(overrides: {
     joinEvent: jest.fn(),
     isAuthenticated: false,
     loading: false,
-    openAuthModal: jest.fn(),
   });
 
   const formData: FormData = overrides.formData || {

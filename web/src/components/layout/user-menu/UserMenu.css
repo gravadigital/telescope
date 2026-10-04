@@ -1,0 +1,25 @@
+.ly-user-menu__trigger {
+  min-width: 44px;
+  padding: 0 var(--space-inline-sm);
+}
+.ly-user-menu__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-band-raised);
+  border: 1px solid var(--border-inverse);
+  color: var(--text-inverse);
+  font: var(--type-ui);
+}
+.ly-user-menu__name {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .ly-user-menu__name {
+    display: inline;
+  }
+}

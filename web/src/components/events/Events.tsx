@@ -4,6 +4,7 @@ import './Events.css';
 import { Event, EventsProps } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { ApiHealthService, EventService } from '../../services/api';
+import { loginPathFor } from '../../domain/redirect';
 
 
 interface EventsComponentProps extends EventsProps {
@@ -18,7 +19,7 @@ const Events: React.FC<EventsComponentProps> = ({ onViewEventDetail }) => {
   const [error, setError] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'all' | 'my' | 'subscriptions'>('all');
 
-  const { isAuthenticated, user, openAuthModal } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   // Reload events when returning to /events page
   useEffect(() => {
@@ -130,7 +131,7 @@ const Events: React.FC<EventsComponentProps> = ({ onViewEventDetail }) => {
                   if (isAuthenticated) {
                     handleCreateEvent();
                   } else {
-                    openAuthModal('login');
+                    navigate(loginPathFor('/events/create'));
                   }
                 }}
                 title={!isAuthenticated ? "Log in to create events" : ""}
@@ -306,7 +307,7 @@ const Events: React.FC<EventsComponentProps> = ({ onViewEventDetail }) => {
                               return (
                                 <button
                                   className="btn btn-primary btn-sm"
-                                  onClick={() => isAuthenticated ? goToEvent() : openAuthModal('login')}
+                                  onClick={() => isAuthenticated ? goToEvent() : navigate(loginPathFor(`/events/${event.id}`))}
                                   title="Participate in this event"
                                 >
                                   Participate

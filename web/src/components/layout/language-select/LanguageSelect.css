@@ -1,0 +1,6 @@
+.ly-language-select {
+  display: inline-flex;
+}
+.ly-language-select .ui-button {
+  min-width: 44px;
+}

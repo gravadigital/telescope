@@ -56,3 +56,16 @@ addDays(date: string, days: number): string
 
 **Location:** `src/domain/voting.ts`, `src/domain/score.ts`
 **Description:** `validateThresholds` compares in hundredths (avoids `0.7 - 0.6` float error). `formatScore` shows `mbc_score × 10` with one decimal.
+
+---
+
+## safeNextPath / loginPathFor
+
+**Location:** `src/domain/redirect.ts`
+**Description:** `safeNextPath` accepts only internal paths (starts with `/`, not `//` or `/\`), otherwise `/events`. `loginPathFor` builds `/login?next=<encoded path>`.
+
+**Signature:**
+```ts
+safeNextPath(raw: string | null | undefined): string
+loginPathFor(path: string): string
+```

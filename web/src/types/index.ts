@@ -48,8 +48,6 @@ export interface AuthContextType {
   joinEvent: (eventId: string) => void;
   isAuthenticated: boolean;
   loading: boolean;
-  openAuthModal: (mode: 'login' | 'register') => void;
-  registerAuthModalHandler?: (handler: (mode: 'login' | 'register') => void) => void;
 }
 
 export interface ApiConfig {

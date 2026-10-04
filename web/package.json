@@ -19,12 +19,56 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --max-warnings=0 --ext .ts,.tsx --ignore-pattern '*.test.*' --ignore-pattern '__tests__' src/i18n src/domain src/components/ui src/components/layout src/pages/not-found src/pages/auth-page"
   },
   "eslintConfig": {
     "extends": [
       "react-app",
       "react-app/jest"
+    ],
+    "overrides": [
+      {
+        "files": [
+          "src/components/ui/**/*.tsx",
+          "src/components/layout/**/*.tsx",
+          "src/pages/not-found/**/*.tsx",
+          "src/pages/auth-page/**/*.tsx"
+        ],
+        "excludedFiles": [
+          "**/*.test.tsx",
+          "**/__tests__/**"
+        ],
+        "rules": {
+          "react/jsx-no-literals": [
+            "error",
+            {
+              "noStrings": false,
+              "allowedStrings": [
+                "·",
+                "/",
+                "—",
+                "–",
+                "×",
+                "…",
+                "→",
+                "←",
+                "↑",
+                "↓",
+                "+",
+                "−",
+                ":",
+                "|",
+                "(",
+                ")",
+                "%"
+              ],
+              "ignoreProps": true
+            }
+          ]
+        }
+      }
     ]
   },
   "jest": {
