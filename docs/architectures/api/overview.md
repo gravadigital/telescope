@@ -97,11 +97,10 @@ no conocen cuál está activo. Ver la convención custom `file-storage`.
 
 Relevada del código, para que no se confunda con decisión de diseño:
 
-1. **Los evaluadores no pueden descargar las propuestas que tienen asignadas.** La descarga
-   exige autenticación y `canDownload` (`attachment_handler.go`) solo la permite al dueño,
-   al autor del evento o a un `admin`: el participante al que se le asignó la propuesta no
-   está incluido. Además, el panel de ranking del frontend la abre con un `<a href>` sin
-   token. **Bloquea el flujo central** — ver D-15 en `docs/prd/requirements.md`.
+1. **El panel de ranking del frontend abre la propuesta con un `<a href>` sin token.** Del lado
+   de `api` quedó resuelto en S-007: el evaluador puede descargar lo que tiene asignado, en
+   `voting` y `results`, con nombre neutro (`propuesta-{n}.{ext}`). Falta adaptar `web`
+   (CA-11 de S-007) — ver D-15 en `docs/prd/requirements.md`.
 2. **`GET /events/:event_id/distributed-results` muta estado**: recalcula el MBC y hace
    upsert en `voting_results`. Un GET no idempotente.
 3. **Cuatro formatos de error distintos** conviviendo — ver la convención custom

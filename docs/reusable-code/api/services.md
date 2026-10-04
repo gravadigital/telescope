@@ -75,3 +75,38 @@ if err := h.votingSetupRepo.OpenVoting(eventID, estimatedDate, config, assignmen
 
 **Location:** `internal/handlers/distributed_vote_handler.go`, `internal/handlers/event_handler.go`
 **Description:** `VotingConfigRequest` is the shared binding struct (`required,min=1,max=50` on `m`; pointers with `omitempty` for the rest) with an `input()` method that returns a `vote.ConfigInput`. `respondVotingConfigError` maps the domain errors to `INVALID_THRESHOLDS`, `M_EXCEEDS_EVALUABLE` and `MATH_CONSTRAINT_VIOLATION`. `respondInsufficientProposals` answers `INSUFFICIENT_ATTACHMENTS` with the `minProposalsToVote` constant.
+
+---
+
+## VoteRepository.ReplaceAssignmentVotes
+
+**Location:** `internal/storage/postgres/vote_repository.go`
+**Description:** In one `db.Transaction`: `DELETE FROM votes WHERE assignment_id`, then validates and inserts each vote. Returns `replaced = true` if at least one row was deleted. It does not write `assignments`: `update_assignment_completion` and `update_attachment_vote_count` run on DELETE and INSERT. A trigger rejection rolls back and keeps the previous votes. `GetAssignmentByParticipant` returns the sentinel `ErrAssignmentNotFound` (same file) when there is no assignment.
+
+**Signature:**
+```go
+ReplaceAssignmentVotes(assignmentID string, votes []*vote.Vote) (replaced bool, err error)
+var ErrAssignmentNotFound = errors.New("assignment not found")
+```
+
+**Usage:**
+```go
+replaced, err := h.voteRepo.ReplaceAssignmentVotes(assignment.ID.String(), votes)
+```
+
+---
+
+## Assignment.PositionOf
+
+**Location:** `internal/domain/vote/vote.go`
+**Description:** Returns the 1-based position of an attachment in `AttachmentIDs`, or `(0, false)`. Used for the `Propuesta n` label and for `propuesta-{n}.{ext}` so both always match.
+
+**Signature:**
+```go
+func (a *Assignment) PositionOf(attachmentID uuid.UUID) (int, bool)
+```
+
+**Usage:**
+```go
+n, ok := assignment.PositionOf(att.ID)
+```

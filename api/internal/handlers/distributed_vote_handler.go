@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gravadigital/telescopio-api/internal/config"
+	"github.com/gravadigital/telescopio-api/internal/domain/attachment"
 	"github.com/gravadigital/telescopio-api/internal/domain/event"
 	"github.com/gravadigital/telescopio-api/internal/domain/vote"
 	"github.com/gravadigital/telescopio-api/internal/logger"
@@ -444,10 +446,10 @@ func (h *DistributedVoteHandler) GetParticipantAssignment(c *gin.Context) {
 		return
 	}
 
-	// Check if event is in voting stage
-	if eventObj.Stage != event.StageVoting {
+	// Assignments are readable while voting and, read-only, in results
+	if eventObj.Stage != event.StageVoting && eventObj.Stage != event.StageResult {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":         "Assignments are only available during voting stage",
+			"error":         "Assignments are only available during voting and results stages",
 			"current_stage": eventObj.Stage.String(),
 		})
 		return
@@ -473,12 +475,70 @@ func (h *DistributedVoteHandler) GetParticipantAssignment(c *gin.Context) {
 	// Get assignment for this participant
 	assignment, err := h.voteRepo.GetAssignmentByParticipant(eventID, participantID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Assignment not found for this participant"})
+		if errors.Is(err, postgres.ErrAssignmentNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "Participant has no assignment in this event",
+				"code":  "NO_ASSIGNMENT",
+			})
+			return
+		}
+		h.log.Error("failed to retrieve assignment", "error", err, "event_id", eventID, "participant_id", participantID)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to retrieve assignment",
+			"code":  "RETRIEVAL_ERROR",
+		})
 		return
 	}
 
+	eventAttachments, err := h.attachmentRepo.GetByEventID(eventID)
+	if err != nil {
+		h.log.Error("failed to retrieve event attachments", "error", err, "event_id", eventID)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to retrieve assignment",
+			"code":  "RETRIEVAL_ERROR",
+		})
+		return
+	}
+	attachmentsByID := make(map[uuid.UUID]*attachment.Attachment, len(eventAttachments))
+	for _, att := range eventAttachments {
+		attachmentsByID[att.ID] = att
+	}
+
+	// The payload is built explicitly: it must never carry authorship (anonymous evaluation).
+	items := make([]gin.H, 0, len(assignment.AttachmentIDs))
+	for _, attachmentID := range assignment.GetAttachmentUUIDs() {
+		att, ok := attachmentsByID[attachmentID]
+		if !ok {
+			h.log.Error("assigned attachment not found in event",
+				"event_id", eventID, "assignment_id", assignment.ID, "attachment_id", attachmentID)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to retrieve assignment",
+				"code":  "RETRIEVAL_ERROR",
+			})
+			return
+		}
+		position, _ := assignment.PositionOf(attachmentID)
+		var description any
+		if att.Description != "" {
+			description = att.Description
+		}
+		items = append(items, gin.H{
+			"id":          att.ID.String(),
+			"label":       fmt.Sprintf("Propuesta %d", position),
+			"mime_type":   att.MimeType,
+			"file_size":   att.FileSize,
+			"description": description,
+		})
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"assignment":     assignment,
+		"assignment": gin.H{
+			"id":           assignment.ID.String(),
+			"event_id":     assignment.EventID.String(),
+			"is_completed": assignment.IsCompleted,
+			"completed_at": assignment.CompletedAt,
+			"attachments":  items,
+		},
 		"event_name":     eventObj.Name,
 		"participant_id": participantID,
 	})
@@ -542,8 +602,16 @@ func (h *DistributedVoteHandler) SubmitRankingVotes(c *gin.Context) {
 		return
 	}
 
-	eventUUID := uuid.MustParse(eventID)
-	participantUUID := uuid.MustParse(participantID)
+	eventUUID, err := uuid.Parse(eventID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event_id or participant_id format"})
+		return
+	}
+	participantUUID, err := uuid.Parse(participantID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event_id or participant_id format"})
+		return
+	}
 	assignmentUUID, err := uuid.Parse(req.AssignmentID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid assignment_id format"})
@@ -559,20 +627,6 @@ func (h *DistributedVoteHandler) SubmitRankingVotes(c *gin.Context) {
 
 	if assignment.ID != assignmentUUID {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Assignment ID does not match participant's assignment"})
-		return
-	}
-
-	// IMPORTANT: Check if assignment is already completed (votes already submitted)
-	if assignment.IsCompleted {
-		h.log.Warn("attempt to submit votes for already completed assignment",
-			"event_id", eventID,
-			"participant_id", participantID,
-			"assignment_id", assignment.ID)
-		c.JSON(http.StatusConflict, gin.H{
-			"error":        "Votes have already been submitted for this assignment",
-			"code":         "VOTES_ALREADY_SUBMITTED",
-			"completed_at": assignment.CompletedAt,
-		})
 		return
 	}
 
@@ -649,25 +703,16 @@ func (h *DistributedVoteHandler) SubmitRankingVotes(c *gin.Context) {
 		votes = append(votes, vote)
 	}
 
-	// Save votes
-	for _, v := range votes {
-		if err := h.voteRepo.Create(v); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Failed to save vote",
-			})
-			return
-		}
-	}
-
-	// Mark assignment as completed if all attachments are ranked
-	if len(votes) == len(assignedAttachments) {
-		assignment.IsCompleted = true
-		now := time.Now()
-		assignment.CompletedAt = &now
-		if err := h.voteRepo.UpdateAssignment(assignment); err != nil {
-			// Log error but don't fail the request - just ignore logging for now
-			// TODO: Improve error handling
-		}
+	// Replace the previous ranking (if any) atomically; triggers keep is_completed and vote_count.
+	replaced, err := h.voteRepo.ReplaceAssignmentVotes(assignment.ID.String(), votes)
+	if err != nil {
+		h.log.Error("failed to save ranking votes",
+			"error", err,
+			"event_id", eventID,
+			"participant_id", participantID,
+			"assignment_id", assignment.ID)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save votes"})
+		return
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
@@ -675,6 +720,7 @@ func (h *DistributedVoteHandler) SubmitRankingVotes(c *gin.Context) {
 		"event_id":       eventID,
 		"participant_id": participantID,
 		"votes_count":    len(votes),
+		"replaced":       replaced,
 	})
 }
 

@@ -118,6 +118,7 @@ type VoteRepository interface {
 	GetAssignmentsByEventIDPaginated(eventID string, params PaginationParams) (*PaginatedResult, error)
 	GetAssignmentByParticipant(eventID, participantID string) (*vote.Assignment, error)
 	UpdateAssignment(assignment *vote.Assignment) error
+	ReplaceAssignmentVotes(assignmentID string, votes []*vote.Vote) (replaced bool, err error)
 	DeleteAssignment(id string) error
 }
 

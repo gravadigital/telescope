@@ -30,20 +30,45 @@ type AttachmentHandler struct {
 	attachmentRepo postgres.AttachmentRepository
 	eventRepo      postgres.EventRepository
 	userRepo       postgres.UserRepository
+	voteRepo       postgres.VoteRepository
 	fileStorage    storage.FileStorage
 	config         *config.Config
 	log            *log.Logger
 }
 
-func NewAttachmentHandler(attachmentRepo postgres.AttachmentRepository, eventRepo postgres.EventRepository, userRepo postgres.UserRepository, fileStorage storage.FileStorage, cfg *config.Config) *AttachmentHandler {
+func NewAttachmentHandler(attachmentRepo postgres.AttachmentRepository, eventRepo postgres.EventRepository, userRepo postgres.UserRepository, voteRepo postgres.VoteRepository, fileStorage storage.FileStorage, cfg *config.Config) *AttachmentHandler {
 	return &AttachmentHandler{
 		attachmentRepo: attachmentRepo,
 		eventRepo:      eventRepo,
 		userRepo:       userRepo,
+		voteRepo:       voteRepo,
 		fileStorage:    fileStorage,
 		config:         cfg,
 		log:            logger.Handler("attachment"),
 	}
+}
+
+// neutralExtensions maps every MIME type UploadAttachment accepts to the extension used in the
+// anonymous download name. Add the extension here when a new allowed type is added.
+var neutralExtensions = map[string]string{
+	"image/jpeg":         "jpg",
+	"image/png":          "png",
+	"image/gif":          "gif",
+	"image/webp":         "webp",
+	"application/pdf":    "pdf",
+	"text/plain":         "txt",
+	"application/msword": "doc",
+	"application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+}
+
+// neutralFilename builds the name served to evaluators. It is never derived from the original
+// name or the storage filename, because both can reveal the author.
+func neutralFilename(position int, mimeType string) string {
+	ext, ok := neutralExtensions[mimeType]
+	if !ok {
+		ext = "bin"
+	}
+	return fmt.Sprintf("propuesta-%d.%s", position, ext)
 }
 
 // UploadAttachment handles POST /api/events/{event_id}/participant/{participant_id}/attachment
@@ -352,6 +377,21 @@ func (h *AttachmentHandler) GetEventAttachments(c *gin.Context) {
 
 	h.log.Debug("retrieving event attachments", "event_id", eventID)
 
+	userID, err := auth.GetUserIDFromContext(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized", "code": "UNAUTHORIZED"})
+		return
+	}
+
+	// Only the event author and admins see every proposal (with authorship); anyone else
+	// gets their own. A failed event lookup is treated as "not the author".
+	canSeeAll := false
+	if role, roleErr := auth.GetUserRoleFromContext(c); roleErr == nil && role == participant.RoleAdmin {
+		canSeeAll = true
+	} else if evt, evtErr := h.eventRepo.GetByID(eventID); evtErr == nil {
+		canSeeAll = evt.AuthorID == userID
+	}
+
 	attachments, err := h.attachmentRepo.GetByEventID(eventID)
 	if err != nil {
 		h.log.Error("failed to retrieve event attachments", "event_id", eventID, "error", err)
@@ -360,6 +400,16 @@ func (h *AttachmentHandler) GetEventAttachments(c *gin.Context) {
 			"code":  "RETRIEVAL_ERROR",
 		})
 		return
+	}
+
+	if !canSeeAll {
+		own := make([]*attachment.Attachment, 0, 1)
+		for _, att := range attachments {
+			if att.ParticipantID == userID {
+				own = append(own, att)
+			}
+		}
+		attachments = own
 	}
 
 	// Transform to response format
@@ -401,7 +451,8 @@ func (h *AttachmentHandler) DownloadAttachment(c *gin.Context) {
 		return
 	}
 
-	if !h.canDownload(c, attachment) {
+	filename, allowed := h.downloadName(c, attachment)
+	if !allowed {
 		h.log.Warn("unauthorized attachment download attempt", "attachment_id", attachmentID)
 		c.JSON(http.StatusForbidden, gin.H{
 			"error": "You are not authorized to download this attachment",
@@ -424,11 +475,11 @@ func (h *AttachmentHandler) DownloadAttachment(c *gin.Context) {
 	defer fileReader.Close()
 
 	// Set appropriate headers for file download
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", attachment.OriginalName))
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
 	c.Header("Content-Type", attachment.MimeType)
 	c.Header("Content-Length", fmt.Sprintf("%d", attachment.FileSize))
 
-	h.log.Info("serving file download", "attachment_id", attachmentID, "filename", attachment.OriginalName)
+	h.log.Info("serving file download", "attachment_id", attachmentID, "served_as", filename)
 
 	// Stream the file to the response
 	if _, err := io.Copy(c.Writer, fileReader); err != nil {
@@ -527,26 +578,45 @@ func (h *AttachmentHandler) DeleteAttachment(c *gin.Context) {
 	})
 }
 
-// canDownload reports whether the authenticated user (set by JWTAuthMiddleware)
-// may download the given attachment: its owner, the parent event's author, or an admin.
-func (h *AttachmentHandler) canDownload(c *gin.Context, att *attachment.Attachment) bool {
+// downloadName reports whether the authenticated user (set by JWTAuthMiddleware) may download
+// the attachment and the file name to serve it with. Admins, the owner and the event author get
+// the original name. An evaluator with the attachment in their assignment, while the event is in
+// voting or results, gets a neutral name. Any lookup error denies access.
+func (h *AttachmentHandler) downloadName(c *gin.Context, att *attachment.Attachment) (string, bool) {
 	userID, err := auth.GetUserIDFromContext(c)
 	if err != nil {
-		return false
+		return "", false
 	}
 
 	if role, err := auth.GetUserRoleFromContext(c); err == nil && role == participant.RoleAdmin {
-		return true
+		return att.OriginalName, true
 	}
 
 	if att.ParticipantID == userID {
-		return true
+		return att.OriginalName, true
 	}
 
 	eventEntity, err := h.eventRepo.GetByID(att.EventID.String())
 	if err != nil {
-		return false
+		return "", false
 	}
 
-	return eventEntity.AuthorID == userID
+	if eventEntity.AuthorID == userID {
+		return att.OriginalName, true
+	}
+
+	if eventEntity.Stage != event.StageVoting && eventEntity.Stage != event.StageResult {
+		return "", false
+	}
+
+	assignment, err := h.voteRepo.GetAssignmentByParticipant(att.EventID.String(), userID.String())
+	if err != nil {
+		return "", false
+	}
+
+	position, ok := assignment.PositionOf(att.ID)
+	if !ok {
+		return "", false
+	}
+	return neutralFilename(position, att.MimeType), true
 }

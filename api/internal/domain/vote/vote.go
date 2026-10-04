@@ -252,6 +252,17 @@ func (a *Assignment) GetAttachmentUUIDs() []uuid.UUID {
 	return uuids
 }
 
+// PositionOf returns the 1-based position of an attachment in the assignment.
+// It is the single source for the "Propuesta n" label and the neutral download name.
+func (a *Assignment) PositionOf(attachmentID uuid.UUID) (int, bool) {
+	for i, idStr := range a.AttachmentIDs {
+		if id, err := uuid.Parse(idStr); err == nil && id == attachmentID {
+			return i + 1, true
+		}
+	}
+	return 0, false
+}
+
 // MarkCompleted marks the assignment as completed
 func (a *Assignment) MarkCompleted() {
 	a.IsCompleted = true

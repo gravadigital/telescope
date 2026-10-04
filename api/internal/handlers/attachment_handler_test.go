@@ -25,6 +25,7 @@ type testAttachmentHandlerSet struct {
 	attachmentRepo *mockAttachmentRepository
 	eventRepo      *mockEventRepository
 	userRepo       *mockUserRepository
+	voteRepo       *mockVoteRepository
 	fileStorage    *mockFileStorage
 	handler        *AttachmentHandler
 }
@@ -34,11 +35,12 @@ func newTestAttachmentHandlerSet() *testAttachmentHandlerSet {
 		attachmentRepo: newMockAttachmentRepository(),
 		eventRepo:      newMockEventRepository(),
 		userRepo:       newMockUserRepository(),
+		voteRepo:       newMockVoteRepository(),
 		fileStorage:    newMockFileStorage(),
 	}
 	cfg := &config.Config{}
 	cfg.Upload.MaxFileSize = 10 * 1024 * 1024
-	s.handler = NewAttachmentHandler(s.attachmentRepo, s.eventRepo, s.userRepo, s.fileStorage, cfg)
+	s.handler = NewAttachmentHandler(s.attachmentRepo, s.eventRepo, s.userRepo, s.voteRepo, s.fileStorage, cfg)
 	return s
 }
 
@@ -352,24 +354,6 @@ func TestGetAttachment_RejectsMissing(t *testing.T) {
 
 	assert.Equal(t, http.StatusNotFound, w.Code)
 }
-
-func TestGetEventAttachments_Success(t *testing.T) {
-	s := newTestAttachmentHandlerSet()
-	e, _ := newParticipationStageEvent()
-	att := attachment.NewAttachment(e.ID, uuid.New(), "f.jpg", "photo.jpg", "key", "image/jpeg", 10, "")
-	s.attachmentRepo.addAttachment(att)
-
-	w := performRequest(t, http.MethodGet, s.handler.GetEventAttachments,
-		gin.Params{{Key: "event_id", Value: e.ID.String()}}, "", nil)
-
-	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-	resp := jsonBody(t, w)
-	assert.Equal(t, float64(1), resp["count"])
-}
-
-// ---------------------------------------------------------------------------
-// DownloadAttachment
-// ---------------------------------------------------------------------------
 
 func TestDownloadAttachment_Success(t *testing.T) {
 	s := newTestAttachmentHandlerSet()

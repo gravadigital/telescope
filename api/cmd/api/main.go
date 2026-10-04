@@ -78,7 +78,7 @@ func main() {
 
 	votingSetupRepo := postgres.NewPostgresVotingSetupRepository(db)
 	eventHandler := handlers.NewEventHandler(eventRepo, userRepo, attachmentRepo, voteRepo, votingSetupRepo, emailService, distributedVoteHandler, cfg)
-	attachmentHandler := handlers.NewAttachmentHandler(attachmentRepo, eventRepo, userRepo, fileStorage, cfg)
+	attachmentHandler := handlers.NewAttachmentHandler(attachmentRepo, eventRepo, userRepo, voteRepo, fileStorage, cfg)
 	userHandler := handlers.NewUserHandler(userRepo, eventRepo, emailService, cfg)
 	googleAuthHandler := handlers.NewGoogleAuthHandler(userRepo, cfg)
 

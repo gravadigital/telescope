@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -439,22 +440,6 @@ func TestGenerateAssignmentsHandler_RejectsFewerThanThreeProposals(t *testing.T)
 // GetParticipantAssignment
 // ---------------------------------------------------------------------------
 
-func TestGetParticipantAssignment_Success(t *testing.T) {
-	s := newTestHandlerSet()
-	e := newVotingEvent()
-	s.eventRepo.addEvent(e)
-	users := addParticipants(s, e.ID, 2)
-	p := users[0]
-
-	assignment := vote.NewAssignment(e.ID, p.ID, []uuid.UUID{uuid.New()})
-	s.voteRepo.assignments[assignment.ID.String()] = assignment
-
-	w := performRequest(t, http.MethodGet, s.handler.GetParticipantAssignment,
-		gin.Params{{Key: "event_id", Value: e.ID.String()}, {Key: "participant_id", Value: p.ID.String()}}, "", nil)
-
-	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
-}
-
 func TestGetParticipantAssignment_RejectsNonParticipant(t *testing.T) {
 	s := newTestHandlerSet()
 	e := newVotingEvent()
@@ -476,6 +461,7 @@ func TestGetParticipantAssignment_RejectsWrongStage(t *testing.T) {
 		gin.Params{{Key: "event_id", Value: e.ID.String()}, {Key: "participant_id", Value: uuid.New().String()}}, "", nil)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, "participation", jsonBody(t, w)["current_stage"])
 }
 
 // ---------------------------------------------------------------------------
@@ -535,26 +521,6 @@ func TestSubmitRankingVotes_DoesNotCompleteAssignmentOnPartialVote(t *testing.T)
 	updated, err := s.voteRepo.GetAssignmentByParticipant(e.ID.String(), p.ID.String())
 	require.NoError(t, err)
 	assert.False(t, updated.IsCompleted, "a partial vote must not mark the assignment completed")
-}
-
-func TestSubmitRankingVotes_RejectsAlreadyCompletedAssignment(t *testing.T) {
-	s := newTestHandlerSet()
-	e, p, assignment, attachments := setupVotingScenario(t, s)
-	assignment.MarkCompleted()
-	s.voteRepo.assignments[assignment.ID.String()] = assignment
-
-	body := map[string]interface{}{
-		"assignment_id": assignment.ID.String(),
-		"rankings": []map[string]interface{}{
-			{"attachment_id": attachments[0].ID.String(), "rank": 1},
-			{"attachment_id": attachments[1].ID.String(), "rank": 2},
-		},
-	}
-	w := performRequest(t, http.MethodPost, s.handler.SubmitRankingVotes,
-		gin.Params{{Key: "event_id", Value: e.ID.String()}, {Key: "participant_id", Value: p.ID.String()}}, "", body)
-
-	assert.Equal(t, http.StatusConflict, w.Code)
-	assert.Equal(t, "VOTES_ALREADY_SUBMITTED", jsonBody(t, w)["code"])
 }
 
 func TestSubmitRankingVotes_RejectsDuplicateRanks(t *testing.T) {
@@ -978,4 +944,282 @@ func TestPreviewVotingConfiguration_OnlyTheAuthorCanSeeIt(t *testing.T) {
 
 	w = serve(e.AuthorID, participant.RoleOrganizer)
 	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+}
+
+// ---------------------------------------------------------------------------
+// S-007: anonymous assignment, ranking replacement
+// ---------------------------------------------------------------------------
+
+// anonymityScenario builds event E with proposals A1 (P1), A2 (P2), A3 (P3), a participant P4
+// without proposal, and the assignment X1 of P1 = [A2, A3].
+type anonymityScenario struct {
+	e          *event.Event
+	p          []*participant.User // P1..P4
+	a          []*attachment.Attachment
+	assignment *vote.Assignment
+}
+
+func setupAnonymityScenario(s *testHandlerSet, e *event.Event) anonymityScenario {
+	s.eventRepo.addEvent(e)
+	e.Name = "Convocatoria 2026"
+	users := addParticipants(s, e.ID, 4)
+	mk := func(owner *participant.User, name, mime string, size int64, desc, key string) *attachment.Attachment {
+		att := attachment.NewAttachment(e.ID, owner.ID, owner.ID.String()+"_file", name, key, mime, size, desc)
+		s.attachmentRepo.addAttachment(att)
+		return att
+	}
+	atts := []*attachment.Attachment{
+		mk(users[0], "informe-garcia.pdf", "application/pdf", 2048, "Observación de Júpiter", "key-a1"),
+		mk(users[1], "juan-perez.png", "image/png", 4096, "", "key-a2"),
+		mk(users[2], "notas.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 8192, "Notas de campo", "key-a3"),
+	}
+	assignment := vote.NewAssignment(e.ID, users[0].ID, []uuid.UUID{atts[1].ID, atts[2].ID})
+	s.voteRepo.assignments[assignment.ID.String()] = assignment
+	return anonymityScenario{e: e, p: users, a: atts, assignment: assignment}
+}
+
+func assignmentParams(e *event.Event, p *participant.User) gin.Params {
+	return gin.Params{{Key: "event_id", Value: e.ID.String()}, {Key: "participant_id", Value: p.ID.String()}}
+}
+
+func TestGetParticipantAssignment_ReturnsAnonymousPayload(t *testing.T) {
+	s := newTestHandlerSet()
+	sc := setupAnonymityScenario(s, newVotingEvent())
+
+	w := performRequest(t, http.MethodGet, s.handler.GetParticipantAssignment, assignmentParams(sc.e, sc.p[0]), "", nil)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	resp := jsonBody(t, w)
+	assert.Equal(t, "Convocatoria 2026", resp["event_name"])
+	assert.Equal(t, sc.p[0].ID.String(), resp["participant_id"])
+
+	a := resp["assignment"].(map[string]interface{})
+	assert.ElementsMatch(t, []string{"id", "event_id", "is_completed", "completed_at", "attachments"}, keys(a))
+	assert.Equal(t, sc.assignment.ID.String(), a["id"])
+	assert.Equal(t, false, a["is_completed"])
+	assert.Nil(t, a["completed_at"])
+
+	items := a["attachments"].([]interface{})
+	require.Len(t, items, 2)
+	first := items[0].(map[string]interface{})
+	second := items[1].(map[string]interface{})
+	for _, it := range items {
+		assert.ElementsMatch(t, []string{"id", "label", "mime_type", "file_size", "description"}, keys(it.(map[string]interface{})))
+	}
+	assert.Equal(t, sc.a[1].ID.String(), first["id"])
+	assert.Equal(t, "Propuesta 1", first["label"])
+	assert.Equal(t, "image/png", first["mime_type"])
+	assert.Equal(t, float64(4096), first["file_size"])
+	assert.Nil(t, first["description"])
+	assert.Equal(t, "Propuesta 2", second["label"])
+	assert.Equal(t, "Notas de campo", second["description"])
+
+	body := w.Body.String()
+	for _, leaked := range []string{
+		"juan-perez.png", "notas.docx", sc.p[1].ID.String(), sc.p[2].ID.String(),
+		"original_name", "filename", "file_path", "attachment_ids", "quality_score",
+		"expertise_match_score", "conflict_of_interest", "vote_count",
+	} {
+		assert.NotContains(t, body, leaked)
+	}
+}
+
+func keys(m map[string]interface{}) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
+
+func TestGetParticipantAssignment_AvailableInResults(t *testing.T) {
+	s := newTestHandlerSet()
+	sc := setupAnonymityScenario(s, newResultsEvent())
+	completedAt := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	sc.assignment.IsCompleted = true
+	sc.assignment.CompletedAt = &completedAt
+
+	w := performRequest(t, http.MethodGet, s.handler.GetParticipantAssignment, assignmentParams(sc.e, sc.p[0]), "", nil)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	a := jsonBody(t, w)["assignment"].(map[string]interface{})
+	assert.Equal(t, true, a["is_completed"])
+	assert.Equal(t, "2026-10-10T12:00:00Z", a["completed_at"])
+	assert.Len(t, a["attachments"], 2)
+}
+
+func TestGetParticipantAssignment_NoAssignment(t *testing.T) {
+	s := newTestHandlerSet()
+	sc := setupAnonymityScenario(s, newVotingEvent())
+
+	w := performRequest(t, http.MethodGet, s.handler.GetParticipantAssignment, assignmentParams(sc.e, sc.p[3]), "", nil)
+
+	require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
+	resp := jsonBody(t, w)
+	assert.Equal(t, "NO_ASSIGNMENT", resp["code"])
+	assert.Equal(t, "Participant has no assignment in this event", resp["error"])
+}
+
+func TestGetParticipantAssignment_DatabaseErrorIsNotNoAssignment(t *testing.T) {
+	s := newTestHandlerSet()
+	sc := setupAnonymityScenario(s, newVotingEvent())
+	s.voteRepo.getAssignmentByPartErr = errors.New("db down")
+
+	w := performRequest(t, http.MethodGet, s.handler.GetParticipantAssignment, assignmentParams(sc.e, sc.p[0]), "", nil)
+
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Equal(t, "RETRIEVAL_ERROR", jsonBody(t, w)["code"])
+}
+
+func TestGetParticipantAssignment_AssignedAttachmentMissingFromEvent(t *testing.T) {
+	s := newTestHandlerSet()
+	sc := setupAnonymityScenario(s, newVotingEvent())
+	sc.assignment.AttachmentIDs = append(sc.assignment.AttachmentIDs, uuid.NewString())
+
+	w := performRequest(t, http.MethodGet, s.handler.GetParticipantAssignment, assignmentParams(sc.e, sc.p[0]), "", nil)
+
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Equal(t, "RETRIEVAL_ERROR", jsonBody(t, w)["code"])
+}
+
+func submitBody(assignment *vote.Assignment, ranks ...[2]interface{}) map[string]interface{} {
+	rankings := make([]map[string]interface{}, len(ranks))
+	for i, r := range ranks {
+		rankings[i] = map[string]interface{}{"attachment_id": r[0].(uuid.UUID).String(), "rank": r[1]}
+	}
+	return map[string]interface{}{"assignment_id": assignment.ID.String(), "rankings": rankings}
+}
+
+func votesOf(s *testHandlerSet, assignmentID uuid.UUID) map[uuid.UUID]int {
+	out := map[uuid.UUID]int{}
+	for _, v := range s.voteRepo.votes {
+		if v.AssignmentID == assignmentID {
+			out[v.AttachmentID] = v.RankPosition
+		}
+	}
+	return out
+}
+
+func TestSubmitRankingVotes_FirstSubmissionIsNotAReplacement(t *testing.T) {
+	s := newTestHandlerSet()
+	sc := setupAnonymityScenario(s, newVotingEvent())
+	body := submitBody(sc.assignment, [2]interface{}{sc.a[1].ID, 1}, [2]interface{}{sc.a[2].ID, 2})
+
+	w := performRequest(t, http.MethodPost, s.handler.SubmitRankingVotes, assignmentParams(sc.e, sc.p[0]), "", body)
+
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	resp := jsonBody(t, w)
+	assert.Equal(t, "Ranking votes submitted successfully", resp["message"])
+	assert.Equal(t, sc.e.ID.String(), resp["event_id"])
+	assert.Equal(t, sc.p[0].ID.String(), resp["participant_id"])
+	assert.Equal(t, float64(2), resp["votes_count"])
+	assert.Equal(t, false, resp["replaced"])
+
+	require.Len(t, s.voteRepo.replaceCalls, 1)
+	call := s.voteRepo.replaceCalls[0]
+	assert.Equal(t, sc.assignment.ID.String(), call.assignmentID)
+	require.Len(t, call.votes, 2)
+	for _, v := range call.votes {
+		assert.Equal(t, sc.assignment.ID, v.AssignmentID)
+		assert.Equal(t, sc.p[0].ID, v.VoterID)
+		assert.Equal(t, sc.e.ID, v.EventID)
+	}
+}
+
+func TestSubmitRankingVotes_ReplacesCompletedRanking(t *testing.T) {
+	s := newTestHandlerSet()
+	sc := setupAnonymityScenario(s, newVotingEvent())
+	for i, att := range sc.a[1:] {
+		v := vote.NewVote(sc.e.ID, sc.p[0].ID, att.ID, i+1)
+		v.AssignmentID = sc.assignment.ID
+		s.voteRepo.votes = append(s.voteRepo.votes, v)
+	}
+	sc.assignment.MarkCompleted()
+	body := submitBody(sc.assignment, [2]interface{}{sc.a[2].ID, 1}, [2]interface{}{sc.a[1].ID, 2})
+
+	w := performRequest(t, http.MethodPost, s.handler.SubmitRankingVotes, assignmentParams(sc.e, sc.p[0]), "", body)
+
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	resp := jsonBody(t, w)
+	assert.Equal(t, true, resp["replaced"])
+	assert.Equal(t, float64(2), resp["votes_count"])
+	assert.Equal(t, map[uuid.UUID]int{sc.a[2].ID: 1, sc.a[1].ID: 2}, votesOf(s, sc.assignment.ID))
+	assert.True(t, sc.assignment.IsCompleted)
+}
+
+func TestSubmitRankingVotes_ReplacesAfterPartialSubmission(t *testing.T) {
+	s := newTestHandlerSet()
+	sc := setupAnonymityScenario(s, newVotingEvent())
+	prev := vote.NewVote(sc.e.ID, sc.p[0].ID, sc.a[1].ID, 1)
+	prev.AssignmentID = sc.assignment.ID
+	s.voteRepo.votes = append(s.voteRepo.votes, prev)
+	body := submitBody(sc.assignment, [2]interface{}{sc.a[1].ID, 1}, [2]interface{}{sc.a[2].ID, 2})
+
+	w := performRequest(t, http.MethodPost, s.handler.SubmitRankingVotes, assignmentParams(sc.e, sc.p[0]), "", body)
+
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	assert.Equal(t, true, jsonBody(t, w)["replaced"])
+	assert.Len(t, votesOf(s, sc.assignment.ID), 2, "no duplicated vote for the first proposal")
+}
+
+func TestSubmitRankingVotes_RejectsOutsideVoting(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		e     *event.Event
+		stage string
+	}{
+		{"results", newResultsEvent(), "results"},
+		{"participation", newParticipationEvent(), "participation"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := newTestHandlerSet()
+			sc := setupAnonymityScenario(s, tc.e)
+			body := submitBody(sc.assignment, [2]interface{}{sc.a[2].ID, 1}, [2]interface{}{sc.a[1].ID, 2})
+
+			w := performRequest(t, http.MethodPost, s.handler.SubmitRankingVotes, assignmentParams(sc.e, sc.p[0]), "", body)
+
+			require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+			resp := jsonBody(t, w)
+			assert.Equal(t, "Voting is only allowed during voting stage", resp["error"])
+			assert.Equal(t, tc.stage, resp["current_stage"])
+			assert.Empty(t, s.voteRepo.replaceCalls)
+			assert.Empty(t, s.voteRepo.votes)
+		})
+	}
+}
+
+func TestSubmitRankingVotes_ReturnsErrorWhenSaveFails(t *testing.T) {
+	s := newTestHandlerSet()
+	sc := setupAnonymityScenario(s, newVotingEvent())
+	s.voteRepo.replaceVotesErr = errors.New("insert vote")
+	body := submitBody(sc.assignment, [2]interface{}{sc.a[1].ID, 1}, [2]interface{}{sc.a[2].ID, 2})
+
+	w := performRequest(t, http.MethodPost, s.handler.SubmitRankingVotes, assignmentParams(sc.e, sc.p[0]), "", body)
+
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Equal(t, "Failed to save votes", jsonBody(t, w)["error"])
+	assert.Empty(t, s.voteRepo.votes)
+}
+
+func TestSubmitRankingVotes_RejectsUnassignedAttachment(t *testing.T) {
+	s := newTestHandlerSet()
+	sc := setupAnonymityScenario(s, newVotingEvent())
+	body := submitBody(sc.assignment, [2]interface{}{sc.a[0].ID, 1}, [2]interface{}{sc.a[1].ID, 2})
+
+	w := performRequest(t, http.MethodPost, s.handler.SubmitRankingVotes, assignmentParams(sc.e, sc.p[0]), "", body)
+
+	require.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, "Attachment is not assigned to this participant: "+sc.a[0].ID.String(), jsonBody(t, w)["error"])
+	assert.Empty(t, s.voteRepo.replaceCalls)
+}
+
+func TestSubmitRankingVotes_RejectsMalformedPathIDs(t *testing.T) {
+	s := newTestHandlerSet()
+	sc := setupAnonymityScenario(s, newVotingEvent())
+	body := submitBody(sc.assignment, [2]interface{}{sc.a[1].ID, 1})
+
+	w := performRequest(t, http.MethodPost, s.handler.SubmitRankingVotes,
+		gin.Params{{Key: "event_id", Value: sc.e.ID.String()}, {Key: "participant_id", Value: "not-a-uuid"}}, "", body)
+
+	assert.Contains(t, []int{http.StatusBadRequest, http.StatusForbidden}, w.Code, "must not panic")
 }

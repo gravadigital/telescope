@@ -165,6 +165,17 @@
   color: #ffffff;
 }
 
+.ranking-vote-panel .attachment-info .attachment-description {
+  margin: 0 0 var(--spacing-sm);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: var(--text-xs);
+}
+
+.ranking-vote-panel .attachment-info button.download-link {
+  cursor: pointer;
+  font-family: inherit;
+}
+
 /* Rank selector ----------------------------------------------------------- */
 
 .ranking-vote-panel .rank-selector {

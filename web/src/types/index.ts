@@ -165,19 +165,20 @@ export interface VotingConfiguration {
   updated_at?: string;
 }
 
-export interface Assignment {
+export interface AssignedAttachment {
+  id: string;
+  label: string;               // "Propuesta N" (N = posición, 1-based)
+  mime_type: string;
+  file_size: number;
+  description: string | null;
+}
+
+export interface AnonymousAssignment {
   id: string;
   event_id: string;
-  participant_id: string;
-  attachment_ids: string[];                  // Array de UUIDs
-  assignment_round: number;
   is_completed: boolean;
-  completed_at?: string | null;
-  quality_score?: number | null;            // Q_i score (0-1)
-  expertise_match_score?: number | null;
-  conflict_of_interest: boolean;
-  created_at?: string;
-  updated_at?: string;
+  completed_at: string | null;
+  attachments: AssignedAttachment[];
 }
 
 export interface RankingVote {

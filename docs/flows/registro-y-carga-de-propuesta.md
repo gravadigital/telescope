@@ -4,7 +4,7 @@ title: Registro a un evento y carga de propuesta
 type: feature
 status: Active
 created: 2026-09-18
-last_updated: 2026-10-02
+last_updated: 2026-10-04
 stories: [S-006, S-007, S-008, S-009, S-015]
 ---
 
@@ -13,7 +13,7 @@ stories: [S-006, S-007, S-008, S-009, S-015]
 **Tipo:** Feature
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-10-02
+**Última actualización:** 2026-10-04
 **Stories:** S-006, S-007, S-008, S-009, S-015 (cambios planificados por REQ-003)
 
 ## Descripción
@@ -35,7 +35,13 @@ Solo ocurre durante la etapa `participation` y con el evento no pausado.
 | 2 | Sin sesión, "Inscribirme" lleva a `/login?next=/events/{event_id}`. La inscripción emite `registration_confirmed` (al inscripto) y `participant_registered` agregada (al autor) | S-009, S-015 |
 | 3 | La validación del cliente pasa a vivir en `web/src/domain/files.ts` | S-010 |
 | 4 | La confirmación del archivo pasa del modal a la zona de carga (`FileDropzone`); el reemplazo no tiene modal aparte | S-015 |
-| Listado | `GET /api/v1/events/{event_id}/attachments` devuelve solo la propia propuesta a quien no es el organizador (anonimato de la evaluación) | S-007 |
+
+## Listado de propuestas del evento
+
+`GET /api/v1/events/{event_id}/attachments` (JWT Bearer) devuelve todas las propuestas solo al
+autor del evento y a un `admin`; cualquier otro usuario recibe únicamente la propia (anonimato de
+la evaluación, S-007). `count` es la cantidad devuelta después de filtrar. Un evento inexistente
+responde `200` con `data: []`.
 
 ## Servicios Involucrados
 

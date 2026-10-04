@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { DistributedVotingService, AttachmentService, VoteDraftService, DraftRanking } from '../../services/api';
-import { Assignment, Attachment, VotingStatistics } from '../../types';
-import { API_CONFIG } from '../../config/api';
+import {
+  DistributedVotingService,
+  AttachmentService,
+  VoteDraftService,
+  DraftRanking,
+  extensionForMime
+} from '../../services/api';
+import { AnonymousAssignment, AssignedAttachment, VotingStatistics } from '../../types';
 import './RankingVotePanel.css';
 
 interface RankingVotePanelProps {
@@ -10,7 +15,7 @@ interface RankingVotePanelProps {
   onVotesSubmitted: () => void;
 }
 
-interface AttachmentWithRank extends Attachment {
+interface RankedAttachment extends AssignedAttachment {
   rank?: number;
 }
 
@@ -23,8 +28,10 @@ const RankingVotePanel: React.FC<RankingVotePanelProps> = ({
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
-  const [assignment, setAssignment] = useState<Assignment | null>(null);
-  const [attachments, setAttachments] = useState<AttachmentWithRank[]>([]);
+  const [assignment, setAssignment] = useState<AnonymousAssignment | null>(null);
+  const [noAssignment, setNoAssignment] = useState<boolean>(false);
+  const [downloadError, setDownloadError] = useState<string>('');
+  const [attachments, setAttachments] = useState<RankedAttachment[]>([]);
   const [stats, setStats] = useState<VotingStatistics | null>(null);
 
   type DraftStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -54,14 +61,17 @@ const RankingVotePanel: React.FC<RankingVotePanelProps> = ({
       );
       
       console.log('✅ Assignment loaded successfully:', assignmentData);
-      setAssignment(assignmentData);
 
-      // Cargar detalles de los attachments asignados
-      const allAttachments = await AttachmentService.getEventAttachments(eventId);
-      const assignedAttachments = allAttachments.filter(att =>
-        assignmentData.attachment_ids.includes(att.id)
-      );
-      setAttachments(assignedAttachments);
+      if (assignmentData === null) {
+        setNoAssignment(true);
+        setAssignment(null);
+        setAttachments([]);
+        return;
+      }
+
+      setNoAssignment(false);
+      setAssignment(assignmentData);
+      setAttachments(assignmentData.attachments.map(att => ({ ...att })));
 
       // Restore draft if the assignment is not yet completed
       if (!assignmentData.is_completed) {
@@ -80,16 +90,10 @@ const RankingVotePanel: React.FC<RankingVotePanelProps> = ({
           // Silent: if draft restoration fails, start with empty selections
         }
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('❌ Failed to load assignment:', err);
-      
-      // Check if the error is because voting hasn't been configured yet
-      const errorMessage = err?.message || err?.toString() || '';
-      if (errorMessage.includes('not found') || errorMessage.includes('404')) {
-        setError('Voting has not been configured yet. Please wait for the organizer to set up the voting system.');
-      } else {
-        setError('Failed to load your assignment. Please try again later.');
-      }
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(`Failed to load your assignment: ${errorMessage}.`);
     } finally {
       setLoading(false);
     }
@@ -124,6 +128,16 @@ const RankingVotePanel: React.FC<RankingVotePanelProps> = ({
         </div>
       </div>
     );
+  };
+
+  const handleDownload = async (att: RankedAttachment, position: number): Promise<void> => {
+    setDownloadError('');
+    try {
+      await AttachmentService.downloadAssignedAttachment(att.id, position, att.mime_type);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setDownloadError(`Could not download "${att.label}": ${errorMessage}.`);
+    }
   };
 
   const handleRankChange = (attachmentId: string, rank: number): void => {
@@ -213,6 +227,17 @@ const RankingVotePanel: React.FC<RankingVotePanelProps> = ({
     );
   }
 
+  if (noAssignment) {
+    return (
+      <div className="ranking-vote-panel">
+        <div className="message" role="status">
+          <strong>You are not taking part in this vote.</strong>
+          <p>Only participants who submitted a proposal evaluate the others.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (error && !assignment) {
     return (
       <div className="ranking-vote-panel">
@@ -236,11 +261,6 @@ const RankingVotePanel: React.FC<RankingVotePanelProps> = ({
           <h3>✅ Assignment Completed</h3>
           <p>You have already submitted your rankings for this event.</p>
           {renderProgress()}
-          {assignment.quality_score !== null && assignment.quality_score !== undefined && (
-            <p className="quality-score">
-              Your quality score: <strong>{(assignment.quality_score * 100).toFixed(1)}%</strong>
-            </p>
-          )}
         </div>
       </div>
     );
@@ -266,28 +286,27 @@ const RankingVotePanel: React.FC<RankingVotePanelProps> = ({
       </div>
 
       <div className="attachments-list">
-        {attachments.map((att) => (
+        {attachments.map((att, index) => (
           <div key={att.id} className="attachment-item">
             <div className="attachment-info">
-              <strong>{att.original_name}</strong>
+              <strong>{att.label}</strong>
               <small>
-                Uploaded: {new Date(att.uploaded_at).toLocaleDateString()} |
-                Size: {(att.file_size / 1024 / 1024).toFixed(2)} MB
+                {extensionForMime(att.mime_type).toUpperCase()} · {(att.file_size / 1024 / 1024).toFixed(2)} MB
               </small>
-              {att.url && (
-                <a 
-                  href={`${API_CONFIG.BASE_URL}${att.url}`}
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="download-link"
-                >
-                  📥 Download / View File
-                </a>
-              )}
+              {att.description && <p className="attachment-description">{att.description}</p>}
+              <button
+                type="button"
+                className="download-link"
+                onClick={() => handleDownload(att, index + 1)}
+              >
+                <span aria-hidden="true">📥</span> Download / View File
+              </button>
             </div>
             <div className="rank-selector">
-              <label>Rank:</label>
+              <label htmlFor={`rank-${att.id}`}>Rank:</label>
               <select
+                id={`rank-${att.id}`}
+                aria-label={`Rank for ${att.label}`}
                 value={att.rank || ''}
                 onChange={(e) => handleRankChange(att.id, parseInt(e.target.value))}
               >
@@ -303,6 +322,7 @@ const RankingVotePanel: React.FC<RankingVotePanelProps> = ({
         ))}
       </div>
 
+      {downloadError && <div className="message error-message" role="alert">{downloadError}</div>}
       {error && <div className="message error-message">{error}</div>}
       {success && <div className="message success-message">{success}</div>}
 

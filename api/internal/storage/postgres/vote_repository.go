@@ -508,7 +508,7 @@ func (r *PostgresVoteRepository) GetAssignmentByParticipant(eventID, participant
 	if err := r.db.Where("event_id = ? AND participant_id = ?", eventUUID, participantUUID).First(&assignment).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			r.log.Debug("assignment not found", "event_id", eventID, "participant_id", participantID)
-			return nil, errors.New("assignment not found")
+			return nil, ErrAssignmentNotFound
 		}
 		r.log.Error("failed to retrieve assignment by participant", "event_id", eventID, "participant_id", participantID, "error", err)
 		return nil, fmt.Errorf("failed to retrieve assignment by participant: %w", err)
@@ -746,4 +746,40 @@ func (r *PostgresVoteRepository) GetVotingStatistics(eventID string) (map[string
 
 	r.log.Debug("voting statistics retrieved successfully", "event_id", eventID, "stats", stats)
 	return stats, nil
+}
+
+// ErrAssignmentNotFound is returned when a participant has no assignment in the event.
+var ErrAssignmentNotFound = errors.New("assignment not found")
+
+// ReplaceAssignmentVotes deletes the assignment's votes and inserts the new ones in a single
+// transaction. Completion flags and vote counts are maintained by DB triggers (ADR-002).
+func (r *PostgresVoteRepository) ReplaceAssignmentVotes(assignmentID string, votes []*vote.Vote) (bool, error) {
+	id, err := uuid.Parse(assignmentID)
+	if err != nil {
+		return false, fmt.Errorf("replace votes: invalid assignment id: %w", err)
+	}
+
+	replaced := false
+	err = r.db.Transaction(func(tx *gorm.DB) error {
+		res := tx.Where("assignment_id = ?", id).Delete(&vote.Vote{})
+		if res.Error != nil {
+			return fmt.Errorf("replace votes: delete previous: %w", res.Error)
+		}
+		replaced = res.RowsAffected > 0
+
+		for _, v := range votes {
+			if err := v.Validate(); err != nil {
+				return fmt.Errorf("replace votes: validate: %w", err)
+			}
+			if err := tx.Create(v).Error; err != nil {
+				return fmt.Errorf("replace votes: insert: %w", err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		r.log.Error("failed to replace assignment votes", "assignment_id", assignmentID, "error", err)
+		return false, err
+	}
+	return replaced, nil
 }

@@ -77,18 +77,10 @@ func (h *VoteDraftHandler) SaveDraft(c *gin.Context) {
 		return
 	}
 
-	// Fetch the assignment to verify it exists and is not already completed
+	// Fetch the assignment to verify it exists
 	assignment, err := h.voteRepo.GetAssignmentByParticipant(eventIDStr, participantIDStr)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Assignment not found", "code": "ASSIGNMENT_NOT_FOUND"})
-		return
-	}
-
-	if assignment.IsCompleted {
-		c.JSON(http.StatusConflict, gin.H{
-			"error": "Cannot save draft: assignment is already completed",
-			"code":  "ASSIGNMENT_ALREADY_COMPLETED",
-		})
 		return
 	}
 
