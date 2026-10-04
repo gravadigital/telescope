@@ -4,7 +4,7 @@ title: Evaluación por pares y envío del ranking
 type: feature
 status: Active
 created: 2026-09-18
-last_updated: 2026-10-02
+last_updated: 2026-10-04
 stories: [S-007, S-009, S-017]
 ---
 
@@ -13,29 +13,28 @@ stories: [S-007, S-009, S-017]
 **Tipo:** Feature
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-10-02
-**Stories:** S-007, S-009, S-017 (cambios planificados por REQ-003)
+**Última actualización:** 2026-10-04
+**Stories:** S-007, S-009, S-017 (S-007 implementada en `api`; el resto, planificado por REQ-003)
 
 ## Descripción
 
 El recorrido del participante como evaluador: consulta las `m` propuestas que le tocaron, las
-ordena, guarda borradores mientras trabaja y finalmente envía el ranking definitivo. **El envío
-es irreversible**: una vez enviado, la asignación queda completa y no admite reenvío.
+ordena, guarda borradores mientras trabaja y envía el ranking. **El envío es reemplazable
+mientras dure `voting`**: un nuevo envío sustituye al anterior de forma transaccional.
+**La evaluación es anónima**: el evaluador nunca ve el autor ni el nombre original de una
+propuesta.
 
 Ocurre durante la etapa `voting`, después de que se generaron las asignaciones.
 
 ## Cambios planificados (REQ-003)
 
-> Diseño aprobado, **pendiente de implementar**. Al implementar, incorporar al paso
-> correspondiente y quitar de acá.
+> Diseño aprobado, **pendiente de implementar** (lo de S-007 ya está incorporado en los pasos).
+> Al implementar, incorporar al paso correspondiente y quitar de acá.
 
 | Paso | Cambio | Story |
 |---|---|---|
-| Descripción | El envío deja de ser irreversible mientras dure `voting`. **La evaluación es anónima**: el evaluador nunca ve el autor ni el nombre original de una propuesta | S-007 |
-| 1 | `GET …/assignment` responde en `voting` y `results`, con payload explícito `AnonymousAssignment` (`attachments[{ id, label: "Propuesta N", mime_type, file_size, description }]`), sin `quality_score` ni autoría. Sin asignación → `404 NO_ASSIGNMENT` | S-007 |
-| 1 → 2 (nuevo) | Abrir cada propuesta: `GET /api/v1/attachments/{attachment_id}/download` permitido al evaluador con esa propuesta asignada, en `voting`/`results`, con nombre neutro `propuesta-{n}.{ext}` (cierra D-15). `GET /events/{event_id}/attachments` devuelve solo la propia propuesta a quien no es el organizador | S-007 |
-| 3 | El borrador se guarda también con la asignación completa (se elimina `409 ASSIGNMENT_ALREADY_COMPLETED` durante `voting`). La web lo guarda con debounce desde `SortableRankList` | S-007, S-017 |
-| 4 | Reemplazo transaccional (`DELETE FROM votes WHERE assignment_id` + `INSERT`), response con `replaced: true`; se elimina `409 VOTES_ALREADY_SUBMITTED`. Los triggers mantienen `is_completed` y `vote_count`. Emite `ranking_submitted` | S-007, S-009 |
+| 3 | La web guarda el borrador con debounce desde `SortableRankList` | S-017 |
+| 4 | Emite `ranking_submitted` con `{replaced}` | S-009 |
 | Web | Lista ordenable ↑↓ (posición siempre única) en lugar de selects; solo lectura en `results`; copy del mecanismo real (la propia propuesta sube o baja) | S-017 |
 
 ## Servicios Involucrados
@@ -57,8 +56,14 @@ sequenceDiagram
 
     P->>WEB: abre /events/{id} en etapa voting
     WEB->>API: GET .../participants/{participant_id}/assignment
-    API->>DB: SELECT assignments
-    API-->>WEB: 200 { assignment_id, attachment_ids }
+    API->>DB: SELECT assignments, attachments
+    API-->>WEB: 200 { assignment: { id, event_id, is_completed, completed_at, attachments[{ id, label, mime_type, file_size, description }] }, event_name, participant_id }
+
+    loop cada propuesta asignada
+        P->>WEB: abre la propuesta
+        WEB->>API: GET /api/v1/attachments/{attachment_id}/download
+        API-->>WEB: 200 binario (Content-Disposition: propuesta-{n}.{ext})
+    end
 
     WEB->>API: GET .../participants/{participant_id}/vote-draft
     alt existe borrador
@@ -76,11 +81,11 @@ sequenceDiagram
 
     P->>WEB: envía el ranking definitivo
     WEB->>API: POST .../ranking-votes
-    API->>DB: INSERT votes (m filas)
+    API->>DB: BEGIN · DELETE FROM votes WHERE assignment_id · INSERT votes · COMMIT
     Note over DB: trigger validate_vote_constraints<br/>asignación · pertenencia · rank ≤ m · score
-    Note over DB: trigger update_assignment_completion<br/>→ is_completed = true
-    Note over DB: trigger update_attachment_vote_count<br/>→ vote_count++
-    API-->>WEB: 200 (respuesta plana, sin envelope)
+    Note over DB: trigger update_assignment_completion (AFTER DELETE / INSERT)<br/>→ is_completed recalculado
+    Note over DB: trigger update_attachment_vote_count (AFTER DELETE / INSERT)<br/>→ vote_count recalculado
+    API-->>WEB: 201 { message, event_id, participant_id, votes_count, replaced }
     WEB-->>P: "✅ Your rankings have been submitted successfully!"
 ```
 
@@ -93,16 +98,43 @@ sequenceDiagram
 - **Método:** GET
 - **Endpoint:** `/api/v1/events/{event_id}/participants/{participant_id}/assignment`
 - **Auth:** JWT Bearer
+- **Etapas:** `voting` y `results` (otra etapa → 400)
 
-**Response (éxito) — 200:** la asignación con `assignment_id` y las `m` propuestas asignadas
-(`attachment_ids`, con sus datos para mostrar).
+**Response (éxito) — 200:** `AnonymousAssignment`: `assignment { id, event_id, is_completed,
+completed_at, attachments[{ id, label: "Propuesta N", mime_type, file_size, description }] }`,
+`event_name` y `participant_id`. Sin autoría, sin `original_name`, sin `attachment_ids` ni
+campos internos (`quality_score`, etc.). `N` es la posición en `attachment_ids` (1-based).
 
-**Operación de BD:** `SELECT` sobre `assignments` filtrando por `event_id` y `participant_id`.
+**Response (sin asignación) — 404:** `{ error, code: "NO_ASSIGNMENT" }`.
+
+**Operación de BD:** `SELECT` sobre `assignments` filtrando por `event_id` y `participant_id`, y
+sobre `attachments` del evento para armar los datos de cada propuesta.
 
 **Garantía del modelo:** las `m` propuestas **nunca incluyen la del propio participante** — el
 trigger `validate_assignment_constraints` lo impidió al crearlas.
 
 **Ref:** `docs/apis/api.yaml` → `.../participants/{participant_id}/assignment`
+
+---
+
+### Paso 1b: Abrir cada propuesta asignada
+
+**Origen:** `web` · **Destino:** `api` · **Tipo:** REST
+
+- **Método:** GET
+- **Endpoint:** `/api/v1/attachments/{attachment_id}/download`
+- **Auth:** JWT Bearer
+
+El evaluador puede descargar una propuesta si la tiene en su asignación del mismo evento y el
+evento está en `voting` o `results`. El archivo se sirve con un nombre neutro
+`propuesta-{n}.{ext}` (`n` = posición en `attachment_ids`; la extensión sale del `mime_type`,
+`bin` si no está en el mapa), nunca con `original_name`. El dueño, el autor del evento y un
+`admin` reciben `original_name`. Cualquier otro caso → `403 FORBIDDEN`.
+
+`GET /api/v1/events/{event_id}/attachments` devuelve todas las propuestas solo al autor del
+evento y a un `admin`; cualquier otro usuario recibe únicamente la propia.
+
+**Ref:** `docs/apis/api.yaml` → `/attachments/{attachment_id}/download`
 
 ---
 
@@ -145,7 +177,10 @@ funcionalidad que sostiene el objetivo G-04 (fricción mínima para participar).
 **Operación de BD:** **UPSERT** sobre `vote_drafts`, con la clave UNIQUE
 (`assignment_id`, `participant_id`) — **un solo borrador por asignación y participante**.
 
-**Diferencia clave con el Paso 5:** el borrador **no valida consecutividad ni completitud**. Puede
+El borrador se guarda también con la asignación ya completa (no hay `409
+ASSIGNMENT_ALREADY_COMPLETED`), para poder editar un ranking enviado.
+
+**Diferencia clave con el Paso 4:** el borrador **no valida consecutividad ni completitud**. Puede
 guardar un ranking parcial o inconsistente: es un guardado de progreso, no una entrega.
 
 `vote_drafts` es la única tabla con `ON DELETE CASCADE` explícito sobre las tres FK.
@@ -174,21 +209,27 @@ guardar un ranking parcial o inconsistente: es un guardado de progreso, no una e
 **Validaciones del backend, más estrictas que en el borrador:**
 - Los rangos deben ser enteros **consecutivos desde 1**, sin duplicados.
 - Cada `attachment_id` debe pertenecer a la asignación del participante.
-- **Una vez enviados, la asignación queda completa y no admite reenvío.**
+- **Reenvío:** mientras el evento esté en `voting`, el ranking nuevo reemplaza al anterior. Fuera
+  de `voting` → 400.
 
-**Response (éxito) — 200:** ⚠️ **respuesta plana, sin envelope `data` ni `code`** — a diferencia
-del resto de la API. Es una de las cuatro formas de respuesta que el cliente tiene que normalizar.
+**Response (éxito) — 201:** `{ message, event_id, participant_id, votes_count, replaced }`.
+`replaced` es `true` si se borraron votos previos. ⚠️ **respuesta plana, sin envelope `data` ni
+`code`** — a diferencia del resto de la API. Es una de las cuatro formas de respuesta que el
+cliente tiene que normalizar.
 
-**Operación de BD:** `INSERT` sobre `votes` — **`m` filas**, una por propuesta evaluada, con
-`event_id`, `assignment_id`, `voter_id`, `attachment_id` y `rank_position`.
+**Operación de BD:** en una sola transacción, `DELETE FROM votes WHERE assignment_id = ?` y luego
+`INSERT` sobre `votes` — **`m` filas**, una por propuesta evaluada, con `event_id`,
+`assignment_id`, `voter_id`, `attachment_id` y `rank_position`. Si un trigger rechaza algún voto,
+se hace rollback y se conservan los votos anteriores. La aplicación no escribe `is_completed` ni
+`completed_at`.
 
 **Tres triggers se disparan en cadena:**
 
 | Trigger | Momento | Efecto |
 |---|---|---|
 | `validate_vote_constraints` | BEFORE INSERT | Verifica que el votante tenga asignación en el evento, que la propuesta esté en su asignación y que `rank_position ≤ m`. **Si `score` viene nulo lo calcula**: `(m − rank_position + 1) × 100 / m` |
-| `update_assignment_completion` | AFTER INSERT | Cuenta los votos del participante y, si coinciden con la cantidad asignada, marca `is_completed = true` y setea `completed_at`. **La aplicación no escribe estos campos** |
-| `update_attachment_vote_count` | AFTER INSERT | Incrementa `attachments.vote_count` de cada propuesta votada |
+| `update_assignment_completion` | AFTER INSERT / DELETE | Cuenta los votos del participante: si coinciden con la cantidad asignada marca `is_completed = true` y setea `completed_at`; si quedan menos, lo desmarca. **La aplicación no escribe estos campos** |
+| `update_attachment_vote_count` | AFTER INSERT / DELETE | Incrementa o decrementa `attachments.vote_count` de cada propuesta votada |
 
 **Ref:** `docs/apis/api.yaml` → `.../ranking-votes`;
 `api/internal/storage/migrations/004_constraints_and_triggers.go`
@@ -199,18 +240,20 @@ del resto de la API. Es una de las cuatro formas de respuesta que el cliente tie
 
 | Paso | Condición | Respuesta | Qué ve el participante |
 |---|---|---|---|
-| 1 | Sin asignación (no participó, o no se generaron) | 404 | La UI no muestra el panel de ranking |
+| 1 | Sin asignación (no participó, o no se generaron) | 404 `NO_ASSIGNMENT` | La UI no muestra el panel de ranking |
+| 1b | Propuesta que no está en la asignación del evaluador, o evento fuera de `voting`/`results` | 403 `FORBIDDEN` | No puede abrirla |
 | 3 | Falla el guardado de borrador | 4xx/5xx | Depende del panel; el progreso local se mantiene |
 | 4 | Rangos no consecutivos o duplicados | 400 | Mensaje del backend, crudo |
 | 4 | Propuesta fuera de la asignación | 400 (o trigger) | Idem |
 | 4 | `rank_position > m` | **500** (trigger) | ⚠️ `RAISE EXCEPTION` sin forma de error de la API |
-| 4 | Ya votó | 400/409 | No admite reenvío |
+| 4 | Evento fuera de `voting` | 400 | No se puede enviar ni reemplazar el ranking |
+| 4 | Falla al guardar los votos | 500 | Nada cambia: se conservan los votos anteriores |
 
 ## Estado Resultante
 
-- `votes` — `m` filas del participante, con `score` calculado.
+- `votes` — `m` filas del participante, con `score` calculado (las de un envío anterior se reemplazan).
 - `assignments` — `is_completed = true` y `completed_at` seteados **por trigger**.
-- `attachments.vote_count` — incrementado en cada propuesta evaluada.
+- `attachments.vote_count` — refleja solo el ranking vigente.
 - `vote_drafts` — el borrador queda (no se borra al enviar).
 
 **Consecuencia para quien no envía:** al calcular los resultados, quien no completó su asignación

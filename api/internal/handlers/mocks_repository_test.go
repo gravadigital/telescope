@@ -431,6 +431,13 @@ type mockVoteRepository struct {
 	createAssignmentErr    error
 	updateAssignmentErr    error
 	getAssignmentByPartErr error
+	replaceVotesErr        error
+	replaceCalls           []replaceVotesCall
+}
+
+type replaceVotesCall struct {
+	assignmentID string
+	votes        []*vote.Vote
 }
 
 func newMockVoteRepository() *mockVoteRepository {
@@ -557,7 +564,46 @@ func (m *mockVoteRepository) GetAssignmentByParticipant(eventID, participantID s
 			return a, nil
 		}
 	}
-	return nil, fmt.Errorf("assignment not found")
+	return nil, postgres.ErrAssignmentNotFound
+}
+
+// ReplaceAssignmentVotes mimics the repository plus the update_assignment_completion trigger.
+func (m *mockVoteRepository) ReplaceAssignmentVotes(assignmentID string, votes []*vote.Vote) (bool, error) {
+	if m.replaceVotesErr != nil {
+		return false, m.replaceVotesErr
+	}
+	m.replaceCalls = append(m.replaceCalls, replaceVotesCall{assignmentID: assignmentID, votes: votes})
+
+	kept := m.votes[:0:0]
+	replaced := false
+	for _, v := range m.votes {
+		if v.AssignmentID.String() == assignmentID {
+			replaced = true
+			continue
+		}
+		kept = append(kept, v)
+	}
+	m.votes = append(kept, votes...)
+
+	if a, ok := m.assignments[assignmentID]; ok {
+		n := 0
+		for _, v := range m.votes {
+			if v.AssignmentID.String() == assignmentID {
+				n++
+			}
+		}
+		if n >= len(a.AttachmentIDs) {
+			if !a.IsCompleted {
+				now := time.Now()
+				a.IsCompleted = true
+				a.CompletedAt = &now
+			}
+		} else {
+			a.IsCompleted = false
+			a.CompletedAt = nil
+		}
+	}
+	return replaced, nil
 }
 
 func (m *mockVoteRepository) UpdateAssignment(a *vote.Assignment) error {

@@ -104,25 +104,6 @@ func TestSaveDraft_RejectsMissingAssignment(t *testing.T) {
 	assert.Equal(t, "ASSIGNMENT_NOT_FOUND", jsonBody(t, w)["code"])
 }
 
-func TestSaveDraft_RejectsAlreadyCompletedAssignment(t *testing.T) {
-	s := newTestVoteDraftHandlerSet()
-	eventID := uuid.New()
-	participantID := uuid.New()
-	assignment := vote.NewAssignment(eventID, participantID, []uuid.UUID{uuid.New()})
-	assignment.MarkCompleted()
-	s.voteRepo.assignments[assignment.ID.String()] = assignment
-
-	body := map[string]interface{}{
-		"rankings": []map[string]interface{}{{"attachment_id": assignment.GetAttachmentUUIDs()[0].String(), "rank": 1}},
-	}
-	w := performAuthedRequest(t, http.MethodPut, s.handler.SaveDraft,
-		gin.Params{{Key: "event_id", Value: eventID.String()}, {Key: "participant_id", Value: participantID.String()}},
-		participantID.String(), body)
-
-	assert.Equal(t, http.StatusConflict, w.Code)
-	assert.Equal(t, "ASSIGNMENT_ALREADY_COMPLETED", jsonBody(t, w)["code"])
-}
-
 func TestSaveDraft_RejectsInvalidAttachmentIDInRankings(t *testing.T) {
 	s := newTestVoteDraftHandlerSet()
 	eventID := uuid.New()
@@ -231,4 +212,36 @@ func TestGetDraft_ReportsGenericErrorDistinctlyFromNotFound(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 	assert.Equal(t, "DRAFT_GET_ERROR", jsonBody(t, w)["code"])
+}
+
+func TestSaveDraft_AcceptsCompletedAssignment(t *testing.T) {
+	s := newTestVoteDraftHandlerSet()
+	eventID := uuid.New()
+	participantID := uuid.New()
+	a2, a3 := uuid.New(), uuid.New()
+	assignment := vote.NewAssignment(eventID, participantID, []uuid.UUID{a2, a3})
+	assignment.MarkCompleted()
+	s.voteRepo.assignments[assignment.ID.String()] = assignment
+
+	body := map[string]interface{}{
+		"rankings": []map[string]interface{}{
+			{"attachment_id": a3.String(), "rank": 1},
+			{"attachment_id": a2.String(), "rank": 2},
+		},
+	}
+	w := performAuthedRequest(t, http.MethodPut, s.handler.SaveDraft,
+		gin.Params{{Key: "event_id", Value: eventID.String()}, {Key: "participant_id", Value: participantID.String()}},
+		participantID.String(), body)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	resp := jsonBody(t, w)
+	assert.Equal(t, "DRAFT_SAVED", resp["code"])
+	data := resp["data"].(map[string]interface{})
+	assert.Equal(t, assignment.ID.String(), data["assignment_id"])
+	assert.Equal(t, participantID.String(), data["participant_id"])
+	assert.Equal(t, float64(2), data["rankings_count"])
+
+	saved, err := s.draftRepo.GetByAssignmentAndParticipant(assignment.ID, participantID)
+	require.NoError(t, err)
+	assert.Len(t, saved.Rankings, 2)
 }
