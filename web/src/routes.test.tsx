@@ -2,7 +2,8 @@ import React from 'react';
 import { screen } from '@testing-library/react';
 import { AppRoutes } from './App';
 import { renderWithProviders, sampleUser } from './test-utils/renderWithProviders';
-import { EventService, ApiHealthService } from './services/api';
+import { EventService, UserService, ApiHealthService } from './services/api';
+import { page } from './test-utils/eventFixtures';
 
 jest.mock('./context/AuthContext');
 jest.mock('./services/api');
@@ -20,7 +21,8 @@ const guest = { user: null, isAuthenticated: false, loading: false };
 describe('rutas', () => {
   beforeEach(() => {
     (ApiHealthService.checkHealth as jest.Mock).mockResolvedValue(true);
-    (EventService.getAllEvents as jest.Mock).mockResolvedValue([]);
+    (EventService.listEvents as jest.Mock).mockResolvedValue(page([]));
+    (UserService.getMyEvents as jest.Mock).mockResolvedValue([]);
     (EventService.getEventById as jest.Mock).mockResolvedValue(null);
   });
 
@@ -56,8 +58,30 @@ describe('rutas', () => {
 
   it('TS-61: las rutas existentes no caen en la 404', async () => {
     renderWithProviders(<AppRoutes />, { route: '/events', auth: guest });
-    expect(await screen.findByRole('heading', { name: 'Browse Events' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Eventos' })).toBeInTheDocument();
     expect(screen.queryByText('No encontramos esta página')).toBeNull();
+  });
+
+  it('TS-58: /my-events exige sesión', () => {
+    renderWithProviders(<AppRoutes />, { route: '/my-events', auth: guest });
+    expect(screen.getByTestId('location')).toHaveTextContent('/login?next=%2Fmy-events');
+    expect(screen.queryByRole('heading', { name: 'Mis eventos' })).toBeNull();
+  });
+
+  it('TS-60: Inicio, Eventos y Mis eventos', async () => {
+    const signedIn = { user: sampleUser, isAuthenticated: true, loading: false };
+    const cases: Array<[string, typeof guest | typeof signedIn, string]> = [
+      ['/', guest, 'Concursos donde la comunidad decide quién gana.'],
+      ['/events', guest, 'Eventos'],
+      ['/my-events', signedIn, 'Mis eventos'],
+    ];
+    for (const [route, auth, heading] of cases) {
+      const view = renderWithProviders(<AppRoutes />, { route, auth });
+      expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeInTheDocument();
+      expect(screen.getByRole('banner')).toBeInTheDocument();
+      expect(screen.queryByText('No encontramos esta página')).toBeNull();
+      view.unmount();
+    }
   });
 
   it('TS-61: detalle de evento no cae en la 404', async () => {

@@ -18,28 +18,90 @@ jest.mock("../config/api", () => ({
 const mockedApiRequest = apiRequest as jest.MockedFunction<typeof apiRequest>;
 const mockedDownloadFile = downloadFile as jest.MockedFunction<typeof downloadFile>;
 
-describe("EventService.getAllEvents", () => {
+describe("EventService.listEvents", () => {
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  it("relanza el error de red sin fabricar eventos (TS-8)", async () => {
-    mockedApiRequest.mockRejectedValueOnce(new Error("Failed to fetch"));
-
-    await expect(EventService.getAllEvents()).rejects.toThrow("Failed to fetch");
+  it("arma la query solo con valores (TS-1)", async () => {
+    mockedApiRequest.mockResolvedValue({ data: [] });
+    await EventService.listEvents({ q: "  afiche ", stage: "participation", page: 2, limit: 10 });
+    expect(mockedApiRequest).toHaveBeenLastCalledWith(
+      "/api/v1/events?q=afiche&stage=participation&page=2&limit=10"
+    );
+    await EventService.listEvents({ q: "", page: 1 });
+    expect(mockedApiRequest).toHaveBeenLastCalledWith("/api/v1/events?page=1");
   });
 
-  it("no devuelve los eventos fabricados conocidos ante un error", async () => {
+  it("mapea la respuesta (TS-2)", async () => {
+    mockedApiRequest.mockResolvedValue({
+      data: [
+        {
+          id: "e-1", name: "Concurso de afiches", description: "x", stage: "participation",
+          author_id: "u-9", max_participants: 20, participants_count: 12, participant_ids: ["u-2"],
+          participation_estimated_end_date: "2026-10-10", voting_estimated_end_date: null,
+          is_paused: false, is_cancelled: false, created_at: "2026-09-28T12:00:00Z",
+          start_date: "2026-10-01",
+        },
+      ],
+      pagination: { page: 1, limit: 10, total: 1, total_pages: 1 },
+      filters: { stage: "" },
+      stage_counts: { participation: 4, voting: 2, results: 2 },
+    });
+    const result = await EventService.listEvents({});
+    expect(result).toEqual({
+      items: [
+        {
+          id: "e-1", name: "Concurso de afiches", description: "x", stage: "participation",
+          author_id: "u-9", max_participants: 20, participants_count: 12, participant_ids: ["u-2"],
+          participation_estimated_end_date: "2026-10-10", voting_estimated_end_date: null,
+          is_paused: false, is_cancelled: false, created_at: "2026-09-28T12:00:00Z",
+        },
+      ],
+      pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      stageCounts: { participation: 4, voting: 2, results: 2 },
+    });
+    expect(result.items[0]).not.toHaveProperty("organizer");
+  });
+
+  it("relanza el error de red sin fabricar eventos (TS-3)", async () => {
     mockedApiRequest.mockRejectedValueOnce(new Error("Failed to fetch"));
+    await expect(EventService.listEvents({})).rejects.toThrow("Failed to fetch");
+  });
 
-    let events;
-    try {
-      events = await EventService.getAllEvents();
-    } catch {
-      events = undefined;
-    }
+  it("rechaza una respuesta sin lista en vez de devolver vacío", async () => {
+    mockedApiRequest.mockResolvedValueOnce({});
+    await expect(EventService.listEvents({})).rejects.toThrow("Invalid response");
+  });
+});
 
-    expect(events).toBeUndefined();
+describe("UserService.getMyEvents", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("pide scope=all y mapea (TS-4)", async () => {
+    mockedApiRequest.mockResolvedValue({
+      data: [
+        {
+          id: "e-3", name: "Feria", title: "Feria", description: "", stage: "creation",
+          role: "creator", my_status: null, max_participants: 30, participants_count: 0,
+          participation_estimated_end_date: null, voting_estimated_end_date: null,
+          is_paused: false, is_cancelled: false, author_id: "u-1", created_at: "2026-10-01T09:00:00Z",
+          organizer: "Ana",
+        },
+      ],
+    });
+    const result = await UserService.getMyEvents("u-1");
+    expect(mockedApiRequest).toHaveBeenCalledWith("/api/v1/users/u-1/events?scope=all");
+    expect(result).toEqual([
+      {
+        id: "e-3", name: "Feria", description: "", stage: "creation", role: "creator",
+        my_status: null, max_participants: 30, participants_count: 0,
+        participation_estimated_end_date: null, voting_estimated_end_date: null,
+        is_paused: false, is_cancelled: false, author_id: "u-1", created_at: "2026-10-01T09:00:00Z",
+      },
+    ]);
   });
 });
 

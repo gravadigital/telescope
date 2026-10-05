@@ -104,3 +104,40 @@ GoogleButton({ label: string; onToken(accessToken: string): void; onError(): voi
 <Route path="/login" element={<RedirectIfAuthenticated><LoginPage /></RedirectIfAuthenticated>} />
 <AuthLayout brandTitle={t('auth.login.brandTitle')} title={t('auth.login.title')}>...</AuthLayout>
 ```
+
+---
+
+## PendingCard
+
+**Location:** `src/components/events/pending-card/PendingCard.tsx`
+**Description:** One "Tus pendientes" card built with `Card`: heading by task kind, event name, closing date (upload / vote) or ranking position (results), and a single link styled as a primary button to `/events/{id}`. No business logic: everything comes in `task`.
+
+**Signature:**
+```ts
+PendingCard({ task: PendingTask })
+```
+
+**Usage:**
+```tsx
+pendingTasks(myEvents).slice(0, PENDING_LIMIT).map((task) => <PendingCard key={task.event.id} task={task} />)
+```
+
+---
+
+## EventsTable
+
+**Location:** `src/components/events/events-table/EventsTable.tsx`
+**Description:** Column configuration over `DataTable` shared by Events and My events. `public` (Event / Stage / Participants / Created), `organizer` (… / Closes) and `participant` (Event / Stage / My status / Closes). The row action comes from `rowAction` and uses the new `hint` and `accessibleLabel` props of `DataTableRowAction`.
+
+**Signature:**
+```ts
+EventsTable({ variant: 'public' | 'organizer' | 'participant'; caption: string; captionHidden?: boolean;
+  rows: EventListItem[] | MyEvent[]; userId: string | null; myEventsById?: Record<string, MyEvent>;
+  loading?: boolean; skeletonRows?: number })
+```
+
+**Usage:**
+```tsx
+<EventsTable variant="public" caption={t('events.list.title')} captionHidden rows={items} userId={user?.id ?? null} myEventsById={byId} />
+```
+

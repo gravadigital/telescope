@@ -113,6 +113,20 @@ describe('catálogo', () => {
     });
   });
 
+  it('TS-62: namespaces de eventos neutros y sin voseo', () => {
+    for (const ns of [es.home, es.events, es.myEvents]) {
+      const leaves = flattenLeaves(ns);
+      expect(leaves.length).toBeGreaterThan(0);
+      leaves.forEach(([, text]) => {
+        expect(findVoseo(text)).toEqual([]);
+        expect(findGenderMarks(text)).toEqual([]);
+      });
+    }
+    expect(es.common.retry).toBe('Reintentar');
+    expect(es.myEvents.organizingEmpty).toBe('Todavía no has organizado ningún evento.');
+    expect(en.myEvents.organizingEmpty).toBe("You haven't organized any events yet.");
+  });
+
   it('es y en tienen las mismas hojas', () => {
     expect(flattenLeaves(en).map(([k]) => k)).toEqual(flattenLeaves(es).map(([k]) => k));
   });

@@ -100,8 +100,45 @@ export interface ApiResponse<T = any> {
   error?: string;
 }
 
+// Listado de eventos (GET /events) y "mis eventos" (GET /users/{id}/events?scope=all)
+export type StageCounts = { participation: number; voting: number; results: number };
+
+export interface EventListItem {
+  id: string;
+  name: string;
+  description: string;
+  stage: EventStage;
+  author_id: string;
+  max_participants: number | null;
+  participants_count: number;
+  participant_ids: string[];
+  participation_estimated_end_date: string | null;
+  voting_estimated_end_date: string | null;
+  is_paused: boolean;
+  is_cancelled: boolean;
+  created_at: string;
+}
+
+export interface EventListPage {
+  items: EventListItem[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+  stageCounts: StageCounts;
+}
+
+export interface MyStatus {
+  has_attachment: boolean;
+  has_assignment: boolean;
+  ranking_submitted: boolean;
+  result_position: number | null;
+  result_total: number | null;
+}
+
+export interface MyEvent extends Omit<EventListItem, 'participant_ids'> {
+  role: 'creator' | 'participant';
+  my_status: MyStatus | null;
+}
+
 // Props para componentes
-export interface EventsProps {}
 
 export interface EventDetailProps {
   event: Event;

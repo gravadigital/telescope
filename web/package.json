@@ -21,7 +21,7 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint --max-warnings=0 --ext .ts,.tsx --ignore-pattern '*.test.*' --ignore-pattern '__tests__' src/i18n src/domain src/components/ui src/components/layout src/pages/not-found src/pages/login src/pages/register src/pages/forgot-password src/pages/reset-password src/pages/complete-profile src/components/auth src/hooks/useGoogleSignIn.ts"
+    "lint": "eslint --max-warnings=0 --ext .ts,.tsx --ignore-pattern '*.test.*' --ignore-pattern '__tests__' src/i18n src/domain src/components/ui src/components/layout src/pages/home src/pages/events-list src/pages/my-events src/components/events/pending-card src/components/events/events-table src/pages/not-found src/pages/login src/pages/register src/pages/forgot-password src/pages/reset-password src/pages/complete-profile src/components/auth src/hooks/useGoogleSignIn.ts"
   },
   "eslintConfig": {
     "extends": [
@@ -33,6 +33,11 @@
         "files": [
           "src/components/ui/**/*.tsx",
           "src/components/layout/**/*.tsx",
+          "src/pages/home/**/*.tsx",
+          "src/pages/events-list/**/*.tsx",
+          "src/pages/my-events/**/*.tsx",
+          "src/components/events/pending-card/**/*.tsx",
+          "src/components/events/events-table/**/*.tsx",
           "src/pages/not-found/**/*.tsx",
           "src/pages/login/**/*.tsx",
           "src/pages/register/**/*.tsx",

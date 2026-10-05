@@ -1,0 +1,48 @@
+.ev-pending-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-md);
+}
+
+.ev-pending-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-sm);
+  min-width: 0;
+}
+
+.ev-pending-card__title {
+  margin: 0;
+  font: var(--type-heading-s);
+  color: var(--text-primary);
+}
+
+.ev-pending-card__event {
+  margin: 0;
+  font: var(--type-ui);
+  color: var(--text-primary);
+}
+
+.ev-pending-card__deadline {
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--text-secondary);
+}
+
+.ev-pending-card__action {
+  align-self: stretch;
+  justify-content: center;
+}
+
+@media (min-width: 768px) {
+  .ev-pending-card {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .ev-pending-card__action {
+    align-self: center;
+    flex-shrink: 0;
+  }
+}

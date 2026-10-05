@@ -1,0 +1,21 @@
+.ev-events-table__event {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-sm);
+  min-width: 0;
+}
+
+.ev-events-table__name {
+  font: var(--type-ui);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ev-events-table__desc {
+  font: var(--type-caption);
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}

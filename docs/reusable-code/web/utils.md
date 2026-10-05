@@ -91,3 +91,28 @@ scopedMessageKeyForError(err: unknown, codes: readonly string[], fallback: Trans
 ```ts
 setFormError(scopedMessageKeyForError(err, ['INVALID_PAYLOAD'], 'auth.register.error'));
 ```
+
+---
+
+## domain/events
+
+**Location:** `src/domain/events.ts`
+**Description:** Pure rules for the event lists. The front only interprets `my_status` (the ranking position is computed by the backend). Pending tasks exclude paused / cancelled events for upload and vote; row action follows the product-map table; `openEvents` sorts by closest registration close, then more participants.
+
+**Signature:**
+```ts
+pendingTasks(events: MyEvent[]): PendingTask[]
+rowAction({ event, userId, myEvent? }): RowAction            // { kind, variant, to, hint? }
+stagePill(e): { key: TranslationKey; tone; icon }
+myStatusLabel(e: MyEvent): { key; params? } | null
+currentDeadline(e): string | null
+openEvents(items: EventListItem[]): EventListItem[]
+parseStageFilter(raw: string | null): 'all' | 'participation' | 'voting' | 'results'
+```
+
+**Usage:**
+```ts
+const tasks = pendingTasks(myEvents);
+const action = rowAction({ event: row, userId: user?.id ?? null, myEvent: byId[row.id] });
+```
+
