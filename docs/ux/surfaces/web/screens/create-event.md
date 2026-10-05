@@ -107,7 +107,7 @@ date: 2026-10-02
 
 ### Pasos del wizard
 - Texto/label: "1 Identificación · 2 Cupo · 3 Revisar y crear"
-- Annotation: completado ✓, actual "En curso", pendiente. Se puede volver a un paso completado tocándolo.
+- Annotation: completado ✓, actual con el marcador relleno y el nombre destacado ("En curso" solo para lectores de pantalla), pendiente. Se puede volver a un paso completado tocándolo.
 
 ### Eyebrow paso
 - Texto/label: "PASO {n} DE 3"
@@ -239,6 +239,8 @@ date: 2026-10-02
 - Aviso de visibilidad en el paso 3: con RF 14 un evento en Creación es invisible, y hay que decirlo antes de crear.
 - En mobile la vista previa va debajo: a 400px no hay espacio lateral y el formulario es la tarea.
 - Éxito navega a S-05 (la v1.0 iba a S-04 y redirigía).
+
+- 2026-10-05 (story S-014): el paso actual ya no muestra "En curso" como texto visible; se distingue por el marcador relleno y el nombre en negrita, y "En curso" queda solo para lectores de pantalla. Visible al lado del nombre no se entendía.
 
 **Alternativas descartadas:**
 - Pasos "Fechas", "Archivos permitidos" y "Reglas de votación": fuera de alcance (L-4).

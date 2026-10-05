@@ -6,7 +6,7 @@ const ROOTS = [
   path.join(COMPONENTS, 'ui'),
   path.join(COMPONENTS, 'layout'),
   path.join(COMPONENTS, 'auth'),
-  ...['event-hero', 'stage-timeline', 'next-step-card', 'progress-checklist', 'pending-card', 'events-table'].map((d) =>
+  ...['event-hero', 'stage-timeline', 'next-step-card', 'progress-checklist', 'pending-card', 'events-table', 'event-preview', 'edit-event-dialog'].map((d) =>
     path.join(COMPONENTS, 'events', d)
   ),
 ];

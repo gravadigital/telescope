@@ -3,6 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import ManageEventPage from './ManageEventPage';
+import { I18nProvider } from '../../i18n';
+import { renderWithProviders } from '../../test-utils/renderWithProviders';
 import { EventService, AttachmentService, DistributedVotingService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
@@ -95,11 +97,13 @@ const votingStatsBase = {
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={['/events/ev-1/manage']}>
-      <Routes>
-        <Route path="/events/:eventId/manage" element={<ManageEventPage />} />
-      </Routes>
-    </MemoryRouter>
+    <I18nProvider initialLocale="es">
+      <MemoryRouter initialEntries={['/events/ev-1/manage']}>
+        <Routes>
+          <Route path="/events/:eventId/manage" element={<ManageEventPage />} />
+        </Routes>
+      </MemoryRouter>
+    </I18nProvider>
   );
 }
 
@@ -398,5 +402,70 @@ describe('ManageEventPage', () => {
     ).toBeInTheDocument();
     expect(screen.getAllByText('—')).toHaveLength(2);
     expect(screen.getByRole('button', { name: 'Advance to Voting' })).toBeDisabled();
+  });
+
+  describe('Editar datos (S-014)', () => {
+    const renderManage = (initialEntry: { pathname: string; state?: unknown } = {
+      pathname: '/events/ev-1/manage',
+    }) =>
+      renderWithProviders(
+        <Routes>
+          <Route path="/events/:eventId/manage" element={<ManageEventPage />} />
+        </Routes>,
+        { auth: { user: organizer, isAuthenticated: true, loading: false }, initialEntry }
+      );
+
+    const arrange = (event: object) => {
+      mockedGetEventById.mockResolvedValue(event as any);
+      mockedGetEventParticipants.mockResolvedValue([]);
+      mockedGetEventAttachments.mockResolvedValue([]);
+      mockedGetVotingStatistics.mockResolvedValue(votingStatsBase as any);
+    };
+
+    it.each([
+      ['creation', true],
+      ['participation', true],
+      ['voting', false],
+      ['results', false],
+    ])('TS-57: botón "Editar datos" en %s → %s', async (stage, visible) => {
+      arrange({ ...baseEvent, stage });
+      renderManage();
+      await screen.findByRole('heading', { name: 'Test Event' });
+      const button = screen.queryByRole('button', { name: 'Editar datos' });
+      if (visible) expect(button).toBeInTheDocument();
+      else expect(button).toBeNull();
+    });
+
+    it('TS-58: edita y ve el cambio', async () => {
+      arrange({
+        ...baseEvent,
+        stage: 'participation',
+        participant_ids: [],
+        description: 'Diseña el afiche del festival',
+      });
+      (EventService.updateEvent as jest.Mock).mockResolvedValue({
+        ...baseEvent,
+        stage: 'participation',
+        title: 'Afiches 2026',
+      });
+      renderManage();
+      userEvent.click(await screen.findByRole('button', { name: 'Editar datos' }));
+      const name = screen.getByLabelText(/^Nombre del evento/);
+      userEvent.clear(name);
+      userEvent.type(name, 'Afiches 2026');
+      userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+      expect(await screen.findByRole('heading', { name: 'Afiches 2026' })).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(screen.getByText('Datos actualizados.')).toBeInTheDocument();
+    });
+
+    it('TS-59: aviso de creación y state limpio', async () => {
+      arrange({ ...baseEvent, stage: 'creation' });
+      renderManage({ pathname: '/events/ev-1/manage', state: { notice: 'eventCreated' } });
+      expect(
+        await screen.findByText('Evento creado. Cuando esté listo, abre la inscripción.')
+      ).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByTestId('location-state')).toHaveTextContent('null'));
+    });
   });
 });

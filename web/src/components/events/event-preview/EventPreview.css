@@ -1,0 +1,39 @@
+.ev-event-preview__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-stack-sm);
+  min-width: 0;
+}
+
+.ev-event-preview__body > .ui-progress-bar {
+  align-self: stretch;
+}
+
+.ev-event-preview__name {
+  margin: 0;
+  font: var(--type-heading-s);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.ev-event-preview__desc {
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.ev-event-preview__organizer {
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--text-secondary);
+}
+
+.ev-event-preview .ev-event-preview__placeholder {
+  color: var(--text-muted);
+}

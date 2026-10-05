@@ -6,3 +6,4 @@ export * from './voting';
 export * from './redirect';
 export * from './auth';
 export * from './events';
+export * from './eventForm';

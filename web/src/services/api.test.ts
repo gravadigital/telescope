@@ -1,4 +1,6 @@
-import { apiRequest, downloadFile } from "../config/api";
+import { apiRequest, downloadFile, ApiError } from "../config/api";
+import * as fs from "fs";
+import * as path from "path";
 import {
   EventService,
   UserService,
@@ -264,5 +266,77 @@ describe("AttachmentService.downloadAssignedAttachment", () => {
     await AttachmentService.downloadAssignedAttachment("f2", 2, "image/png");
 
     expect(mockedDownloadFile).toHaveBeenCalledWith("/api/v1/attachments/f2/download", "propuesta-2.png");
+  });
+});
+
+const detail = {
+  id: "e-1", name: "Concurso de afiches", description: "Diseña el afiche del festival",
+  stage: "participation", author_id: "u-1", organizer: "Club de Diseño", max_participants: 15,
+  participant_ids: ["u-2"], participants_count: 1, is_paused: false, is_cancelled: false,
+  start_date: "2026-10-06", end_date: "2026-10-07", participation_estimated_end_date: "2026-10-20",
+  voting_estimated_end_date: null, created_at: "2026-10-05T12:00:00Z", updated_at: "2026-10-05T13:00:00Z",
+  attachment_count: 0,
+};
+
+describe("EventService.createEvent / updateEvent (S-014)", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("crea el evento con la fecha automática y devuelve el id (TS-14)", async () => {
+    const log = jest.spyOn(console, "log").mockImplementation(() => undefined);
+    mockedApiRequest.mockResolvedValue({ event: { id: "e-9" }, code: "EVENT_CREATED" });
+    const result = await EventService.createEvent(
+      { name: "Concurso de afiches", description: "Diseña el afiche del festival", organizer: "Club de Diseño", max_participants: 20 },
+      new Date(2026, 9, 5)
+    );
+    expect(mockedApiRequest).toHaveBeenCalledTimes(1);
+    const [url, options] = mockedApiRequest.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/v1/events");
+    expect(options.method).toBe("POST");
+    expect(options.body).toBe(
+      '{"name":"Concurso de afiches","description":"Diseña el afiche del festival","organizer":"Club de Diseño","max_participants":20,"start_date":"2026-10-06","end_date":"2026-10-07"}'
+    );
+    expect(result).toEqual({ id: "e-9" });
+    expect(log).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it("relanza el error de nombre duplicado (TS-15)", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const error = new ApiError({ status: 409, body: { error: "An event with this name already exists", code: "DUPLICATE_EVENT_NAME" } });
+    mockedApiRequest.mockRejectedValue(error);
+    await expect(
+      EventService.createEvent({ name: "x", description: "y", organizer: "", max_participants: 20 })
+    ).rejects.toMatchObject({ status: 409, code: "DUPLICATE_EVENT_NAME" });
+  });
+
+  it("edita solo un campo y mapea el evento (TS-16)", async () => {
+    mockedApiRequest.mockResolvedValue({ data: detail, code: "EVENT_UPDATED" });
+    const event = await EventService.updateEvent("e-1", { max_participants: 15 });
+    const [url, options] = mockedApiRequest.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/v1/events/e-1");
+    expect(options.method).toBe("PATCH");
+    expect(options.body).toBe('{"max_participants":15}');
+    expect(event).toMatchObject({
+      id: "e-1", title: "Concurso de afiches", organizer: "Club de Diseño", max_participants: 15,
+      participant_ids: ["u-2"], stage: "participation", creator_id: "u-1",
+    });
+  });
+
+  it("relanza el error del PATCH con sus extras (TS-17)", async () => {
+    const error = new ApiError({ status: 400, body: { error: "x", code: "MAX_PARTICIPANTS_BELOW_REGISTERED", current_count: 12 } });
+    mockedApiRequest.mockRejectedValue(error);
+    await expect(EventService.updateEvent("e-1", { max_participants: 3 })).rejects.toMatchObject({
+      status: 400, code: "MAX_PARTICIPANTS_BELOW_REGISTERED", details: { current_count: 12 },
+    });
+  });
+
+  it("no fabrica el organizador (TS-18)", async () => {
+    mockedApiRequest.mockResolvedValue({ data: { ...detail, organizer: undefined } });
+    const event = await EventService.getEventById("e-1");
+    expect(event?.organizer).toBe("");
+    const source = fs.readFileSync(path.join(__dirname, "api.ts"), "utf-8");
+    expect(source).not.toContain("Organizador por determinar");
   });
 });

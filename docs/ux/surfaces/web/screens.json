@@ -945,7 +945,7 @@
           "category": "feedback",
           "content": "1 Identificación · 2 Cupo · 3 Revisar y crear",
           "fill": 0.33,
-          "annotation": "Completado ✓, actual «En curso», pendiente. Se puede volver a un paso completado tocándolo.",
+          "annotation": "Completado ✓, actual con el marcador relleno y el nombre destacado («En curso» solo para lectores de pantalla), pendiente. Se puede volver a un paso completado tocándolo.",
           "viewport_overrides": {
             "mobile": {
               "content": "Paso 1 de 3",

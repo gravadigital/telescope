@@ -4,7 +4,7 @@ title: Edición y visibilidad del evento
 type: feature
 status: Active
 created: 2026-10-02
-last_updated: 2026-10-04
+last_updated: 2026-10-05
 stories: [S-008, S-014]
 ---
 
@@ -13,7 +13,7 @@ stories: [S-008, S-014]
 **Tipo:** Feature
 **Status:** Active (implementado en `api` por S-008; la parte de `web` es S-013 y S-014)
 **Creado:** 2026-10-02
-**Última actualización:** 2026-10-04
+**Última actualización:** 2026-10-05
 **Stories:** S-008, S-014
 
 ## Descripción

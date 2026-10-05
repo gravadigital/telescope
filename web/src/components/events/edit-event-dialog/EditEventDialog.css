@@ -1,0 +1,33 @@
+.ev-edit-event-dialog__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-md);
+  min-width: 0;
+}
+
+.ev-edit-event-dialog__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-md);
+  min-width: 0;
+}
+
+.ev-edit-event-dialog__organizer,
+.ev-edit-event-dialog__capacity {
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .ev-edit-event-dialog__row {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: var(--space-inline-md);
+    align-items: start;
+  }
+  .ev-edit-event-dialog__organizer {
+    grid-column: span 8;
+  }
+  .ev-edit-event-dialog__capacity {
+    grid-column: span 4;
+  }
+}

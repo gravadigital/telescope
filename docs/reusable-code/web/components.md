@@ -141,3 +141,39 @@ EventsTable({ variant: 'public' | 'organizer' | 'participant'; caption: string; 
 <EventsTable variant="public" caption={t('events.list.title')} captionHidden rows={items} userId={user?.id ?? null} myEventsById={byId} />
 ```
 
+---
+
+## EventPreview
+
+**Location:** `src/components/events/event-preview/EventPreview.tsx`
+**Description:** Decorative card (`aria-hidden`, no focusable elements) showing how an event will look in the list once registration opens: "Registration open" pill, name, 2-line description, "by {organizer}" and a `0 / {capacity}` progress bar. Empty name / description show muted placeholders; an empty organizer falls back to `fallbackOrganizer`.
+
+**Signature:**
+```ts
+EventPreview({ name: string; description: string; organizer: string; capacity: number; fallbackOrganizer: string })
+```
+
+**Usage:**
+```tsx
+<EventPreview name={values.name} description={values.description} organizer={values.organizer}
+  capacity={values.maxParticipants} fallbackOrganizer={user?.name ?? ''} />
+```
+
+---
+
+## EditEventDialog
+
+**Location:** `src/components/events/edit-event-dialog/EditEventDialog.tsx`
+**Description:** Dialog to edit name, description, organizer and capacity of an event in Creation or Participation via `PATCH /events/{id}`. Preloads the current data, sends only the changed fields, raises the capacity minimum to the registered count (and to `details.current_count` after `MAX_PARTICIPANTS_BELOW_REGISTERED`), and confirms discarding unsaved changes inside the same dialog. Calls `onSaved(updated)` then `onClose()`.
+
+**Signature:**
+```ts
+EditEventDialog({ open: boolean; event: Event; onClose: () => void; onSaved: (event: Event) => void })
+```
+
+**Usage:**
+```tsx
+<EditEventDialog open={editOpen} event={event} onClose={() => setEditOpen(false)}
+  onSaved={(updated) => setEvent((prev) => ({ ...prev, ...updated }))} />
+```
+

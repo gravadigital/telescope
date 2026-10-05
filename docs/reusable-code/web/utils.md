@@ -116,3 +116,30 @@ const tasks = pendingTasks(myEvents);
 const action = rowAction({ event: row, userId: user?.id ?? null, myEvent: byId[row.id] });
 ```
 
+---
+
+## domain/eventForm
+
+**Location:** `src/domain/eventForm.ts`
+**Description:** Single source of the event form rules, shared by the create wizard and the edit dialog. Measures trimmed values by code points (the backend counts runes) and returns translation keys as field errors. `automaticEventDates` is computed in the local calendar (start tomorrow, end the day after).
+
+**Signature:**
+```ts
+validateEventForm(values: EventFormValues, options?: { minCapacity?: number; fields?: readonly EventFormField[] }): FieldErrors<EventFormField>
+toEventInput(values): EventCreateInput          // trims, snake_case
+changedEventFields(initial, values): EventUpdate // only what changed (PATCH body)
+hasEventFormData(values): boolean
+automaticEventDates(now?: Date): { start_date: string; end_date: string }
+canEditEvent(stage): boolean                     // creation | participation
+minCapacityFor(registered: number): number
+charCount(value: string): number
+// constants: EVENT_NAME_MIN/MAX, EVENT_DESCRIPTION_MIN/MAX, EVENT_ORGANIZER_MAX, EVENT_CAPACITY_MIN/MAX/DEFAULT, EMPTY_EVENT_FORM
+```
+
+**Usage:**
+```ts
+const errors = validateEventForm(values, { fields: ['name', 'description', 'organizer'] });
+const changes = changedEventFields(initial, values);
+if (canEditEvent(event.stage)) { /* show "Editar datos" */ }
+```
+

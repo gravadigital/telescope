@@ -249,3 +249,13 @@ export interface VotingStatistics {
   participants_with_bad_quality: number;
   participant_voting_status?: { [participantId: string]: boolean };
 }
+
+export interface EventCreateInput {
+  name: string;
+  description: string;
+  organizer: string;
+  max_participants: number;
+}
+
+/** Body del PATCH /events/{id}: solo lo que cambió. */
+export type EventUpdate = Partial<EventCreateInput>;

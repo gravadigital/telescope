@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { EventService, AttachmentService, DistributedVotingService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { Event, User, Attachment } from '../../types';
@@ -7,6 +7,10 @@ import VotingResultsPanel from '../../components/voting-results-panel/VotingResu
 import VotingConfigurationPanel from '../../components/voting-configuration-panel/VotingConfigurationPanel';
 import StageAdvanceModal from '../../components/stage-advance-modal/StageAdvanceModal';
 import EventTimeline from '../../components/event-timeline/EventTimeline';
+import EditEventDialog from '../../components/events/edit-event-dialog/EditEventDialog';
+import { Button, Callout } from '../../components/ui';
+import { canEditEvent } from '../../domain';
+import { useT } from '../../i18n';
 import '../../components/stage-advance-modal/StageAdvanceModal.css';
 import '../../components/link-button/styles.css';
 import './ManageEventPage.css';
@@ -45,6 +49,8 @@ const LoadErrorAlert: React.FC<{ message: string; onRetry: () => Promise<void> }
 const ManageEventPage: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { t } = useT();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
 
   const [event, setEvent] = useState<Event | null>(null);
@@ -64,6 +70,18 @@ const ManageEventPage: React.FC = () => {
   const [showStageModal, setShowStageModal] = useState<boolean>(false);
   const [showEditDateModal, setShowEditDateModal] = useState<boolean>(false);
   const [editingStage, setEditingStage] = useState<'participation' | 'voting' | null>(null);
+  // Edición de datos del evento (S-014, provisoria hasta S-016).
+  const [editOpen, setEditOpen] = useState<boolean>(false);
+  const [notice, setNotice] = useState<'created' | 'updated' | null>(null);
+
+  // Aviso de "Evento creado" que llega por el state de navegación; se limpia para que un reload no lo repita.
+  const arrivedWithCreatedNotice =
+    (location.state as { notice?: string } | null)?.notice === 'eventCreated';
+  useEffect(() => {
+    if (!arrivedWithCreatedNotice) return;
+    setNotice('created');
+    navigate(location.pathname, { replace: true, state: null });
+  }, [arrivedWithCreatedNotice, location.pathname, navigate]);
 
   useEffect(() => {
     // The session is restored from localStorage in an AuthContext effect, so
@@ -414,6 +432,14 @@ const getStageName = (stage: Event['stage']): string => {
           <p className="subtitle">Control event stages and view participants</p>
         </div>
 
+        {notice && (
+          <div className="manage-notice">
+            <Callout tone="success">
+              {t(notice === 'created' ? 'manageEvent.created' : 'manageEvent.updated')}
+            </Callout>
+          </div>
+        )}
+
         {/* Error Message */}
         {error && (
           <div className="alert alert-danger">
@@ -423,7 +449,14 @@ const getStageName = (stage: Event['stage']): string => {
 
         {/* Event Info Card */}
         <div className="event-info-card">
-          <h2>{event.title}</h2>
+          <div className="manage-title-row">
+            <h2>{event.title}</h2>
+            {canEditEvent(event.stage) && (
+              <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
+                {t('manageEvent.editData')}
+              </Button>
+            )}
+          </div>
           <p className="event-description">{event.description}</p>
 
           <div className="event-meta">
@@ -738,6 +771,17 @@ const getStageName = (stage: Event['stage']): string => {
             formatEstimatedDate={formatEstimatedDate}
           />
         )}
+
+        {/* Editar datos - S-014 */}
+        <EditEventDialog
+          open={editOpen}
+          event={event}
+          onClose={() => setEditOpen(false)}
+          onSaved={(updated) => {
+            setEvent((prev) => (prev ? { ...prev, ...updated } : updated));
+            setNotice('updated');
+          }}
+        />
       </div>
     </div>
   );

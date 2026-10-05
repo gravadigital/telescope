@@ -1,6 +1,8 @@
 import { apiRequest, checkApiHealth, downloadFile, getErrorCode, API_CONFIG } from "../config/api";
 import {
   Event,
+  EventCreateInput,
+  EventUpdate,
   EventListItem,
   EventListPage,
   EventStage,
@@ -13,6 +15,7 @@ import {
   VotingStatistics,
   Attachment
 } from "../types";
+import { automaticEventDates } from "../domain/eventForm";
 
 // Mantener en sync con `neutralExtensions` de api/internal/handlers/attachment_handler.go
 export const NEUTRAL_EXTENSIONS: Record<string, string> = {
@@ -33,15 +36,6 @@ export const neutralFilename = (position: number, mimeType: string): string =>
   `propuesta-${position}.${extensionForMime(mimeType)}`;
 
 
-interface CreateEventRequest {
-  name: string;
-  description: string;
-  date: string;
-  organizer?: string;
-  author_id?: string; // Optional: send user ID as author
-  maxParticipants?: number; // Optional: max participants (1-100, default: 20)
-}
-
 interface CreateUserRequest {
   name: string;
   email: string;
@@ -56,6 +50,30 @@ interface ApiUser {
   joined_event_ids?: string[];
   created_event_ids?: string[];
 }
+
+// Mapea el detalle de la api (`EventDetail`) al tipo del front.
+// `organizer` nunca se inventa: la api ya cae al nombre del autor.
+const toEvent = (raw: any): Event => ({
+  id: raw.id,
+  title: raw.name || raw.title,
+  description: raw.description,
+  date: raw.start_date || raw.date,
+  organizer: raw.organizer ?? '',
+  status: raw.status || "active",
+  stage: raw.stage || "participation",
+  participant_ids: raw.participant_ids || [],
+  voteCount: raw.vote_count || { yes: 0, maybe: 0, no: 0 },
+  attachmentCount: raw.attachment_count || 0,
+  max_participants: raw.max_participants,
+  creator_id: raw.author_id || raw.creator_id,
+  created_at: raw.created_at,
+  updated_at: raw.updated_at,
+  // Fechas estimativas (S-003)
+  participation_estimated_end_date: raw.participation_estimated_end_date || null,
+  voting_estimated_end_date: raw.voting_estimated_end_date || null,
+  is_paused: raw.is_paused || false,
+  is_cancelled: raw.is_cancelled || false
+});
 
 export const EventService = {
   async listEvents(params: {
@@ -112,68 +130,23 @@ export const EventService = {
     }
   },
 
-  async createEvent(eventData: CreateEventRequest): Promise<Event> {
-    try {
-      console.log("Creating event with data:", eventData);
+  async createEvent(input: EventCreateInput, now?: Date): Promise<{ id: string }> {
+    // El autor sale del JWT: no se envía author_id.
+    const response = await apiRequest<{ event: { id: string } }>(API_CONFIG.ENDPOINTS.EVENTS, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...input, ...automaticEventDates(now) }),
+    });
+    return { id: response.event.id };
+  },
 
-      const startDate = new Date(eventData.date);
-      const endDate = new Date(startDate);
-      endDate.setDate(startDate.getDate() + 1);
-
-      // NO enviar author_id - el backend lo toma del token JWT automáticamente
-      const requestBody: Record<string, any> = {
-        name: eventData.name,
-        description: eventData.description,
-        start_date: eventData.date,
-        end_date: endDate.toISOString().split("T")[0],
-        organizer: eventData.organizer || ""
-      };
-
-      // Agregar max_participants si se especificó
-      if (eventData.maxParticipants && eventData.maxParticipants >= 1 && eventData.maxParticipants <= 100) {
-        requestBody.max_participants = eventData.maxParticipants;
-      }
-
-      console.log("Sending request body:", requestBody);
-
-      const response = await apiRequest<{ message: string; event: any; code: string }>(
-        API_CONFIG.ENDPOINTS.EVENTS,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(requestBody),
-        }
-      );
-
-      console.log("API response:", response);
-
-      // El backend devuelve { event: {...}, message, code }
-      const backendEvent = response.event;
-      
-      if (!backendEvent) {
-        throw new Error('Backend did not return event data');
-      }
-      
-      return {
-        id: backendEvent.id,
-        title: backendEvent.name || backendEvent.title,
-        description: backendEvent.description,
-        date: backendEvent.start_date || backendEvent.date,
-        organizer: eventData.organizer || backendEvent.organizer || "Organizador por determinar",
-        status: "active",
-        stage: backendEvent.stage || "creation" as const,
-        participant_ids: [],
-        voteCount: { yes: 0, maybe: 0, no: 0 },
-        attachmentCount: 0,
-        max_participants: backendEvent.max_participants || eventData.maxParticipants || 20,
-        creator_id: backendEvent.author_id
-      };
-    } catch (error) {
-      console.error("Failed to create event with API:", error);
-      throw error;
-    }
+  async updateEvent(eventId: string, changes: EventUpdate): Promise<Event> {
+    const response = await apiRequest<{ data: any }>(`${API_CONFIG.ENDPOINTS.EVENTS}/${eventId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(changes),
+    });
+    return toEvent(response.data);
   },
 
   async getEventById(id: string): Promise<Event | null> {
@@ -184,30 +157,7 @@ export const EventService = {
         return null;
       }
 
-      const event = response.data;
-      console.log("✅ Event details loaded from backend:", event.id);
-
-      return {
-        id: event.id,
-        title: event.name || event.title,
-        description: event.description,
-        date: event.start_date || event.date,
-        organizer: event.organizer || "Organizador por determinar",
-        status: event.status || "active",
-        stage: event.stage || "participation",
-        participant_ids: event.participant_ids || [],
-        voteCount: event.vote_count || { yes: 0, maybe: 0, no: 0 },
-        attachmentCount: event.attachment_count || 0,
-        max_participants: event.max_participants,
-        creator_id: event.author_id || event.creator_id,
-        created_at: event.created_at,
-        updated_at: event.updated_at,
-        // Fechas estimativas (S-003)
-        participation_estimated_end_date: event.participation_estimated_end_date || null,
-        voting_estimated_end_date: event.voting_estimated_end_date || null,
-        is_paused: event.is_paused || false,
-        is_cancelled: event.is_cancelled || false
-      };
+      return toEvent(response.data);
     } catch (error) {
       console.error("Failed to fetch event by ID from API:", error);
       throw error;
