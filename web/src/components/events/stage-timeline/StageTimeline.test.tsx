@@ -80,4 +80,16 @@ describe('StageTimeline', () => {
     expect(screen.queryByRole('button')).toBeNull();
     expect(screen.queryByText(/etapa 2 de 4/)).toBeNull();
   });
+
+  it('TS-24: summaryDetail suma el cierre al resumen mobile', () => {
+    const { container, rerender } = render(<StageTimeline {...props} summaryDetail="Cierra el 10 oct 2026" />);
+    const summary = container.querySelector('.ev-stage-timeline__summary') as HTMLElement;
+    expect(summary).toHaveTextContent('Participación · ahora · etapa 2 de 4');
+    expect(summary).toHaveTextContent('Cierra el 10 oct 2026');
+
+    rerender(<StageTimeline {...props} />);
+    expect(container.querySelector('.ev-stage-timeline__summary')?.textContent).toBe(
+      'Participación · ahora · etapa 2 de 4'
+    );
+  });
 });

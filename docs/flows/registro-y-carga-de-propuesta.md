@@ -4,7 +4,7 @@ title: Registro a un evento y carga de propuesta
 type: feature
 status: Active
 created: 2026-09-18
-last_updated: 2026-10-04
+last_updated: 2026-10-05
 stories: [S-006, S-007, S-008, S-009, S-015]
 ---
 
@@ -13,8 +13,8 @@ stories: [S-006, S-007, S-008, S-009, S-015]
 **Tipo:** Feature
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-10-04
-**Stories:** S-006, S-007, S-008, S-009, S-015 (cambios planificados por REQ-003; S-008 ya implementado)
+**Última actualización:** 2026-10-05
+**Stories:** S-006, S-007, S-008, S-009, S-015 (S-015 implementada; S-008 ya implementado)
 
 ## Descripción
 
@@ -31,9 +31,7 @@ Solo ocurre durante la etapa `participation` y con el evento no pausado.
 
 | Paso | Cambio | Story |
 |---|---|---|
-| 2 | Sin sesión, "Inscribirme" lleva a `/login?next=/events/{event_id}` | S-015 |
 | 3 | La validación del cliente pasa a vivir en `web/src/domain/files.ts` | S-010 |
-| 4 | La confirmación del archivo pasa del modal a la zona de carga (`FileDropzone`); el reemplazo no tiene modal aparte | S-015 |
 
 ## Listado de propuestas del evento
 
@@ -73,7 +71,7 @@ sequenceDiagram
     alt stage != participation o is_paused
         WEB-->>U: bloquea la acción con aviso
     else participación abierta
-        U->>WEB: completa nombre y email, envía
+        U->>WEB: "Inscribirme al evento" (sin sesión: /login?next=/events/{event_id})
         WEB->>API: POST /api/v1/events/{event_id}/register
         API->>DB: SELECT users WHERE email
         alt el email no existe
@@ -84,12 +82,16 @@ sequenceDiagram
 
         U->>WEB: selecciona archivo
         WEB->>WEB: valida tamaño (10MB) y MIME (8 tipos)
-        U->>WEB: confirma en el modal
+        WEB-->>U: ficha del archivo en la zona de carga (sin modal)
+        U->>WEB: comentario opcional y "Enviar propuesta"
+        opt reemplazo de una propuesta ya enviada
+            WEB->>API: DELETE /api/v1/attachments/{attachment_id}
+        end
         WEB->>API: POST .../participant/{participant_id}/attachment
         API->>S3: PutObject
         API->>DB: INSERT attachments
-        API-->>WEB: 201 { data: { id, filename, ... } }
-        WEB-->>U: "File uploaded successfully!"
+        API-->>WEB: 201 { data: { id, filename, size, ... } }
+        WEB-->>U: "Recibimos tu propuesta."
     end
 ```
 
@@ -113,8 +115,9 @@ etapa, así que un evento oculto nunca responde `INVALID_REGISTRATION_STAGE`.
 **Operación de BD:** `SELECT` sobre `events`.
 
 **Nota de comportamiento:** si el usuario autenticado es el creador (`creator_id === user.id`),
-`EventDetailPageWrapper` redirige a `/events/{id}/manage` y este flujo no continúa: el creador
-**no puede registrarse ni subir propuesta** a su propio evento.
+`EventDetailPage` lo redirige a `/events/{id}/manage` (con `replace`) y este flujo no continúa: el
+creador **no puede registrarse ni subir propuesta** a su propio evento. La página espera a que la
+sesión termine de cargar antes de pedir el evento y lo pide una sola vez.
 
 **Ref:** `docs/apis/api.yaml` → `/api/v1/events/{event_id}`
 
@@ -126,7 +129,9 @@ etapa, así que un evento oculto nunca responde `INVALID_REGISTRATION_STAGE`.
 
 - **Método:** POST
 - **Endpoint:** `/api/v1/events/{event_id}/register`
-- **Auth:** **pública** (`security: []`) — pensado para el link compartible
+- **Auth:** **pública** (`security: []`) — pensado para el link compartible. La web exige sesión:
+  sin sesión, "Inscribirme al evento" lleva a `/login?next=/events/{event_id}` y vuelve al mismo
+  evento; con sesión envía `user.name` y `user.email`.
 - **Body:**
   ```json
   {
@@ -173,17 +178,19 @@ etapa, así que un evento oculto nunca responde `INVALID_REGISTRATION_STAGE`.
 
 | Regla | Umbral | Mensaje |
 |---|---|---|
-| Tamaño | `10 * 1024 * 1024` (10 MiB) | `File cannot exceed 10MB` |
-| Tipo MIME | Whitelist de 8 tipos | `File type not allowed. Use: JPEG, PNG, GIF, WebP, PDF, TXT, DOC, DOCX` |
+| Tamaño | `10 * 1024 * 1024` (10 MiB) | `El archivo supera los 10 MB.` |
+| Tipo MIME | Whitelist de 8 tipos (sin MIME decide la extensión) | `Ese formato no está permitido. Usa JPG, PNG, GIF, WebP, PDF, TXT, DOC o DOCX.` |
 
-Reforzado en el input con `accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.doc,.docx"`.
+Se evalúa en `web/src/domain/files.ts` (`validateFile`: el tipo antes que el tamaño) desde
+`FileDropzone`, y el motivo se muestra dentro de la zona de carga. Reforzado en el input con
+`accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.doc,.docx"`.
 
 El backend vuelve a validar las dos cosas: el tamaño contra `MAX_FILE_SIZE` (10 MB por defecto,
 `FILE_TOO_LARGE`) y el tipo contra su propia lista blanca (`INVALID_FILE_TYPE`), que incluye
 `image/webp` y coincide con la del cliente. La base admite
 hasta 100 MB (`CHECK file_size BETWEEN 1 AND 104857600`), pero no es el límite efectivo.
 
-**Ref:** `web/src/pages/event-detail/EventDetailPage.tsx:133-141`
+**Ref:** `web/src/domain/files.ts`; `web/src/components/ui/file-dropzone/FileDropzone.tsx`
 
 ---
 
@@ -197,7 +204,13 @@ hasta 100 MB (`CHECK file_size BETWEEN 1 AND 104857600`), pero no es el límite 
 - **Body:** `multipart/form-data` con el campo `file` (binary) y `description` (opcional,
   hasta 1000 caracteres; `DESCRIPTION_TOO_LONG` si se excede)
 
-**Response (éxito) — 201:** envelope `data` con `id` (uuid) y `filename`.
+**Response (éxito) — 201:** envelope `data` con `id` (uuid), `filename`, `size`, `mime_type`,
+`description`, `participant` y `uploaded_at`. La web lo mapea a `Attachment` (`original_name` =
+`filename`, `file_size` = `size`): el listado trae `original_name` y `file_size`, no estos nombres.
+
+**Confirmación sin modal.** El archivo elegido se muestra en la propia zona de carga (tipo,
+nombre, tamaño, "Cambiar") con el campo de comentario (hasta 1000 caracteres) y el botón "Enviar
+propuesta"; al terminar, "Recibimos tu propuesta." (5 s) y la ficha pasa a "Enviada el {fecha}".
 
 **Operaciones:**
 - **MinIO:** `PutObject`. La clave resultante se guarda en `attachments.file_path` (**es la clave
@@ -211,7 +224,11 @@ evento**; el creador no puede subir.
 
 **Reemplazo:** durante `participation`, el dueño puede eliminar su propuesta
 (`DELETE /api/v1/attachments/{attachment_id}`) y subir otra. Ni el autor del evento ni un
-`admin` pueden eliminar la de otro.
+`admin` pueden eliminar la de otro. Como la api rechaza una segunda propuesta
+(`409 DUPLICATE_ATTACHMENT`), la web reemplaza con **`DELETE` y después `POST`**, sin modal aparte
+("Reemplazar archivo" → zona de carga con el comentario anterior → "Enviar nueva versión"). Si el
+`DELETE` funciona y el `POST` falla, el participante queda sin propuesta: la página vuelve a
+"Sube tu propuesta" con el archivo y el comentario conservados y reintentar es solo el `POST`.
 
 **Ref:** `docs/apis/api.yaml` → `.../participant/{participant_id}/attachment`
 
@@ -221,15 +238,15 @@ evento**; el creador no puede subir.
 
 | Paso | Condición | Respuesta | Qué ve el usuario |
 |---|---|---|---|
-| 1, 2 | Evento en `creation` ajeno | 404 `EVENT_NOT_FOUND` | Pantalla "No encontrada" |
-| 2 | Etapa distinta de `participation` | 400 | La UI no ofrece el botón de participar |
-| 2 | Evento pausado | 400 | `⏸ Registration and file submissions are not available while the event is paused.` |
-| 2 | Cupo completo | 400 | Mensaje de error de la API, crudo |
-| 2 | Falla de red | — | `Failed to register for the event. Please try again.` |
-| 3 | Archivo > 10 MB | — (client-side) | `File cannot exceed 10MB` |
-| 3 | Tipo no permitido | — (client-side) | `File type not allowed. Use: ...` |
-| 4 | Ya subió una propuesta | 400/409 | La UI ya no ofrece subir: muestra `Submission received` |
-| 4 | Falla de subida | 500 | `Upload failed: {msg}` |
+| 1 | Evento inexistente o en `creation` ajeno | 404 `EVENT_NOT_FOUND` | Pantalla "No encontrada" |
+| 1 | Falla de red / 5xx | — | "No pudimos cargar el evento." + Reintentar + Ir a Eventos |
+| 2 | Sin sesión | — | "Inscribirme al evento" → `/login?next=%2Fevents%2F{id}` |
+| 2 | Cupo completo | 400 `MAX_PARTICIPANTS_REACHED` | "El cupo está completo. No quedan lugares en este evento." y se recarga el evento |
+| 2 | Pausado | 403 `EVENT_PAUSED` | Mensaje traducido por `code` |
+| 2 | Otro / red | — | "No pudimos inscribirte. Intenta de nuevo." / mensaje de red |
+| 3 | > 10 MB / tipo no permitido | — (cliente) | En la zona de carga: "El archivo supera los 10 MB." / "Ese formato no está permitido. …" |
+| 4 | Falla de subida | 4xx/5xx | Mensaje por `code` o "No pudimos enviar tu propuesta. Intenta de nuevo."; el archivo se conserva |
+| 4 | Reemplazo: falla el `DELETE` | 4xx/5xx | "No pudimos reemplazar tu propuesta. Intenta de nuevo."; nada cambió |
 
 ## Estado Resultante
 

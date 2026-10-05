@@ -8,6 +8,11 @@ const removed = [
   ['components', 'api-status' + '-auth', 'ApiStatus' + 'Auth.tsx'],
   ['components', 'voting', 'Vot' + 'ing.tsx'],
   ['components', 'event-detail', 'EventDetail.tsx'],
+  ['components', 'Share' + 'Button.tsx'],
+  ['components', 'Share' + 'Button.css'],
+  ['components', 'partici' + 'pants'],
+  ['components', 'voting-results' + '-panel'],
+  ['components', 'mo' + 'dal'],
 ];
 
 const read = (...parts: string[]): string => fs.readFileSync(path.join(SRC, ...parts), 'utf8');
@@ -30,5 +35,16 @@ describe('código muerto', () => {
 
   it('TS-94: los componentes sin uso fueron eliminados', () => {
     removed.forEach((parts) => expect(fs.existsSync(path.join(SRC, ...parts))).toBe(false));
+  });
+
+  it('TS-80: el detalle ya no avanza etapas ni usa los modales viejos', () => {
+    const app = read('App.tsx');
+    expect(app).not.toContain('EventDetailPage' + 'Wrapper');
+    const page = read('pages', 'event-detail', 'EventDetailPage.tsx');
+    ['StageAdvance' + 'Modal', 'VotingConfiguration' + 'Panel', 'updateEvent' + 'Stage', 'err' + '.message', 'console' + '.log'].forEach(
+      (word) => expect(page).not.toContain(word)
+    );
+    const api = read('services', 'api.ts');
+    expect(api).not.toContain('getShareable' + 'EventInfo');
   });
 });

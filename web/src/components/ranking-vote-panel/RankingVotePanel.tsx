@@ -275,16 +275,6 @@ const RankingVotePanel: React.FC<RankingVotePanelProps> = ({
         Rank them from best (1) to worst ({attachments.length}) — each must have a unique position.
       </p>
 
-      <div className="rvp-quality-note">
-        <span className="rvp-quality-icon">⚖️</span>
-        <p>
-          <strong>Your vote carries weight based on quality.</strong> The system compares your
-          rankings with those of other reviewers. The more consistent your rankings are with the
-          group, the more influence your vote has on the final result. Rank carefully and honestly —
-          your assessment matters.
-        </p>
-      </div>
-
       <div className="attachments-list">
         {attachments.map((att, index) => (
           <div key={att.id} className="attachment-item">

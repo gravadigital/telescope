@@ -4,7 +4,7 @@ title: Cálculo y publicación de resultados
 type: feature
 status: Active
 created: 2026-09-18
-last_updated: 2026-10-02
+last_updated: 2026-10-05
 stories: [S-006, S-009, S-015, S-016]
 ---
 
@@ -13,8 +13,8 @@ stories: [S-006, S-009, S-015, S-016]
 **Tipo:** Feature
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-10-02
-**Stories:** S-006, S-009, S-015, S-016 (S-006 implementada; el resto, planificado por REQ-003)
+**Última actualización:** 2026-10-05
+**Stories:** S-006, S-009, S-015, S-016 (S-006 y S-015 implementadas; el resto, planificado por REQ-003)
 
 ## Descripción
 
@@ -34,13 +34,12 @@ la pregunta abierta #1 del PRD.
 |---|---|---|
 | — | Sin cambio de cálculo | — |
 | Disparador | Se puede publicar con rankings faltantes (confirmación explícita en el diálogo de la gestión); quien no completó queda con `Q_i = 0` | S-016 |
-| Presentación | Puntaje `mbc_score × 10` con un decimal y separador según idioma; podio (1–3) + lista sobre `adjusted_ranking`; el propio participante resaltado | S-015 |
 
 ## Servicios Involucrados
 
 | Servicio | Rol | Tipo de Participación |
 |----------|-----|-----------------------|
-| `web` | Panel de resultados, usado en tres pantallas | Consumidor |
+| `web` | Resultados públicos (podio + ranking) en el detalle del evento y, provisoriamente, en la gestión | Consumidor |
 | `api` | Ejecuta el cálculo completo y persiste los resultados | Procesador |
 | PostgreSQL | Provee los votos; persiste `voting_results` y `assignments.quality_score` | Almacenamiento |
 
@@ -65,7 +64,7 @@ sequenceDiagram
     WEB->>API: GET /api/v1/events/{event_id}/distributed-results
     API->>DB: SELECT voting_results — solo lectura
     API-->>WEB: 200 { data: { global_ranking, adjusted_ranking, participant_qualities } }
-    WEB-->>U: panel de resultados
+    WEB-->>U: podio (1–3) + ranking desde la 4.ª, puntaje 0–10, "Tú" resaltado
 ```
 
 ---
@@ -89,8 +88,18 @@ El ranking se calcula y persiste **una vez**, al pasar el evento a la etapa `res
 
 **Notificaciones (S-009).** `CalculateAndPersistResults` devuelve los resultados que guardó y `UpdateEventStage` los usa para emitir `stage_changed { stage: "results", result_position, result_total }` a cada inscripto que figura en `adjusted_ranking`; el resto (o todos, si el cálculo falla) recibe `{ stage: "results" }`. Ver [notificaciones-in-app](notificaciones-in-app.md).
 
-Si no hay fila guardada responde `404 RESULTS_NOT_CALCULATED`; el panel de resultados intenta
-el recálculo autenticado como fallback y, si no hay sesión, muestra el mensaje.
+Si no hay fila guardada responde `404 RESULTS_NOT_CALCULATED` (forma `{ error, message }`, que la
+web convierte en `code`) y la web muestra "Los resultados todavía no están disponibles." sin
+error visible: **no recalcula** (el `POST` muta estado); el cálculo ocurre al pasar a Resultados.
+
+**Presentación (S-015, `web/src/components/voting/event-results/`).** Se muestra el
+`adjusted_ranking` ordenado por `adjusted_rank`: podio con los 3 primeros y tabla desde el 4.º
+(`Podium`, `RankingList`). El puntaje es `mbc_score × 10` con un decimal y separador según idioma
+("7,4 pts" / "7.4 pts"); el propio participante (`participant_id === user.id`) se resalta con "Tú".
+Se acompaña con `total_participants` y `total_votes` (`{n} participantes · {m} evaluaciones`) y la
+nota "El puntaje combina los rankings de todos los participantes, en una escala de 0 a 10…". La
+página de detalle (`/events/:id`, público) y, provisoriamente hasta S-016, la gestión usan el mismo
+compuesto.
 
 **Ref:** `docs/apis/api.yaml` → `/api/v1/events/{event_id}/distributed-results`
 
@@ -215,7 +224,7 @@ trivialmente.
 
 - `voting_results` — una fila con ambos rankings y las calidades.
 - `assignments.quality_score` — el `Q_i` de cada evaluador.
-- El panel de resultados muestra el ranking en las tres pantallas que lo usan.
+- Los resultados se muestran con podio y ranking en el detalle del evento (público) y en la gestión.
 
 ## Decisión Pendiente
 

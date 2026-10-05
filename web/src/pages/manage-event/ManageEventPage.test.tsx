@@ -27,6 +27,31 @@ const mockedUpdateEventStage = EventService.updateEventStage as jest.MockedFunct
   typeof EventService.updateEventStage
 >;
 const mockedUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockedGetDistributedResults = DistributedVotingService.getDistributedResults as jest.MockedFunction<
+  typeof DistributedVotingService.getDistributedResults
+>;
+
+const podiumResults = {
+  id: 'vr-1',
+  event_id: 'ev-1',
+  global_ranking: [],
+  participant_qualities: {},
+  adjusted_ranking: ['Bruno Ríos', 'Carla Méndez', 'Diego Sosa'].map((name, i) => ({
+    attachment_id: `a-${i + 1}`,
+    filename: `propuesta-${i + 1}.pdf`,
+    participant_id: `u-${i + 2}`,
+    participant_name: name,
+    mbc_score: 0.8 - i * 0.1,
+    global_rank: i + 1,
+    adjusted_rank: i + 1,
+    vote_count: 3,
+    average_rank: i + 1,
+  })),
+  total_participants: 3,
+  total_votes: 6,
+  attachments_per_evaluator: 2,
+  calculated_at: '2026-10-04T18:00:00Z',
+};
 
 const organizer = {
   id: 'org-1',
@@ -109,6 +134,7 @@ function renderPage() {
 
 describe('ManageEventPage', () => {
   beforeEach(() => {
+    mockedGetDistributedResults.mockResolvedValue(podiumResults);
     mockedUseAuth.mockReturnValue({
       user: organizer,
       token: 't',
@@ -286,6 +312,21 @@ describe('ManageEventPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Participants:')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Advance to/ })).not.toBeInTheDocument();
+  });
+
+  it('TS-81: en Resultados la gestión muestra el podio nuevo (provisorio hasta S-016)', async () => {
+    mockedGetEventById.mockResolvedValueOnce({ ...baseEvent, stage: 'results' } as any);
+    mockedGetEventParticipants.mockResolvedValueOnce([p1, p2, p3]);
+    mockedGetEventAttachments.mockResolvedValueOnce([]);
+    mockedGetVotingStatistics.mockResolvedValueOnce({
+      ...votingStatsBase,
+      participant_voting_status: { u1: true },
+    } as any);
+
+    renderPage();
+
+    expect(await screen.findByRole('list', { name: 'Podio' })).toBeInTheDocument();
+    expect(mockedGetDistributedResults).toHaveBeenCalledWith('ev-1');
   });
 
   it('avance bloqueado por fallo de participantes (TS-18)', async () => {

@@ -18,6 +18,8 @@ export interface StageTimelineProps {
   variant?: 'full' | 'compact';
   onEditDeadline?: (stage: EventStage) => void;
   editLabel?: string;
+  /** Texto extra del resumen mobile (p. ej. el cierre de la etapa). */
+  summaryDetail?: React.ReactNode;
 }
 
 const StageTimeline: React.FC<StageTimelineProps> = ({
@@ -31,6 +33,7 @@ const StageTimeline: React.FC<StageTimelineProps> = ({
   variant = 'full',
   onEditDeadline,
   editLabel,
+  summaryDetail,
 }) => {
   const compact = variant === 'compact';
 
@@ -39,6 +42,7 @@ const StageTimeline: React.FC<StageTimelineProps> = ({
       {!compact && (
         <p className="ev-stage-timeline__summary">
           {`${stageLabels[current]} · ${nowLabel} · ${stepOfLabel}`}
+          {summaryDetail ? <> {'· '}{summaryDetail}</> : null}
         </p>
       )}
       <ol className={`ev-stage-timeline__list${compact ? ' ev-stage-timeline__list--compact' : ''}`}>

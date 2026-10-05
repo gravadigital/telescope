@@ -1,0 +1,18 @@
+.vt-event-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-lg);
+  min-width: 0;
+}
+
+.vt-event-results__message {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-secondary);
+}
+
+.vt-event-results__note {
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--text-secondary);
+}

@@ -26,7 +26,7 @@ export interface Event {
     no: number;
   };
   attachmentCount?: number;
-  max_participants?: number;
+  max_participants?: number | null;
   created_at?: string;
   updated_at?: string;
   creator_id?: string;
@@ -150,18 +150,6 @@ export interface AuthProviderProps {
   children: React.ReactNode;
 }
 
-export interface ShareableEventInfo {
-  title: string;
-  description: string;
-  share_url: string;
-  shareable_link: string;
-  image_url: string;
-  stage: string;
-  start_date: string;
-  end_date: string;
-  organizer: string;
-}
-
 // ========================================
 // Sistema de Votación Distribuida (MBC)
 // ========================================
@@ -221,9 +209,18 @@ export interface VotingResults {
   participant_qualities: { [participantId: string]: number };
   adjusted_ranking: AttachmentResult[];
   total_participants: number;
+  total_votes: number;
   attachments_per_evaluator: number;
   calculated_at: string;
   updated_at?: string;
+}
+
+export interface EventParticipant {
+  id: string;
+  name: string;
+  email: string; // el front público nunca lo muestra
+  role: 'creator' | 'participant';
+  created_at: string; // fecha de inscripción
 }
 
 export interface Attachment {

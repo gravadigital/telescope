@@ -143,3 +143,28 @@ const changes = changedEventFields(initial, values);
 if (canEditEvent(event.stage)) { /* show "Editar datos" */ }
 ```
 
+---
+
+## domain/eventDetail
+
+**Location:** `src/domain/eventDetail.ts`
+**Description:** Pure rules for the event detail page, the only place that decides the "Tu próximo paso" state. `nextStepState(event, userId, myAttachment, assignment)` returns one of 11 states with priority cancelled > results > paused > stage states (a registered user of a full event stays in `upload` / `submitted`). `detailPill` and `progressSteps` return translation keys, never text. `splitResults` returns the podium (first 3 by `adjusted_rank`) and the rest without mutating its input. `shareUrl` / `shareLinks` build the share link and the five network URLs.
+
+**Signature:**
+```ts
+nextStepState(event, userId: string | null, myAttachment: { id: string } | null, assignment: 'none' | 'pending' | 'completed' | null): NextStepState
+detailPill(state, event, now?): { key; params?; tone: 'onBand' }
+progressSteps(state, event, now?): DetailProgressStep[] | null
+splitResults(ranking: AttachmentResult[]): { podium: AttachmentResult[]; rest: AttachmentResult[] }
+shareUrl(origin: string, eventId: string): string
+shareLinks(url: string, name: string): { network: ShareNetwork; href: string }[]
+shareAudienceKey(stage): TranslationKey
+afterKey(state, stage): TranslationKey | null
+capacityOf(e) / isRegistered(e, userId) / isFull(e)
+```
+
+**Usage:**
+```ts
+const state = nextStepState(event, user?.id ?? null, myAttachment, assignmentStatus);
+const { podium, rest } = splitResults(results.adjusted_ranking);
+```

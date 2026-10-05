@@ -39,6 +39,8 @@ export interface FileDropzoneProps {
   onSelect: (file: File) => void;
   onReject?: (reason: FileRejection) => void;
   onClear?: () => void;
+  /** Se llama al tocar "Reemplazar archivo" (la pantalla sabe que hay un reemplazo en curso). */
+  onReplace?: () => void;
 }
 
 interface FileChipProps {
@@ -98,12 +100,21 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
   onSelect,
   onReject,
   onClear,
+  onReplace,
 }) => {
   const uid = React.useId();
   const inputId = `${uid}-input`;
   const errorId = `${uid}-error`;
   const [dragOver, setDragOver] = React.useState(false);
   const [replacing, setReplacing] = React.useState(false);
+
+  // El reemplazo dura hasta que cambia la propuesta enviada (no al elegir archivo):
+  // así "Cambiar" durante un reemplazo vuelve a la zona de carga.
+  const submittedName = submitted?.name;
+  const submittedDate = submitted?.date;
+  React.useEffect(() => {
+    setReplacing(false);
+  }, [submittedName, submittedDate]);
 
   const handleFiles = (files: File[]) => {
     if (files.length === 0) return;
@@ -121,7 +132,6 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
       onReject?.('too_large');
       return;
     }
-    setReplacing(false);
     onSelect(candidate);
   };
 
@@ -165,7 +175,10 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
           actionLabel={labels.replace}
           actionAccessibleLabel={labels.replace}
           disabled={disabled}
-          onAction={() => setReplacing(true)}
+          onAction={() => {
+            setReplacing(true);
+            onReplace?.();
+          }}
         />
       </div>
     );

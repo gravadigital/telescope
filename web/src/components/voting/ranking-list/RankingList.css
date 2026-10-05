@@ -1,0 +1,10 @@
+.vt-ranking-list {
+  min-width: 0;
+}
+
+.vt-ranking-list__participant {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-inline-sm);
+}

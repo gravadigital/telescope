@@ -8,6 +8,7 @@ import {
   EventStage,
   MyEvent,
   User,
+  EventParticipant,
   VotingConfiguration,
   AnonymousAssignment,
   RankingVote,
@@ -276,12 +277,6 @@ export const EventService = {
 
   async registerForEvent(eventId: string, participantName: string, participantEmail: string): Promise<void> {
     try {
-      console.log('🎫 Registering for event:', {
-        eventId,
-        participantName,
-        participantEmail
-      });
-
       await apiRequest<any>(
         API_CONFIG.ENDPOINTS.EVENT_REGISTER(eventId),
         {
@@ -295,8 +290,6 @@ export const EventService = {
           }),
         }
       );
-
-      console.log('✅ Registration successful');
     } catch (error) {
       console.error("❌ Failed to register for event:", error);
       throw error;
@@ -326,16 +319,24 @@ export const EventService = {
     }
   },
 
-  async getShareableEventInfo(eventId: string): Promise<any> {
+  /** Participantes con fecha de inscripción (O-08). Solo `role === 'participant'`. */
+  async getParticipants(eventId: string): Promise<EventParticipant[]> {
     try {
-      const response = await apiRequest<{ data: any }>(
-        API_CONFIG.ENDPOINTS.EVENT_SHARE(eventId)
+      const response = await apiRequest<{ data: { participants: any[] } }>(
+        API_CONFIG.ENDPOINTS.EVENT_PARTICIPANTS(eventId)
       );
-      
-      console.log('✅ Shareable event info loaded:', response.data);
-      return response.data;
+      const participants = response.data?.participants || [];
+      return participants
+        .filter(p => p.role === 'participant')
+        .map(p => ({
+          id: p.id,
+          name: p.name,
+          email: p.email,
+          role: p.role,
+          created_at: p.created_at,
+        }));
     } catch (error) {
-      console.error("❌ Failed to fetch shareable event info:", error);
+      console.error("❌ Failed to fetch participants:", error);
       throw error;
     }
   }
@@ -501,15 +502,33 @@ export const AttachmentService = {
         formData.append("description", description);
       }
 
-      const response = await apiRequest<{ data: Attachment }>(
-        API_CONFIG.ENDPOINTS.UPLOAD_ATTACHMENT(eventId, participantId),
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
+      const response = await apiRequest<{
+        data: {
+          id: string;
+          filename: string;
+          size: number;
+          mime_type: string;
+          description?: string;
+          uploaded_at: string;
+        };
+      }>(API_CONFIG.ENDPOINTS.UPLOAD_ATTACHMENT(eventId, participantId), {
+        method: "POST",
+        body: formData,
+      });
 
-      return response.data;
+      // El 201 no trae la forma de `Attachment` del listado: se mapea acá.
+      const d = response.data;
+      return {
+        id: d.id,
+        event_id: eventId,
+        participant_id: participantId,
+        original_name: d.filename,
+        stored_name: '',
+        file_size: d.size,
+        mime_type: d.mime_type,
+        description: d.description || undefined,
+        uploaded_at: d.uploaded_at,
+      };
     } catch (error) {
       console.error("Failed to upload attachment:", error);
       throw error;

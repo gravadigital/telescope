@@ -102,4 +102,48 @@ describe('FileDropzone', () => {
     setup({ file: pdf(), uploading: true });
     expect(screen.getByRole('button', { name: 'Cambiar archivo propuesta.pdf' })).toBeDisabled();
   });
+
+  describe('reemplazo (S-015)', () => {
+    const submitted = { name: 'afiche.pdf', size: 2516582, date: '2026-10-03' };
+
+    it('TS-20: "Cambiar" durante un reemplazo vuelve a la zona, no a la ficha enviada', () => {
+      const { rerender, onSelect, onClear } = setup({ submitted });
+      userEvent.click(screen.getByRole('button', { name: 'Reemplazar archivo' }));
+      const file = pdf();
+      userEvent.upload(screen.getByLabelText(/Arrastrá tu archivo/), file);
+      expect(onSelect).toHaveBeenCalledWith(file);
+
+      rerender(<FileDropzone labels={labels} locale="es" submitted={submitted} file={file} onSelect={onSelect} onClear={onClear} />);
+      userEvent.click(screen.getByRole('button', { name: 'Cambiar archivo propuesta.pdf' }));
+      rerender(<FileDropzone labels={labels} locale="es" submitted={submitted} file={null} onSelect={onSelect} onClear={onClear} />);
+
+      expect(screen.getByLabelText(/Arrastrá tu archivo/)).toBeInTheDocument();
+      expect(screen.queryByText(/Enviada el/)).not.toBeInTheDocument();
+    });
+
+    it('TS-21: onReplace se llama una vez y se ve la zona', () => {
+      const onReplace = jest.fn();
+      setup({ submitted, onReplace });
+      userEvent.click(screen.getByRole('button', { name: 'Reemplazar archivo' }));
+      expect(onReplace).toHaveBeenCalledTimes(1);
+      expect(screen.getByLabelText(/Arrastrá tu archivo/)).toBeInTheDocument();
+    });
+
+    it('TS-22: un submitted nuevo reinicia el reemplazo', () => {
+      const handlers = { onSelect: jest.fn(), onClear: jest.fn() };
+      const { rerender } = render(<FileDropzone labels={labels} locale="es" submitted={submitted} {...handlers} />);
+      userEvent.click(screen.getByRole('button', { name: 'Reemplazar archivo' }));
+      rerender(
+        <FileDropzone
+          labels={labels}
+          locale="es"
+          submitted={{ name: 'propuesta.pdf', size: 1000, date: '2026-10-05' }}
+          file={null}
+          {...handlers}
+        />
+      );
+      expect(screen.getByText('propuesta.pdf')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Reemplazar archivo' })).toBeInTheDocument();
+    });
+  });
 });

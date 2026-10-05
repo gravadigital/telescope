@@ -1,0 +1,61 @@
+.vt-podium {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-stack-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vt-podium__item {
+  min-width: 0;
+}
+
+.vt-podium__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-sm);
+  height: 100%;
+}
+
+.vt-podium__place {
+  margin: 0;
+  font: var(--type-eyebrow);
+  letter-spacing: var(--type-tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.vt-podium__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-inline-sm);
+  margin: 0;
+  font: var(--type-heading-s);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.vt-podium__proposal {
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.vt-podium__score {
+  margin: 0;
+  font: var(--type-metric);
+  color: var(--text-action);
+}
+
+.vt-podium__item--you .vt-podium__card {
+  border-color: var(--border-focus);
+}
+
+@media (min-width: 768px) {
+  .vt-podium {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

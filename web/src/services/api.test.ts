@@ -340,3 +340,95 @@ describe("EventService.createEvent / updateEvent (S-014)", () => {
     expect(source).not.toContain("Organizador por determinar");
   });
 });
+
+describe("S-015 · servicios del detalle", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("TS-15 mapea la respuesta de la subida a Attachment", async () => {
+    mockedApiRequest.mockResolvedValueOnce({
+      data: {
+        id: "a-7",
+        filename: "propuesta.pdf",
+        size: 2516582,
+        mime_type: "application/pdf",
+        description: "Versión final",
+        participant: "Ana Pérez",
+        uploaded_at: "2026-10-05T13:00:00Z",
+      },
+      code: "UPLOAD_SUCCESS",
+    });
+    const pdf = new File(["x"], "propuesta.pdf", { type: "application/pdf" });
+
+    const result = await AttachmentService.uploadAttachment("e-1", "u-1", pdf, "Versión final");
+
+    const [url, options] = mockedApiRequest.mock.calls[0];
+    expect(url).toBe("/api/v1/events/e-1/participant/u-1/attachment");
+    expect(options?.method).toBe("POST");
+    const body = options?.body as FormData;
+    expect(body.get("file")).toBe(pdf);
+    expect(body.get("description")).toBe("Versión final");
+    expect(result).toEqual({
+      id: "a-7",
+      event_id: "e-1",
+      participant_id: "u-1",
+      original_name: "propuesta.pdf",
+      file_size: 2516582,
+      mime_type: "application/pdf",
+      description: "Versión final",
+      uploaded_at: "2026-10-05T13:00:00Z",
+      stored_name: "",
+    });
+  });
+
+  it("TS-16 getParticipants devuelve solo participantes con su fecha de inscripción", async () => {
+    mockedApiRequest.mockResolvedValueOnce({
+      data: {
+        event: { id: "e-1", name: "Concurso de afiches", stage: "participation" },
+        participants: [
+          { id: "u-9", name: "Org", email: "o@x.com", role: "creator", created_at: "2026-10-01T10:00:00Z" },
+          { id: "u-2", name: "Bruno Ríos", email: "b@x.com", role: "participant", created_at: "2026-10-02T10:00:00Z" },
+        ],
+      },
+      count: 2,
+    });
+
+    const result = await EventService.getParticipants("e-1");
+
+    expect(mockedApiRequest).toHaveBeenCalledWith("/api/v1/events/e-1/participants");
+    expect(result).toEqual([
+      { id: "u-2", name: "Bruno Ríos", email: "b@x.com", role: "participant", created_at: "2026-10-02T10:00:00Z" },
+    ]);
+  });
+
+  it("TS-17 la inscripción manda nombre y email sin console.log", async () => {
+    const log = jest.spyOn(console, "log").mockImplementation(() => undefined);
+    mockedApiRequest.mockResolvedValueOnce({ data: {}, code: "PARTICIPANT_REGISTERED" });
+
+    await EventService.registerForEvent("e-1", "Ana Pérez", "ana@example.com");
+
+    const [url, options] = mockedApiRequest.mock.calls[0];
+    expect(url).toBe("/api/v1/events/e-1/register");
+    expect(options?.body).toBe('{"participant_name":"Ana Pérez","participant_email":"ana@example.com"}');
+    expect(log).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it("TS-18 resultados no calculados rechaza con code RESULTS_NOT_CALCULATED", async () => {
+    mockedApiRequest.mockRejectedValueOnce(
+      new ApiError({ status: 404, body: { error: "RESULTS_NOT_CALCULATED", message: "x" } })
+    );
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(DistributedVotingService.getDistributedResults("e-1")).rejects.toMatchObject({
+      status: 404,
+      code: "RESULTS_NOT_CALCULATED",
+    });
+  });
+
+  it("TS-19 no quedan metadatos de compartir en el servicio", () => {
+    const source = fs.readFileSync(path.join(__dirname, "api.ts"), "utf8");
+    expect(source).not.toContain("getShareable" + "EventInfo");
+  });
+});

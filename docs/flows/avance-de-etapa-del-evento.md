@@ -4,7 +4,7 @@ title: Avance de etapa del evento
 type: event
 status: Active
 created: 2026-09-18
-last_updated: 2026-10-04
+last_updated: 2026-10-05
 stories: [S-006, S-009, S-015, S-016]
 ---
 
@@ -13,8 +13,8 @@ stories: [S-006, S-009, S-015, S-016]
 **Tipo:** Evento
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-10-04
-**Stories:** S-006, S-009, S-015, S-016 (cambios planificados por REQ-003)
+**Última actualización:** 2026-10-05
+**Stories:** S-006, S-009, S-015, S-016 (S-015 implementada; el resto, planificado por REQ-003)
 
 ## Descripción
 
@@ -33,7 +33,7 @@ según desde qué pantalla se ejecute.** Está documentada en el Paso 1.
 
 | Paso | Cambio | Story |
 |---|---|---|
-| 1 | Se reemplaza la doble validación de `ManageEventPage`/`EventDetailPage` por un único módulo `web/src/domain/stages.ts`, usado **solo desde la gestión**. Se elimina "todos votaron". `EventDetailPage` deja de avanzar etapas. Cierra D-05 | S-015, S-016 |
+| 1 | La validación de `ManageEventPage` pasa a un único módulo `web/src/domain/stages.ts`. Se elimina "todos votaron". Cierra D-05 (`EventDetailPage` ya dejó de avanzar etapas en S-015) | S-016 |
 | 2 | El modal pasa a `Dialog` + `DateQuickPicker` (atajos 3 días / 1 semana / 2 semanas). Para `voting` el diálogo incluye la configuración (`GET /api/v1/events/{event_id}/voting-config/preview`) | S-016 |
 | Acciones | "Posponer deadline" también se valida en el cliente (cierra D-06) | S-016 |
 
@@ -49,7 +49,7 @@ según desde qué pantalla se ejecute.** Está documentada en el Paso 1.
 
 | Servicio | Rol | Tipo de Participación |
 |----------|-----|-----------------------|
-| `web` | Presenta el modal de avance y — según la pantalla — valida precondiciones | Iniciador |
+| `web` | Presenta el modal de avance (solo en la gestión) y valida precondiciones | Iniciador |
 | `api` | Valida la transición, actualiza la etapa, dispara los emails | Procesador |
 | PostgreSQL | Persiste `events.stage` y los deadlines estimados | Almacenamiento |
 | SMTP | Entrega la notificación a los participantes | Notificador |
@@ -64,15 +64,11 @@ sequenceDiagram
     participant DB as PostgreSQL
     participant SMTP as Servidor SMTP
 
-    O->>WEB: click en "Advance to {Stage}"
+    O->>WEB: click en "Advance to {Stage}" (solo en ManageEventPage)
 
-    alt desde ManageEventPage
-        WEB->>WEB: valida participantes > 0
-        WEB->>WEB: valida todos votaron (si voting→results)
-        Note over WEB: si falla, throw → el modal muestra el error
-    else desde EventDetailPage
-        Note over WEB: ⚠️ sin ninguna validación previa (D-05)
-    end
+    WEB->>WEB: valida participantes > 0
+    WEB->>WEB: valida todos votaron (si voting→results)
+    Note over WEB: si falla, throw → el modal muestra el error
 
     WEB-->>O: modal pide estimated_end_date
     O->>WEB: confirma
@@ -113,22 +109,18 @@ ambas pantallas y coinciden con el backend; el resto de las transiciones todaví
 
 El error se lanza con `throw` y lo captura `StageAdvanceModal`, que lo muestra en su propio bloque.
 
-**Desde `EventDetailPage`** — valida el mínimo de 3 para `participation` → `voting` (contra
-`event.participant_ids`) y también re-lanza el error para que lo muestre `StageAdvanceModal`.
-Con 0 participantes el mensaje es `Cannot advance to voting: no participants registered yet.`;
-con 1 o 2, el mismo que en `ManageEventPage`.
-Para el resto de las transiciones sigue sin chequeos previos: el backend responde con 400 y el
-mensaje se propaga al modal.
+**`EventDetailPage` ya no avanza etapas (S-015).** El detalle público no tiene botón de avanzar,
+`StageAdvanceModal` ni `VotingConfigurationPanel`: solo `ManageEventPage` ejecuta este flujo, así que
+la doble validación (D-05) deja de existir por pantalla; falta unificarla en `domain/stages.ts` (S-016).
 
-**Consecuencia real:** un organizador que avance desde la pantalla de detalle puede cerrar la
-votación con evaluaciones pendientes. Quien no completó recibe `Q_i = 0` y **su propia propuesta
-baja `n` posiciones**: un cierre prematuro penaliza a gente que todavía tenía plazo.
+**Consecuencia real (sigue en la gestión):** un organizador puede cerrar la votación con
+evaluaciones pendientes. Quien no completó recibe `Q_i = 0` y **su propia propuesta baja `n`
+posiciones**: un cierre prematuro penaliza a gente que todavía tenía plazo.
 
 > Un comentario en `ManageEventPage.tsx:238-239` indica que se **eliminó deliberadamente** la
 > validación de que todos hubieran subido archivo antes de votar.
 
-**Ref:** `web/src/pages/manage-event/ManageEventPage.tsx:232-252`;
-`web/src/pages/event-detail/EventDetailPage.tsx:284-420`
+**Ref:** `web/src/pages/manage-event/ManageEventPage.tsx:232-252`
 
 ---
 
@@ -255,7 +247,7 @@ cancelarse en cualquier etapa.
 | 4 | Falla el envío de email | — | ⚠️ **Nada.** Falla en silencio |
 
 ⚠️ **`ManageEventPage` no muestra ningún mensaje de éxito** tras avanzar de etapa: el único
-feedback es que los datos se recargan. `EventDetailPage` sí muestra `Stage updated to: {etapa}`.
+feedback es que los datos se recargan.
 
 ## Estado Resultante
 

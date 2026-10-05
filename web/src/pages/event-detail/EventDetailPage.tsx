@@ -1,569 +1,689 @@
-import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { Event, Attachment } from '../../types';
-import { EventService, ApiHealthService, AttachmentService } from '../../services/api';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { loginPathFor } from '../../domain/redirect';
-import Participants from '../../components/participants/Participants';
-import VotingConfigurationPanel from '../../components/voting-configuration-panel/VotingConfigurationPanel';
+import React from 'react';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Button, Callout, Card, FileDropzone, StatusPill, TextField } from '../../components/ui';
+import { ShareIcon } from '../../components/ui/icons/Icons';
+import EventHero from '../../components/events/event-hero/EventHero';
+import StageTimeline from '../../components/events/stage-timeline/StageTimeline';
+import NextStepCard from '../../components/events/next-step-card/NextStepCard';
+import ProgressChecklist from '../../components/events/progress-checklist/ProgressChecklist';
+import ShareDialog from '../../components/events/share-dialog/ShareDialog';
+import ParticipantsDialog from '../../components/events/participants-dialog/ParticipantsDialog';
+import EventResults from '../../components/voting/event-results/EventResults';
 import RankingVotePanel from '../../components/ranking-vote-panel/RankingVotePanel';
-import VotingResultsPanel from '../../components/voting-results-panel/VotingResultsPanel';
+import NotFoundPage from '../not-found/NotFoundPage';
+import { useAuth } from '../../context/AuthContext';
+import { ApiError, getErrorCode } from '../../config/api';
+import {
+  COMMENT_MAX,
+  SUCCESS_NOTICE_MS,
+  afterKey,
+  capacityOf,
+  detailPill,
+  isRegistered,
+  nextStepState,
+  progressSteps,
+} from '../../domain/eventDetail';
+import type { AssignmentStatus, NextStepState } from '../../domain/eventDetail';
+import { currentDeadline } from '../../domain/events';
+import type { FileRejection } from '../../domain/files';
+import { loginPathFor } from '../../domain/redirect';
+import { STAGE_ORDER, stageNameKey } from '../../domain/stages';
+import { scopedMessageKeyForError, useT } from '../../i18n';
+import type { TranslationKey } from '../../i18n';
+import {
+  AttachmentService,
+  DistributedVotingService,
+  EventService,
+} from '../../services/api';
+import type { AnonymousAssignment, Attachment, Event, EventStage, VotingResults } from '../../types';
+import '../../components/ui/visually-hidden.css';
 import './EventDetailPage.css';
-import ShareButton from '../../components/ShareButton';
-import Modal from '../../components/modal/Modal';
-import EventTimeline from '../../components/event-timeline/EventTimeline';
-import StageAdvanceModal from '../../components/stage-advance-modal/StageAdvanceModal';
-import '../../components/stage-advance-modal/StageAdvanceModal.css';
-import '../../components/link-button/styles.css';
 
-interface EventDetailPageProps {
-  eventId: string;
-  onBack: () => void;
-}
+const REGISTER_ERROR_CODES = [
+  'MAX_PARTICIPANTS_REACHED',
+  'EVENT_PAUSED',
+  'INVALID_REGISTRATION_STAGE',
+  'ALREADY_REGISTERED',
+] as const;
 
-const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBack }) => {
-  const { user, isAuthenticated, joinEvent } = useAuth();
+const UPLOAD_ERROR_CODES = [
+  'FILE_TOO_LARGE',
+  'INVALID_FILE_TYPE',
+  'EVENT_PAUSED',
+  'INVALID_EVENT_STAGE',
+  'DUPLICATE_ATTACHMENT',
+  'DESCRIPTION_TOO_LONG',
+] as const;
+
+const NOT_FOUND_CODES = ['EVENT_NOT_FOUND', 'INVALID_EVENT_ID', 'MISSING_EVENT_ID'];
+
+const REJECTION_KEYS: Record<FileRejection, TranslationKey> = {
+  too_large: 'eventDetail.upload.tooLarge',
+  invalid_type: 'eventDetail.upload.invalidType',
+  multiple: 'eventDetail.upload.multiple',
+};
+
+type LoadStatus = 'loading' | 'ready' | 'notFound' | 'error';
+
+const EventDetailPage: React.FC = () => {
+  const { t, locale, fmt } = useT();
+  const { eventId } = useParams<{ eventId: string }>();
+  const { user, loading: authLoading, joinEvent } = useAuth();
   const navigate = useNavigate();
+  const userId = user?.id ?? null;
 
-  const [event, setEvent] = useState<Event | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>('');
-  const [success, setSuccess] = useState<string>('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [attachmentDescription, setAttachmentDescription] = useState<string>('');
-  const [uploadLoading, setUploadLoading] = useState<boolean>(false);
-  const [showUploadConfirm, setShowUploadConfirm] = useState<boolean>(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isUserRegistered, setIsUserRegistered] = useState<boolean>(false);
-  const [showParticipants, setShowParticipants] = useState<boolean>(false);
-  const [currentStage, setCurrentStage] = useState<Event['stage'] | null>(null);
-  const [stageLoading, setStageLoading] = useState<boolean>(false);
-  const [votingConfigured, setVotingConfigured] = useState<boolean>(false);
-  const [userHasSubmittedFile, setUserHasSubmittedFile] = useState<boolean>(false);
-  const [userAttachment, setUserAttachment] = useState<Attachment | null>(null);
-  const [downloadError, setDownloadError] = useState<string>('');
-  const [replaceLoading, setReplaceLoading] = useState<boolean>(false);
-  const [replaceError, setReplaceError] = useState<string>('');
-  const [showReplaceConfirm, setShowReplaceConfirm] = useState<boolean>(false);
-  const [showStageModal, setShowStageModal] = useState<boolean>(false);
+  const [loadStatus, setLoadStatus] = React.useState<LoadStatus>('loading');
+  const [event, setEvent] = React.useState<Event | null>(null);
+  const [myAttachment, setMyAttachment] = React.useState<Attachment | null>(null);
+  const [assignment, setAssignment] = React.useState<AnonymousAssignment | null | undefined>(undefined);
+  const [assignmentFailed, setAssignmentFailed] = React.useState(false);
+  const [results, setResults] = React.useState<VotingResults | null>(null);
+  const [openEvents, setOpenEvents] = React.useState(0);
+  const [shareOpen, setShareOpen] = React.useState(false);
+  const [participantsOpen, setParticipantsOpen] = React.useState(false);
 
-  useEffect(() => {
-    fetchEventDetails();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventId]);
+  // Acciones del bloque "Tu próximo paso".
+  const [registering, setRegistering] = React.useState(false);
+  const [sending, setSending] = React.useState(false);
+  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+  const [comment, setComment] = React.useState('');
+  const [replacing, setReplacing] = React.useState(false);
+  const [fileError, setFileError] = React.useState<TranslationKey | null>(null);
+  const [actionError, setActionError] = React.useState<TranslationKey | null>(null);
+  const [notice, setNotice] = React.useState(false);
 
-  useEffect(() => {
-    if (user && event) {
-      const inJoinedEvents = user.joinedEventIDs.includes(event.id);
-      const inParticipantList = event.participant_ids?.includes(user.id) || false;
-      setIsUserRegistered(inJoinedEvents || inParticipantList);
+  const requestRef = React.useRef(0);
+  const noticeTimer = React.useRef<number | undefined>(undefined);
+
+  const clearNotice = React.useCallback((): void => {
+    if (noticeTimer.current !== undefined) {
+      window.clearTimeout(noticeTimer.current);
+      noticeTimer.current = undefined;
     }
-  }, [user, event, joinEvent]);
+    setNotice(false);
+  }, []);
 
-  const fetchEventDetails = async (): Promise<void> => {
-    setLoading(true);
-    setError('');
+  React.useEffect(
+    () => () => {
+      if (noticeTimer.current !== undefined) window.clearTimeout(noticeTimer.current);
+    },
+    []
+  );
 
-    try {
-      const isHealthy = await ApiHealthService.checkHealth();
-      if (!isHealthy) {
-        setError('Unable to connect to the server. Using cached data if available.');
+  // ---------- Carga ----------
+  const loadAll = React.useCallback(
+    async (silent: boolean): Promise<void> => {
+      if (!eventId) {
+        setLoadStatus('notFound');
+        return;
       }
+      const request = ++requestRef.current;
+      if (!silent) setLoadStatus('loading');
+      try {
+        const loaded = await EventService.getEventById(eventId);
+        if (request !== requestRef.current) return;
+        // Un evento en Creación no existe para quien no es su autor (el autor ya fue redirigido).
+        if (!loaded || (loaded.stage === 'creation' && loaded.creator_id !== userId)) {
+          setLoadStatus('notFound');
+          return;
+        }
 
-      const eventData = await EventService.getEventById(eventId);
-
-      if (eventData) {
-        setEvent(eventData);
-        setCurrentStage(eventData.stage);
-        setError('');
-
-        if (user && eventData.stage === 'participation') {
-          try {
-            const attachments = await AttachmentService.getEventAttachments(eventId);
-            const ownAttachment = attachments.find(att => att.participant_id === user.id);
-            setUserHasSubmittedFile(!!ownAttachment);
-            setUserAttachment(ownAttachment || null);
-          } catch {
-            setUserHasSubmittedFile(false);
-            setUserAttachment(null);
+        let attachment: Attachment | null = null;
+        let nextAssignment: AnonymousAssignment | null | undefined;
+        let failedAssignment = false;
+        const mine = userId !== null && loaded.creator_id !== userId && isRegistered(loaded, userId);
+        if (mine && !loaded.is_cancelled) {
+          if (loaded.stage === 'participation') {
+            const attachments = await AttachmentService.getEventAttachments(loaded.id);
+            attachment = attachments.find((a) => a.participant_id === userId) ?? null;
+          } else if (loaded.stage === 'voting') {
+            try {
+              nextAssignment = await DistributedVotingService.getParticipantAssignment(loaded.id, userId!);
+            } catch {
+              failedAssignment = true;
+            }
           }
         }
-      } else {
-        setError(`Event with ID "${eventId}" was not found.`);
+        if (request !== requestRef.current) return;
+        setEvent(loaded);
+        setMyAttachment(attachment);
+        setAssignment(nextAssignment);
+        setAssignmentFailed(failedAssignment);
+        setLoadStatus('ready');
+      } catch (err) {
+        if (request !== requestRef.current) return;
+        const notFound =
+          (err instanceof ApiError && err.status === 404) ||
+          NOT_FOUND_CODES.includes(getErrorCode(err) ?? '');
+        setLoadStatus(notFound ? 'notFound' : 'error');
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(`Failed to load event details: ${errorMessage}.`);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [eventId, userId]
+  );
 
-  const handleStageConfirm = async (targetStage: Event['stage'], estimatedEndDate?: string): Promise<void> => {
-    if (!event) return;
+  React.useEffect(() => {
+    if (authLoading) return;
+    setResults(null);
+    setSelectedFile(null);
+    setComment('');
+    setReplacing(false);
+    setFileError(null);
+    setActionError(null);
+    loadAll(false);
+    return () => {
+      requestRef.current += 1;
+    };
+  }, [authLoading, loadAll]);
 
-    // Same gate as the backend: voting needs at least 3 participants
-    if (targetStage === 'voting' && (event.participant_ids?.length ?? 0) < 3) {
-      const count = event.participant_ids?.length ?? 0;
-      const message = count === 0
-        ? 'Cannot advance to voting: no participants registered yet.'
-        : `Cannot advance to voting: only ${count} participant${count > 1 ? 's' : ''} registered. At least 3 participants are required.`;
-      setError(message);
-      throw new Error(message);
-    }
+  const isResultsStage = event?.stage === 'results';
+  React.useEffect(() => {
+    if (!isResultsStage) return;
+    let cancelled = false;
+    EventService.listEvents({ stage: 'participation', limit: 1 })
+      .then((page) => {
+        if (!cancelled) setOpenEvents(page.stageCounts.participation);
+      })
+      .catch(() => {
+        if (!cancelled) setOpenEvents(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isResultsStage]);
 
-    setStageLoading(true);
-    setError('');
-    try {
-      await EventService.updateEventStage(event.id, targetStage, estimatedEndDate);
-      setCurrentStage(targetStage);
-      setSuccess(`Stage updated to: ${getStageDisplayName(targetStage)}`);
-      setShowStageModal(false);
-      await fetchEventDetails();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Error updating event stage';
-      setError(message);
-      // Rethrow so the stage modal shows the rejection reason to the organizer
-      throw new Error(message);
-    } finally {
-      setStageLoading(false);
-    }
-  };
-
-  const getNextStage = (stage: Event['stage']): Event['stage'] | null => {
-    const order: Event['stage'][] = ['creation', 'participation', 'voting', 'results'];
-    const idx = order.indexOf(stage);
-    return idx < order.length - 1 ? order[idx + 1] : null;
-  };
-
+  // ---------- Acciones ----------
   const handleRegister = async (): Promise<void> => {
-    if (!isAuthenticated || !user || !event) return;
-    setLoading(true);
-    setError('');
-    setSuccess('');
+    if (!event) return;
+    if (!user) {
+      navigate(loginPathFor(`/events/${event.id}`));
+      return;
+    }
+    clearNotice();
+    setActionError(null);
+    setRegistering(true);
     try {
       await EventService.registerForEvent(event.id, user.name, user.email);
-      setIsUserRegistered(true);
-      if (joinEvent) joinEvent(event.id);
-      await fetchEventDetails();
-    } catch {
-      setError('Failed to register for the event. Please try again.');
+      joinEvent(event.id);
+      await loadAll(true);
+    } catch (err) {
+      setActionError(scopedMessageKeyForError(err, REGISTER_ERROR_CODES, 'eventDetail.errors.register'));
+      const code = getErrorCode(err);
+      if (code === 'ALREADY_REGISTERED' || code === 'MAX_PARTICIPANTS_REACHED') {
+        await loadAll(true);
+      }
     } finally {
-      setLoading(false);
+      setRegistering(false);
     }
   };
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>): void => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) { setError('File cannot exceed 10MB'); return; }
-    const allowed = ['image/jpeg','image/png','image/gif','image/webp','application/pdf','text/plain','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!allowed.includes(file.type)) { setError('File type not allowed. Use: JPEG, PNG, GIF, WebP, PDF, TXT, DOC, DOCX'); return; }
+  const handleSelect = (file: File): void => {
     setSelectedFile(file);
-    setError('');
+    setFileError(null);
+    setActionError(null);
   };
 
-  const handleDownloadAttachment = async (): Promise<void> => {
-    if (!userAttachment) return;
-    setDownloadError('');
-    try {
-      await AttachmentService.downloadAttachment(userAttachment.id, userAttachment.original_name);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setDownloadError(`Failed to download your file: ${errorMessage}.`);
-    }
+  const handleReject = (reason: FileRejection): void => {
+    setFileError(REJECTION_KEYS[reason]);
   };
 
-  const handleReplaceFile = async (): Promise<void> => {
-    if (!userAttachment) return;
-    setShowReplaceConfirm(false);
-    setReplaceError('');
-    setReplaceLoading(true);
-    try {
-      await AttachmentService.deleteAttachment(userAttachment.id);
-      setUserHasSubmittedFile(false);
-      setUserAttachment(null);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setReplaceError(`Failed to remove your file: ${errorMessage}.`);
-    } finally {
-      setReplaceLoading(false);
-    }
-  };
-
-  const handleClearFile = (): void => {
+  const handleClear = (): void => {
     setSelectedFile(null);
-    setAttachmentDescription('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    setFileError(null);
   };
 
-  const handleUploadAttachment = async (): Promise<void> => {
-    setShowUploadConfirm(false);
-    if (!selectedFile || !event || !user) return;
-    setUploadLoading(true);
-    setError('');
-    setSuccess('');
+  const handleReplace = (): void => {
+    setReplacing(true);
+    setComment(myAttachment?.description ?? '');
+    setActionError(null);
+    clearNotice();
+  };
+
+  const handleSend = async (): Promise<void> => {
+    if (!event || !user || !selectedFile || sending) return;
+    clearNotice();
+    setActionError(null);
+    setSending(true);
+    let deletedPrevious = false;
     try {
-      await AttachmentService.uploadAttachment(event.id, user.id, selectedFile, attachmentDescription.trim());
-      setSuccess('File uploaded successfully!');
+      // La api admite una sola propuesta por participante: reemplazar es borrar y volver a subir.
+      if (myAttachment) {
+        try {
+          await AttachmentService.deleteAttachment(myAttachment.id);
+          deletedPrevious = true;
+        } catch (err) {
+          setActionError(scopedMessageKeyForError(err, [], 'eventDetail.errors.replace'));
+          return;
+        }
+      }
+      const uploaded = await AttachmentService.uploadAttachment(
+        event.id,
+        user.id,
+        selectedFile,
+        comment.trim()
+      );
+      setMyAttachment(uploaded);
       setSelectedFile(null);
-      setAttachmentDescription('');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      await fetchEventDetails();
-    } catch (err: any) {
-      setError(`Upload failed: ${err?.message || 'Please try again.'}`);
+      setComment('');
+      setReplacing(false);
+      setNotice(true);
+      noticeTimer.current = window.setTimeout(() => {
+        noticeTimer.current = undefined;
+        setNotice(false);
+      }, SUCCESS_NOTICE_MS);
+    } catch (err) {
+      if (deletedPrevious) {
+        // Sin propuesta vigente: se vuelve a "Sube tu propuesta" con lo elegido conservado.
+        setMyAttachment(null);
+        setReplacing(false);
+      }
+      setActionError(scopedMessageKeyForError(err, UPLOAD_ERROR_CODES, 'eventDetail.errors.upload'));
     } finally {
-      setUploadLoading(false);
+      setSending(false);
     }
   };
 
-  const getStageDisplayName = (stage: Event['stage']): string => ({
-    creation: 'Creation',
-    participation: 'Participation',
-    voting: 'Voting',
-    results: 'Results',
-  }[stage] ?? stage);
-
-
-
-  // ── Loading / error states ────────────────────────────────────────────────
-
-  if (loading) {
+  // ---------- Render ----------
+  if (loadStatus === 'loading') {
     return (
-      <div className="event-detail-page">
-        <div className="event-detail-container">
-          <div className="loading-state">
-            <div className="loading-spinner"></div>
-            <h2>Loading event details...</h2>
-          </div>
+      <div className="edp-page">
+        <p role="status" className="ui-visually-hidden">
+          {t('eventDetail.loading')}
+        </p>
+        <div className="edp-skeleton edp-skeleton--hero" aria-hidden="true" />
+        <div className="edp-container">
+          <div className="edp-skeleton edp-skeleton--block" aria-hidden="true" />
+          <div className="edp-skeleton edp-skeleton--block" aria-hidden="true" />
         </div>
       </div>
     );
   }
 
-  if (!event) {
+  if (loadStatus === 'notFound') return <NotFoundPage />;
+
+  if (loadStatus === 'error' || !event) {
     return (
-      <div className="event-detail-page">
-        <div className="event-detail-container">
-          <button onClick={onBack} className="btn btn-secondary btn-sm" style={{ marginBottom: '20px' }}>← Back to Events</button>
-          <div className="alert alert-danger">
-            <h3 style={{ marginTop: 0 }}>⚠️ Unable to Load Event</h3>
-            <p style={{ marginBottom: '20px' }}>{error || 'Event not found'}</p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={onBack} className="btn btn-secondary">← Back to Events List</button>
-              <button onClick={fetchEventDetails} className="btn btn-primary">🔄 Try Again</button>
-            </div>
-          </div>
+      <div className="edp-page">
+        <div className="edp-container edp-load-error">
+          <Callout tone="error" action={{ label: t('common.retry'), onClick: () => loadAll(false) }}>
+            {t('eventDetail.loadError')}
+          </Callout>
+          <Link to="/events" className="edp-load-error__link">
+            {t('eventDetail.goToEvents')}
+          </Link>
         </div>
       </div>
     );
   }
 
-  if (!currentStage) return null;
+  if (userId && event.creator_id === userId) {
+    return <Navigate to={`/events/${event.id}/manage`} replace />;
+  }
 
-  // ── Derived permissions ───────────────────────────────────────────────────
+  const assignmentStatus: AssignmentStatus =
+    assignment === undefined ? null : assignment === null ? 'none' : assignment.is_completed ? 'completed' : 'pending';
+  const state: NextStepState = nextStepState(event, userId, myAttachment, assignmentStatus);
+  const pill = detailPill(state, event);
+  const deadline = currentDeadline({
+    stage: event.stage,
+    participation_estimated_end_date: event.participation_estimated_end_date ?? null,
+    voting_estimated_end_date: event.voting_estimated_end_date ?? null,
+  });
+  const deadlineText = deadline ? fmt.date(deadline) : null;
+  const participantCount = event.participant_ids?.length ?? 0;
+  const capacity = capacityOf(event);
+  const meta = [
+    t('eventDetail.meta', { organizer: event.organizer ?? '', count: participantCount, max: capacity }),
+    isResultsStage && results ? t('eventDetail.metaFinished', { date: fmt.date(results.calculated_at.slice(0, 10)) }) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
-  const isEventCreator = user?.id === event.creator_id;
-  const isEventPaused  = event.is_paused === true;
-  const isOrganizer    = isEventCreator || user?.role === 'admin';
-  const nextStage      = getNextStage(currentStage);
-  const canUploadAttachment = currentStage === 'participation' && isAuthenticated && isUserRegistered && !userHasSubmittedFile && !isEventCreator && !isEventPaused;
+  const stageLabels = Object.fromEntries(
+    STAGE_ORDER.map((s) => [s, t(stageNameKey(s))])
+  ) as Record<EventStage, string>;
+  const subtitles = Object.fromEntries(
+    STAGE_ORDER.map((s) => [
+      s,
+      s === event.stage && deadlineText
+        ? t('eventDetail.timeline.closes', { date: deadlineText })
+        : t(`eventDetail.timeline.${s}` as TranslationKey),
+    ])
+  ) as Record<EventStage, string>;
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  const steps = progressSteps(state, event);
+  const after = afterKey(state, event.stage);
+  const canViewParticipants = userId !== null;
 
-  return (
-    <div className="event-detail-page">
-      <div className="event-detail-container">
+  const uploadText = (kind: 'upload' | 'submitted'): string =>
+    deadlineText
+      ? t(`eventDetail.nextStep.${kind}.text` as TranslationKey, { date: deadlineText })
+      : t(`eventDetail.nextStep.${kind}.textNoDate` as TranslationKey);
 
-        {/* ── Navegación ────────────────────────────────────────────────── */}
-        <nav className="edp-nav">
-          <button onClick={onBack} className="btn btn-secondary btn-sm back-button">← Back to Events</button>
-        </nav>
-
-        {/* ── Bloque 1: Presentación ─────────────────────────────────────── */}
-        <section className="edp-presentation">
-          <div className="edp-presentation-body">
-            <div className="edp-title-row">
-              <h1>{event.title}</h1>
-              <ShareButton eventId={event.id} eventTitle={event.title} />
-            </div>
-            <p className="event-subtitle">{event.description}</p>
-
-            <div className="edp-meta-row">
-              <div className="edp-meta-item">
-                <span className="edp-meta-icon">👤</span>
-                <span>{event.organizer || 'Not specified'}</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {showParticipants && (
-          <Participants eventId={event.id} eventTitle={event.title} onClose={() => setShowParticipants(false)} />
-        )}
-
-        {/* ── Bloque 2: Estado del evento ────────────────────────────────── */}
-        <section className="edp-status">
-          <EventTimeline
-            currentStage={currentStage}
-            participantCount={event.participant_ids?.length ?? 0}
-            maxParticipants={event.max_participants || 20}
-            onViewParticipants={(event.participant_ids?.length ?? 0) > 0
-              ? () => setShowParticipants(v => !v)
-              : undefined}
-            participantsActionLabel={showParticipants ? 'Hide participants' : 'View participants'}
-            deadlines={{
-              participation: event.participation_estimated_end_date,
-              voting: event.voting_estimated_end_date,
-            }}
-          />
-
-          {isEventPaused && (
-            <div className="edp-paused-notice">
-              <span>⏸</span>
-              <span>This event is currently paused</span>
-            </div>
-          )}
-        </section>
-
-        {/* ── Mensajes de feedback ────────────────────────────────────────── */}
-        {success && <div className="alert alert-success"><p>{success}</p></div>}
-        {error   && <div className="alert alert-danger"><p>{error}</p></div>}
-
-        {/* ── Bloque 3: Acción de la etapa ───────────────────────────────── */}
-        <section className="edp-action">
-
-          {/* Organizer: advance stage */}
-          {isOrganizer && nextStage && (
-            <div className="edp-action-advance">
-              <button
-                className="stage-advance-btn"
-                onClick={() => setShowStageModal(true)}
-                disabled={stageLoading}
-              >
-                {stageLoading ? '⏳ Updating...' : `▶️ Advance to ${getStageDisplayName(nextStage)}`}
-              </button>
-            </div>
-          )}
-
-          {/* Creation stage — event not open yet */}
-          {currentStage === 'creation' && !isOrganizer && (
-            <div className="edp-action-empty">
-              <span className="edp-action-empty-icon">🔭</span>
-              <p>This event is being set up. Come back when it opens for participation.</p>
-            </div>
-          )}
-
-          {/* Participation stage */}
-          {currentStage === 'participation' && !isEventCreator && !isEventPaused && (
-            <div className="participation-section">
-              {!isUserRegistered ? (
-                <div className="register-section">
-                  <h3>📝 Event Participation</h3>
-                  <p>Register to participate and upload your file.</p>
-                  <button
-                    className="primary-btn"
-                    onClick={() => isAuthenticated ? handleRegister() : navigate(loginPathFor(`/events/${eventId}`))}
-                    disabled={loading}
-                  >
-                    {loading ? 'Registering...' : 'Participate'}
-                  </button>
-                </div>
-              ) : (
-                <div className="upload-section">
-
-                  {userHasSubmittedFile ? (
-                    <div className="edp-submitted-state">
-                      <span className="edp-submitted-icon">✅</span>
-                      <div>
-                        <p className="edp-submitted-title">Submission received</p>
-                        <p className="edp-submitted-sub">You can replace it until voting starts.</p>
-                        {userAttachment && (
-                          <button
-                            type="button"
-                            className="link-button-component-button"
-                            onClick={handleDownloadAttachment}
-                            title={`Download ${userAttachment.original_name}`}
-                          >
-                            {userAttachment.original_name}
-                          </button>
-                        )}
-                        {userAttachment?.description && (
-                          <p className="edp-submitted-description">{userAttachment.description}</p>
-                        )}
-                        {downloadError && (
-                          <p className="edp-download-error" role="alert">{downloadError}</p>
-                        )}
-                        <div className="edp-submitted-actions">
-                          <button
-                            type="button"
-                            className="secondary-btn"
-                            onClick={() => setShowReplaceConfirm(true)}
-                            disabled={replaceLoading}
-                          >
-                            {replaceLoading ? 'Removing...' : 'Replace file'}
-                          </button>
-                        </div>
-                        {replaceError && (
-                          <p className="edp-download-error" role="alert">{replaceError}</p>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="edp-upload-form">
-                      <div className="edp-upload-header">
-                        <span className="edp-upload-badge">✅ Registered</span>
-                        <p>Upload your submission for this event.</p>
-                      </div>
-
-                      <div className="file-upload">
-                        <input
-                          ref={fileInputRef}
-                          id="attachment-file"
-                          type="file"
-                          onChange={handleFileChange}
-                          disabled={uploadLoading || !canUploadAttachment}
-                          accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.doc,.docx"
-                        />
-                        {selectedFile && (
-                          <div className="file-preview">
-                            <div className="file-preview-info">
-                              <div className="file-preview-details">
-                                <p className="file-preview-name">{selectedFile.name}</p>
-                                <p className="file-preview-size">{(selectedFile.size / 1024).toFixed(2)} KB</p>
-                              </div>
-                            </div>
-                            <button className="file-clear-btn" onClick={handleClearFile} title="Remove selected file">×</button>
-                          </div>
-                        )}
-                        {selectedFile && (
-                          <div className="form-group">
-                            <label className="form-label" htmlFor="attachment-description">
-                              Comment <span className="optional-label">(optional)</span>
-                            </label>
-                            <textarea
-                              id="attachment-description"
-                              className="form-textarea"
-                              value={attachmentDescription}
-                              onChange={(e) => setAttachmentDescription(e.target.value)}
-                              placeholder="Add any context, notes, or comments about your submission..."
-                              maxLength={1000}
-                              rows={4}
-                              disabled={uploadLoading || !canUploadAttachment}
-                            />
-                          </div>
-                        )}
-                        <button
-                          className="primary-btn"
-                          onClick={() => setShowUploadConfirm(true)}
-                          disabled={uploadLoading || !selectedFile || !canUploadAttachment}
-                        >
-                          {uploadLoading ? 'Uploading...' : 'Upload File'}
-                        </button>
-                      </div>
-
-                      <div className="upload-info">
-                        <p>Accepted: JPEG, PNG, GIF, WebP, PDF, TXT, DOC, DOCX · Max 10 MB</p>
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Paused notice for participants */}
-          {isEventPaused && !isEventCreator && (
-            <div className="alert alert-danger">
-              <p>⏸ Registration and file submissions are not available while the event is paused.</p>
-            </div>
-          )}
-
-          {/* Voting stage — organizer: configure */}
-          {currentStage === 'voting' && isOrganizer && !votingConfigured && (
-            <VotingConfigurationPanel
-              eventId={event.id}
-              totalAttachments={event.attachmentCount || 0}
-              totalParticipants={event.participant_ids?.length || 0}
-              onConfigured={() => {
-                setVotingConfigured(true);
-                setSuccess('✅ Voting configuration completed! Participants can now submit their rankings.');
-              }}
-            />
-          )}
-          {currentStage === 'voting' && isOrganizer && votingConfigured && (
-            <div className="voting-configured-info">
-              <h3>✅ Voting is underway</h3>
-              <p>Reviewers have been assigned their submissions and can now submit their rankings.</p>
-              <p>Once everyone has voted, advance to "Results" to publish the final ranking.</p>
-            </div>
-          )}
-
-          {/* Voting stage — participant: rank */}
-          {currentStage === 'voting' && isUserRegistered && !isOrganizer && (
-            <RankingVotePanel
-              eventId={event.id}
-              participantId={user?.id || ''}
-              onVotesSubmitted={() => setSuccess('✅ Your rankings have been submitted successfully!')}
-            />
-          )}
-
-          {/* Results stage */}
-          {currentStage === 'results' && (
-            <VotingResultsPanel eventId={event.id} />
-          )}
-
-        </section>
-      </div>
-
-      {/* Stage advance modal */}
-      {showStageModal && nextStage && currentStage && (
-        <StageAdvanceModal
-          currentStage={currentStage}
-          nextStage={nextStage}
-          isLoading={stageLoading}
-          onCancel={() => setShowStageModal(false)}
-          onConfirm={(estimatedEndDate) => handleStageConfirm(nextStage, estimatedEndDate)}
+  const fileZone = (): React.ReactNode => (
+    <>
+      <FileDropzone
+        key={myAttachment?.id ?? 'none'}
+        file={selectedFile}
+        submitted={
+          myAttachment
+            ? {
+                name: myAttachment.original_name,
+                size: myAttachment.file_size,
+                date: myAttachment.uploaded_at.slice(0, 10),
+              }
+            : undefined
+        }
+        error={fileError ? t(fileError) : undefined}
+        uploading={sending}
+        locale={locale}
+        labels={{
+          prompt: t('eventDetail.upload.prompt'),
+          promptAction: t('eventDetail.upload.promptAction'),
+          formats: t('eventDetail.upload.formats'),
+          ready: t('eventDetail.upload.ready'),
+          change: t('eventDetail.upload.change'),
+          changeAccessible: t('eventDetail.upload.changeAccessible', { name: '{name}' }),
+          submittedOn: t('eventDetail.upload.submittedOn', { date: '{date}' }),
+          replace: t('eventDetail.upload.replace'),
+        }}
+        onSelect={handleSelect}
+        onReject={handleReject}
+        onClear={handleClear}
+        onReplace={handleReplace}
+      />
+      {selectedFile && (
+        <TextField
+          variant="multiline"
+          label={t('eventDetail.comment.label')}
+          optional
+          optionalLabel={t('eventDetail.comment.optional')}
+          help={t('eventDetail.comment.help')}
+          maxLength={COMMENT_MAX}
+          name="comment"
+          value={comment}
+          disabled={sending}
+          onChange={(e) => setComment(e.target.value)}
         />
       )}
-
-      {/* Upload confirmation modal */}
-      {showUploadConfirm && selectedFile && (
-        <Modal onClose={() => setShowUploadConfirm(false)}>
-          <div className="upload-confirm-modal">
-            <h3>Confirm upload</h3>
-            <p>Are you sure you want to upload this file?</p>
-            <div className="upload-confirm-file">
-              <span className="upload-confirm-filename">{selectedFile.name}</span>
-              <span className="upload-confirm-filesize">{(selectedFile.size / 1024).toFixed(2)} KB</span>
-            </div>
-            {attachmentDescription.trim() && (
-              <p className="upload-confirm-description">{attachmentDescription.trim()}</p>
-            )}
-            <div className="upload-confirm-actions">
-              <button className="secondary-btn" onClick={() => setShowUploadConfirm(false)}>Cancel</button>
-              <button className="primary-btn" onClick={handleUploadAttachment}>Upload</button>
-            </div>
-          </div>
-        </Modal>
+      {(state === 'upload' || replacing) && (
+        <div className="edp-submit">
+          <Button
+            size="lg"
+            disabled={!selectedFile}
+            loading={sending}
+            loadingLabel={t('eventDetail.submitting')}
+            onClick={handleSend}
+          >
+            {myAttachment ? t('eventDetail.submitReplace') : t('eventDetail.submit')}
+          </Button>
+          <p className="edp-submit__help">
+            {selectedFile ? t('eventDetail.submitHelpReady') : t('eventDetail.submitHelpEmpty')}
+          </p>
+        </div>
       )}
+    </>
+  );
 
-      {/* Replace file confirmation modal */}
-      {showReplaceConfirm && userAttachment && (
-        <Modal onClose={() => setShowReplaceConfirm(false)}>
-          <div className="upload-confirm-modal">
-            <h3>Replace your submission?</h3>
-            <p>Your current file will be permanently deleted, and you'll need to upload a new one.</p>
-            <div className="upload-confirm-file">
-              <span className="upload-confirm-filename">{userAttachment.original_name}</span>
+  const feedback = (
+    <>
+      <div role="status" aria-live="polite">
+        {notice && <Callout tone="success">{t('eventDetail.received')}</Callout>}
+      </div>
+      {actionError && <Callout tone="error">{t(actionError)}</Callout>}
+    </>
+  );
+
+  const nextStep = (): React.ReactNode => {
+    const common = { eyebrow: t('eventDetail.nextStep.eyebrow') };
+    switch (state) {
+      case 'default':
+        return (
+          <NextStepCard
+            {...common}
+            title={t('eventDetail.nextStep.default.title')}
+            description={t('eventDetail.nextStep.default.text')}
+            primaryAction={{
+              label: t('eventDetail.register'),
+              onClick: handleRegister,
+              loading: registering,
+              loadingLabel: t('eventDetail.registering'),
+            }}
+          >
+            <ul className="edp-requirements" aria-label={t('eventDetail.requirements.label')}>
+              <li>{t('eventDetail.requirements.formats')}</li>
+              <li>{t('eventDetail.requirements.size')}</li>
+              {deadlineText && <li>{t('eventDetail.requirements.closes', { date: deadlineText })}</li>}
+            </ul>
+            {feedback}
+          </NextStepCard>
+        );
+      case 'upload':
+      case 'submitted':
+        return (
+          <NextStepCard
+            {...common}
+            title={t(`eventDetail.nextStep.${state}.title` as TranslationKey)}
+            description={uploadText(state)}
+          >
+            {fileZone()}
+            {feedback}
+          </NextStepCard>
+        );
+      case 'paused':
+      case 'full':
+      case 'noProposalInVoting':
+        return (
+          <NextStepCard {...common} title={t(`eventDetail.nextStep.${state}.title` as TranslationKey)}>
+            <Callout tone="warning">{t(`eventDetail.nextStep.${state}.text` as TranslationKey)}</Callout>
+            {feedback}
+          </NextStepCard>
+        );
+      case 'vote':
+      case 'rankingSent':
+        return (
+          <NextStepCard
+            {...common}
+            title={
+              assignment
+                ? t(`eventDetail.nextStep.${state}.title` as TranslationKey, {
+                    count: assignment.attachments.length,
+                  })
+                : t('eventDetail.pill.vote')
+            }
+            description={assignment ? t(`eventDetail.nextStep.${state}.text` as TranslationKey) : undefined}
+          >
+            {assignmentFailed && (
+              <Callout tone="error" action={{ label: t('common.retry'), onClick: () => loadAll(true) }}>
+                {t('eventDetail.errors.assignment')}
+              </Callout>
+            )}
+            {assignment && user && (
+              <RankingVotePanel
+                eventId={event.id}
+                participantId={user.id}
+                onVotesSubmitted={() => {
+                  loadAll(true);
+                }}
+              />
+            )}
+          </NextStepCard>
+        );
+      case 'votingNotRegistered':
+      case 'cancelled':
+        return (
+          <NextStepCard
+            {...common}
+            title={t(`eventDetail.nextStep.${state}.title` as TranslationKey)}
+            description={t(`eventDetail.nextStep.${state}.text` as TranslationKey)}
+          />
+        );
+      case 'results':
+        return (
+          <NextStepCard
+            title={t('eventDetail.nextStep.results.title')}
+            description={
+              results
+                ? t('eventDetail.nextStep.results.text', {
+                    participants: t('common.participants', { count: results.total_participants }),
+                    evaluations: t('results.evaluations', { count: results.total_votes }),
+                  })
+                : undefined
+            }
+          >
+            <EventResults eventId={event.id} currentUserId={userId} onLoaded={setResults} />
+          </NextStepCard>
+        );
+    }
+  };
+
+  const detailRows: Array<{ label: string; value: React.ReactNode }> = [
+    { label: t('eventDetail.details.organizer'), value: event.organizer || '—' },
+  ];
+  if (isResultsStage && results) {
+    detailRows.push(
+      { label: t('eventDetail.details.evaluations'), value: fmt.number(results.total_votes) },
+      { label: t('eventDetail.details.finished'), value: fmt.date(results.calculated_at.slice(0, 10)) }
+    );
+  } else if (deadlineText && (event.stage === 'participation' || event.stage === 'voting')) {
+    detailRows.push({
+      label: t('eventDetail.details.closes', { stage: stageLabels[event.stage] }),
+      value: deadlineText,
+    });
+  }
+  detailRows.push({
+    label: t('eventDetail.details.participants'),
+    value: (
+      <span className="edp-details__participants">
+        <span>{t('eventDetail.details.participantsValue', { count: participantCount, max: capacity })}</span>
+        {canViewParticipants && (
+          <Button
+            variant="tertiary"
+            size="sm"
+            aria-label={t('eventDetail.details.viewAccessible')}
+            onClick={() => setParticipantsOpen(true)}
+          >
+            {t('eventDetail.details.view')}
+          </Button>
+        )}
+      </span>
+    ),
+  });
+
+  return (
+    <div className="edp-page">
+      <EventHero
+        back={{ label: t('eventDetail.back'), to: '/events' }}
+        pills={
+          <StatusPill tone={pill.tone}>{t(pill.key, pill.params)}</StatusPill>
+        }
+        title={event.title}
+        meta={meta}
+        actions={
+          <Button variant="onBand" iconStart={<ShareIcon />} onClick={() => setShareOpen(true)}>
+            {t('eventDetail.share')}
+          </Button>
+        }
+      />
+
+      <div className="edp-container">
+        <StageTimeline
+          current={event.stage}
+          stageLabels={stageLabels}
+          subtitles={subtitles}
+          nowLabel={t('events.timeline.now')}
+          completedLabel={t('events.timeline.completed')}
+          pendingLabel={t('events.timeline.pending')}
+          stepOfLabel={t('events.timeline.stepOf', { number: STAGE_ORDER.indexOf(event.stage) + 1 })}
+          summaryDetail={deadlineText ? t('eventDetail.timeline.closes', { date: deadlineText }) : undefined}
+        />
+
+        <div className="edp-body">
+          <div className="edp-main">
+            <div className="edp-item edp-item--next">{nextStep()}</div>
+            <section className="edp-item edp-item--about edp-about">
+              <h2 className="edp-about__title">{t('eventDetail.about')}</h2>
+              <p className="edp-about__text">{event.description}</p>
+            </section>
+          </div>
+
+          <aside className="edp-aside" aria-label={t('eventDetail.details.title')}>
+            {steps && (
+              <div className="edp-item edp-item--progress">
+                <ProgressChecklist
+                  title={t('eventDetail.progress.title')}
+                  doneLabel={t('eventDetail.progress.done')}
+                  steps={steps.map((step) => ({
+                    label: t(step.labelKey),
+                    detail: step.detailKey ? t(step.detailKey, step.params) : undefined,
+                    status: step.status,
+                  }))}
+                />
+              </div>
+            )}
+            {(state === 'vote' || state === 'rankingSent') && (
+              <div className="edp-item edp-item--how">
+                <Callout tone="info" title={t('eventDetail.howVoteCounts.title')}>
+                  {t('eventDetail.howVoteCounts.text')}
+                </Callout>
+              </div>
+            )}
+            <div className="edp-item edp-item--details">
+              <Card title={t('eventDetail.details.title')}>
+                <dl className="edp-details">
+                  {detailRows.map((row) => (
+                    <div key={row.label} className="edp-details__row">
+                      <dt className="edp-details__label">{row.label}</dt>
+                      <dd className="edp-details__value">{row.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </Card>
             </div>
-            <div className="upload-confirm-actions">
-              <button className="secondary-btn" onClick={() => setShowReplaceConfirm(false)}>Cancel</button>
-              <button className="primary-btn" onClick={handleReplaceFile}>Replace</button>
+            {after && (
+              <div className="edp-item edp-item--after">
+                <Callout tone="info" title={t('eventDetail.after.title')}>
+                  {t(after)}
+                </Callout>
+              </div>
+            )}
+          </aside>
+        </div>
+
+        {isResultsStage && openEvents > 0 && (
+          <div className="edp-banner">
+            <Card variant="feature" eyebrow={t('eventDetail.banner.title')} className="edp-banner__card">
+              <p className="edp-banner__text">{t('eventDetail.banner.text', { count: openEvents })}</p>
+              {!user && <p className="edp-banner__text">{t('eventDetail.banner.guest')}</p>}
+            </Card>
+            <div className="edp-banner__actions">
+              <Link to="/events" className="ui-button ui-button--primary ui-button--md ui-button--full">
+                {t('eventDetail.banner.cta')}
+              </Link>
+              {!user && (
+                <Link to="/register" className="ui-button ui-button--secondary ui-button--md ui-button--full">
+                  {t('eventDetail.banner.createAccount')}
+                </Link>
+              )}
             </div>
           </div>
-        </Modal>
+        )}
+      </div>
+
+      <ShareDialog
+        open={shareOpen}
+        eventId={event.id}
+        eventName={event.title}
+        stage={event.stage}
+        onClose={() => setShareOpen(false)}
+      />
+      {canViewParticipants && (
+        <ParticipantsDialog
+          open={participantsOpen}
+          eventId={event.id}
+          count={participantCount}
+          max={capacity}
+          onClose={() => setParticipantsOpen(false)}
+        />
       )}
     </div>
   );

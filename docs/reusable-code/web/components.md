@@ -177,3 +177,105 @@ EditEventDialog({ open: boolean; event: Event; onClose: () => void; onSaved: (ev
   onSaved={(updated) => setEvent((prev) => ({ ...prev, ...updated }))} />
 ```
 
+---
+
+## ShareDialog
+
+**Location:** `src/components/events/share-dialog/ShareDialog.tsx`
+**Description:** Share dialog (O-14) for an event. Builds the link on the client (`${origin}/events/${id}`), shows what whoever opens it will see per stage, copies with "✓ Copiado" for 2 s (a `role="status"` region announces it) and, if the clipboard fails or is missing, shows a warning and selects the link field. Lists WhatsApp, X, LinkedIn, Facebook and Email (`target="_blank"` except Email) and, only when `navigator.share` exists, a mobile-only "Más opciones" button (a user `AbortError` is ignored). Also reused by S-016.
+
+**Signature:**
+```ts
+ShareDialog({ open: boolean; eventId: string; eventName: string; stage: EventStage; onClose: () => void })
+```
+
+**Usage:**
+```tsx
+<ShareDialog open={shareOpen} eventId={event.id} eventName={event.title} stage={event.stage}
+  onClose={() => setShareOpen(false)} />
+```
+
+---
+
+## ParticipantsTable
+
+**Location:** `src/components/events/participants-table/ParticipantsTable.tsx`
+**Description:** Public variant of the participants table: columns name and registration date (`created_at` formatted with the locale), on `DataTable` with a visually hidden caption and 4 skeleton rows while loading. Never renders the email.
+
+**Signature:**
+```ts
+ParticipantsTable({ rows: EventParticipant[]; caption: string; loading?: boolean })
+```
+
+**Usage:**
+```tsx
+<ParticipantsTable rows={participants} caption={t('participants.title', { count, max })} />
+```
+
+---
+
+## ParticipantsDialog
+
+**Location:** `src/components/events/participants-dialog/ParticipantsDialog.tsx`
+**Description:** Participants dialog (O-08). Every time it opens it calls `EventService.getParticipants(eventId)` and shows a skeleton table with a status message, an empty state, an error callout with "Reintentar", or the table. Footer has a "Cerrar" button.
+
+**Signature:**
+```ts
+ParticipantsDialog({ open: boolean; eventId: string; count: number; max: number; onClose: () => void })
+```
+
+**Usage:**
+```tsx
+<ParticipantsDialog open={open} eventId={event.id} count={ids.length} max={capacityOf(event)} onClose={close} />
+```
+
+---
+
+## Podium
+
+**Location:** `src/components/voting/podium/Podium.tsx`
+**Description:** Ordered list `aria-label="Podio"` with one card per place ("Puesto N", participant or "—", file name, "{score} pts" on the 0-10 scale). The current user's item gets a "Tú" pill and the class `vt-podium__item--you`. Three columns from 768px, stacked on mobile.
+
+**Signature:**
+```ts
+Podium({ entries: AttachmentResult[]; currentUserId: string | null })
+```
+
+**Usage:**
+```tsx
+<Podium entries={splitResults(results.adjusted_ranking).podium} currentUserId={user?.id ?? null} />
+```
+
+---
+
+## RankingList
+
+**Location:** `src/components/voting/ranking-list/RankingList.tsx`
+**Description:** "Ranking completo" table (position, participant, proposal, score) on `DataTable`, stacked with labels on mobile. The current user's row is highlighted and marked "Tú".
+
+**Signature:**
+```ts
+RankingList({ entries: AttachmentResult[]; currentUserId: string | null })
+```
+
+**Usage:**
+```tsx
+<RankingList entries={splitResults(results.adjusted_ranking).rest} currentUserId={user?.id ?? null} />
+```
+
+---
+
+## EventResults
+
+**Location:** `src/components/voting/event-results/EventResults.tsx`
+**Description:** Public results block. Loads `GET /distributed-results`; renders `Podium`, `RankingList` (only if there is a 4th place) and the score note. `RESULTS_NOT_CALCULATED` or an empty `adjusted_ranking` show "Los resultados todavía no están disponibles." (not an error); other failures show an error callout with "Reintentar". It never calls the recalculate endpoint. Used by the event detail and, until S-016, by the management page.
+
+**Signature:**
+```ts
+EventResults({ eventId: string; currentUserId: string | null; onLoaded?: (results: VotingResults) => void })
+```
+
+**Usage:**
+```tsx
+<EventResults eventId={event.id} currentUserId={user?.id ?? null} onLoaded={setResults} />
+```

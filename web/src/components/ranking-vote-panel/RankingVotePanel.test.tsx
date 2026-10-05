@@ -94,6 +94,14 @@ describe('RankingVotePanel', () => {
     expect(getEventAttachments).not.toHaveBeenCalled();
   });
 
+  it('no afirma que el voto pese más (TS-25)', async () => {
+    renderPanel();
+    await screen.findByText('Propuesta 1');
+
+    expect(screen.queryByText(/carries weight/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/more influence/i)).not.toBeInTheDocument();
+  });
+
   it('no muestra datos de autoría (TS-12)', async () => {
     renderPanel();
     await screen.findByText('Propuesta 1');

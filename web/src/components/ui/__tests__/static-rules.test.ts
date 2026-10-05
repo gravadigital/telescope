@@ -6,7 +6,8 @@ const ROOTS = [
   path.join(COMPONENTS, 'ui'),
   path.join(COMPONENTS, 'layout'),
   path.join(COMPONENTS, 'auth'),
-  ...['event-hero', 'stage-timeline', 'next-step-card', 'progress-checklist', 'pending-card', 'events-table', 'event-preview', 'edit-event-dialog'].map((d) =>
+  path.join(COMPONENTS, 'voting'),
+  ...['event-hero', 'stage-timeline', 'next-step-card', 'progress-checklist', 'pending-card', 'events-table', 'event-preview', 'edit-event-dialog', 'share-dialog', 'participants-table', 'participants-dialog'].map((d) =>
     path.join(COMPONENTS, 'events', d)
   ),
 ];
@@ -71,7 +72,7 @@ describe('reglas estáticas de componentes nuevos', () => {
       const selectors = css.replace(/\{[^}]*\}/g, '{}').replace(/@media[^{]*\{/g, '');
       let m: RegExpExecArray | null;
       while ((m = re.exec(selectors)) !== null) {
-        if (!/^(ui|ev|ly|au)-/.test(m[1])) offenders.push(`${rel(f)}: .${m[1]}`);
+        if (!/^(ui|ev|ly|au|vt)-/.test(m[1])) offenders.push(`${rel(f)}: .${m[1]}`);
       }
     });
     expect(offenders).toEqual([]);

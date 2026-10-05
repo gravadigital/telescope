@@ -4,7 +4,7 @@ This document lists the reusable code documented so far for this service (increm
 
 ## Components
 
-**Total: 30**
+**Total: 36**
 
 - **Button** (`src/components/ui/button/Button.tsx`) - Variants primary / secondary / tertiary / onBand / icon, sizes sm / md / lg, loading state; `icon` requires `aria-label`
 - **TextField** (`src/components/ui/text-field/TextField.tsx`) - Text, multiline with counter and search variants; label, help, error, password toggle
@@ -19,7 +19,7 @@ This document lists the reusable code documented so far for this service (increm
 - **ProgressBar** (`src/components/ui/progress-bar/ProgressBar.tsx`) - `role="progressbar"` with tone and size
 - **NumberStepper** (`src/components/ui/number-stepper/NumberStepper.tsx`) - Bounded integer with − / +, recommended mark and range error
 - **DateQuickPicker** (`src/components/ui/date-quick-picker/DateQuickPicker.tsx`) - Date with duration presets (from today or postpone) and native calendar
-- **FileDropzone** (`src/components/ui/file-dropzone/FileDropzone.tsx`) - File picker / drop zone validated with `domain/files`, includes the FileChip
+- **FileDropzone** (`src/components/ui/file-dropzone/FileDropzone.tsx`) - File picker / drop zone validated with `domain/files`, includes the FileChip; `onReplace` tells the page a replacement started and `submitted` resets it
 - **Menu** (`src/components/ui/menu/Menu.tsx`) - Dropdown menu (actions / select) with roving focus
 - **AppHeader / AppLayout** (`src/components/layout/app-header/AppHeader.tsx`, `src/components/layout/app-layout/AppLayout.tsx`) - Global band (logo, links, notifications slot, language and user menus) and layout route with header, `<main>` and footer
 - **UserMenu / LanguageSelect** (`src/components/layout/user-menu/UserMenu.tsx`, `src/components/layout/language-select/LanguageSelect.tsx`) - User menu with avatar initials and language radio items; ES / EN selector for visitors
@@ -27,13 +27,19 @@ This document lists the reusable code documented so far for this service (increm
 - **AuthLayout / RedirectIfAuthenticated** (`src/components/layout/auth-layout/AuthLayout.tsx`, `src/components/layout/redirect-if-authenticated/RedirectIfAuthenticated.tsx`) - Split brand / form layout for the auth pages (no global chrome) and the inverse guard that sends signed-in users to `next`
 - **GoogleButton** (`src/components/auth/google-button/GoogleButton.tsx`) - "Continue with Google" button (implicit flow) with label by prop
 - **EventHero** (`src/components/events/event-hero/EventHero.tsx`) - Dark band with back link, pills, title, meta and actions
-- **StageTimeline** (`src/components/events/stage-timeline/StageTimeline.tsx`) - Four-stage timeline (full / compact) with editable deadline
+- **StageTimeline** (`src/components/events/stage-timeline/StageTimeline.tsx`) - Four-stage timeline (full / compact) with editable deadline; `summaryDetail` adds the deadline to the mobile summary
 - **NextStepCard** (`src/components/events/next-step-card/NextStepCard.tsx`) - Raised card for the next step with checklist, consequence and actions
 - **ProgressChecklist** (`src/components/events/progress-checklist/ProgressChecklist.tsx`) - Numbered participant progress
 - **PendingCard** (`src/components/events/pending-card/PendingCard.tsx`) - Card for one pending task (upload / vote / results) with event, deadline or position and a single action link
 - **EventsTable** (`src/components/events/events-table/EventsTable.tsx`) - Event table on `DataTable` with variants `public` / `organizer` / `participant`; stage pill, capacity bar and one resolved action per row
 - **EventPreview** (`src/components/events/event-preview/EventPreview.tsx`) - Decorative `aria-hidden` card previewing how an event will look in the list (pill, name, description, organizer, 0 / capacity)
 - **EditEventDialog** (`src/components/events/edit-event-dialog/EditEventDialog.tsx`) - Edit name / description / organizer / capacity via PATCH; only changed fields, capacity minimum = registered, inline discard confirmation
+- **ShareDialog** (`src/components/events/share-dialog/ShareDialog.tsx`) - Share dialog (O-14): link built on the client, "Copiar" with 2 s "✓ Copiado" and failure notice, five networks, native "Más opciones" when `navigator.share` exists
+- **ParticipantsTable** (`src/components/events/participants-table/ParticipantsTable.tsx`) - Public participants table on `DataTable` (name and registration date; never the email)
+- **ParticipantsDialog** (`src/components/events/participants-dialog/ParticipantsDialog.tsx`) - Participants dialog (O-08): loads on open with skeleton / empty / error + retry
+- **Podium** (`src/components/voting/podium/Podium.tsx`) - Top-3 results as cards with score on a 0-10 scale and the current user marked "Tú"
+- **RankingList** (`src/components/voting/ranking-list/RankingList.tsx`) - Results table from 4th place on `DataTable` with the current user's row highlighted
+- **EventResults** (`src/components/voting/event-results/EventResults.tsx`) - Public results block: loads `distributed-results`, handles loading / not calculated / error + retry, never recalculates; `onLoaded(results)`
 
 See full details in [components.md](./components.md)
 
@@ -47,7 +53,7 @@ See full details in [hooks.md](./hooks.md)
 
 ## Utils
 
-**Total: 12**
+**Total: 13**
 
 - **ApiError / getErrorCode** (`src/config/api.ts`) - Error thrown by `apiRequest`, `uploadFile` and `downloadFile` with `status`, `code` and `details`
 - **domain/stages** (`src/domain/stages.ts`) - Stage order, next stage, status, i18n key and `validateStageAdvance` (same codes as the backend)
@@ -60,6 +66,7 @@ See full details in [hooks.md](./hooks.md)
 - **i18n helpers** (`src/i18n/`) - `translate`, `detectLocale`, `messageKeyForError`, `scopedMessageKeyForError`, `findVoseo` / `findGenderMarks` (neutral Spanish guard)
 - **domain/eventForm** (`src/domain/eventForm.ts`) - Event form rules shared by create and edit: `validateEventForm`, `toEventInput`, `changedEventFields`, `hasEventFormData`, `automaticEventDates`, `canEditEvent`, `minCapacityFor`, range constants
 - **domain/voting** (`src/domain/voting.ts`) - `validateThresholds` (in hundredths), `recommendedMinEvaluations`, `VotingConfigPreview`
+- **domain/eventDetail** (`src/domain/eventDetail.ts`) - Event detail rules: `nextStepState` (11 states with priority cancelled > results > paused), `detailPill`, `progressSteps`, `splitResults` (podium + rest), `shareUrl` / `shareLinks`, `shareAudienceKey`, `afterKey`, `capacityOf` / `isRegistered` / `isFull` and constants
 
 See full details in [utils.md](./utils.md)
 

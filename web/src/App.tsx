@@ -1,5 +1,5 @@
 import React, { JSX } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import './App.css';
 import AppLayout from './components/layout/app-layout/AppLayout';
@@ -18,63 +18,12 @@ import HomePage from './pages/home/HomePage';
 import EventsListPage from './pages/events-list/EventsListPage';
 import MyEventsPage from './pages/my-events/MyEventsPage';
 import ResetPasswordPage from './pages/reset-password/ResetPasswordPage';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
 import { RUNTIME_CONFIG } from './config/runtime';
 
 // Importar utilidades de testing en desarrollo
 if (process.env.NODE_ENV === 'development') {
   import('./utils/testData.js');
-}
-
-// Event Detail Page Wrapper Component
-function EventDetailPageWrapper(): JSX.Element {
-  const { eventId } = useParams<{ eventId: string }>();
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const [isCheckingOwnership, setIsCheckingOwnership] = React.useState(true);
-
-  // Check if user is the event owner and redirect to manage page
-  React.useEffect(() => {
-    const checkOwnership = async () => {
-      if (!eventId) return;
-      
-      try {
-        // Dynamically import EventService to check event ownership
-        const { EventService } = await import('./services/api');
-        const event = await EventService.getEventById(eventId);
-        
-        if (event && user && event.creator_id === user.id) {
-          // User is the creator, redirect to manage page
-          navigate(`/events/${eventId}/manage`, { replace: true });
-          return;
-        }
-      } catch (error) {
-        console.error('Error checking event ownership:', error);
-      } finally {
-        setIsCheckingOwnership(false);
-      }
-    };
-
-    checkOwnership();
-  }, [eventId, user, navigate]);
-
-  const handleBack = (): void => {
-    navigate('/events');
-  };
-
-  if (!eventId) {
-    return <div>Event not found</div>;
-  }
-
-  if (isCheckingOwnership) {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <p>Loading...</p>
-      </div>
-    );
-  }
-
-  return <EventDetailPage eventId={eventId} onBack={handleBack} />;
 }
 
 // Rutas de la app (sin router ni providers, para poder probarlas)
@@ -87,7 +36,7 @@ export function AppRoutes(): JSX.Element {
         <Route path="/my-events" element={<RequireAuth><MyEventsPage /></RequireAuth>} />
         <Route path="/events/create" element={<RequireAuth><CreateEventPage /></RequireAuth>} />
         <Route path="/events/:eventId/manage" element={<RequireAuth><ManageEventPage /></RequireAuth>} />
-        <Route path="/events/:eventId" element={<EventDetailPageWrapper />} />
+        <Route path="/events/:eventId" element={<EventDetailPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
       {/* Páginas de autenticación: layout propio, sin barra global ni pie */}

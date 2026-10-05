@@ -7,3 +7,4 @@ export * from './redirect';
 export * from './auth';
 export * from './events';
 export * from './eventForm';
+export * from './eventDetail';

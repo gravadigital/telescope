@@ -1,0 +1,106 @@
+.ev-share-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-md);
+  min-width: 0;
+}
+
+.ev-share-dialog__audience {
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--text-secondary);
+}
+
+.ev-share-dialog__link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-sm);
+  min-width: 0;
+}
+
+.ev-share-dialog__field,
+.ev-share-dialog__copy {
+  min-width: 0;
+}
+
+.ev-share-dialog__status:empty {
+  display: none;
+}
+
+.ev-share-dialog__via {
+  display: flex;
+  align-items: center;
+  gap: var(--space-inline-md);
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--text-muted);
+}
+
+.ev-share-dialog__via::before,
+.ev-share-dialog__via::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--border-default);
+}
+
+.ev-share-dialog__networks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-stack-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ev-share-dialog__network {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-stack-sm);
+  padding: var(--space-padding-compact) var(--space-inline-sm);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  color: var(--text-primary);
+  text-decoration: none;
+  font: var(--type-caption);
+}
+
+.ev-share-dialog__network:hover {
+  background: var(--bg-surface-subtle);
+}
+
+.ev-share-dialog__network:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-color: var(--border-focus);
+}
+
+.ev-share-dialog__network-name {
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .ev-share-dialog__link {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: var(--space-inline-md);
+    align-items: end;
+  }
+
+  .ev-share-dialog__field {
+    grid-column: span 8;
+  }
+
+  .ev-share-dialog__copy {
+    grid-column: span 4;
+  }
+
+  .ev-share-dialog__networks {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .ev-share-dialog__more {
+    display: none;
+  }
+}

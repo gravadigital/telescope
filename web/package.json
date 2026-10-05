@@ -21,7 +21,7 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint --max-warnings=0 --ext .ts,.tsx --ignore-pattern '*.test.*' --ignore-pattern '__tests__' src/i18n src/domain src/components/ui src/components/layout src/pages/home src/pages/events-list src/pages/my-events src/pages/create-event src/components/events/event-preview src/components/events/edit-event-dialog src/components/events/pending-card src/components/events/events-table src/pages/not-found src/pages/login src/pages/register src/pages/forgot-password src/pages/reset-password src/pages/complete-profile src/components/auth src/hooks/useGoogleSignIn.ts"
+    "lint": "eslint --max-warnings=0 --ext .ts,.tsx --ignore-pattern '*.test.*' --ignore-pattern '__tests__' src/i18n src/domain src/components/ui src/components/layout src/pages/home src/pages/events-list src/pages/my-events src/pages/create-event src/components/events/event-preview src/components/events/edit-event-dialog src/components/events/share-dialog src/components/events/participants-table src/components/events/participants-dialog src/components/voting src/pages/event-detail src/components/events/pending-card src/components/events/events-table src/pages/not-found src/pages/login src/pages/register src/pages/forgot-password src/pages/reset-password src/pages/complete-profile src/components/auth src/hooks/useGoogleSignIn.ts"
   },
   "eslintConfig": {
     "extends": [
@@ -39,6 +39,11 @@
           "src/pages/create-event/**/*.tsx",
           "src/components/events/event-preview/**/*.tsx",
           "src/components/events/edit-event-dialog/**/*.tsx",
+          "src/components/events/share-dialog/**/*.tsx",
+          "src/components/events/participants-table/**/*.tsx",
+          "src/components/events/participants-dialog/**/*.tsx",
+          "src/components/voting/**/*.tsx",
+          "src/pages/event-detail/**/*.tsx",
           "src/components/events/pending-card/**/*.tsx",
           "src/components/events/events-table/**/*.tsx",
           "src/pages/not-found/**/*.tsx",

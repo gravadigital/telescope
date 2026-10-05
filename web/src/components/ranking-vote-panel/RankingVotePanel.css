@@ -70,36 +70,6 @@
   background: #4ade80;
 }
 
-/* Quality explanation ---------------------------------------------------- */
-
-.rvp-quality-note {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-md);
-  background: rgba(106, 90, 205, 0.08);
-  border: 1px solid rgba(106, 90, 205, 0.25);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-lg);
-  margin-bottom: var(--spacing-xl);
-}
-
-.rvp-quality-icon {
-  font-size: 1.3rem;
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.rvp-quality-note p {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: rgba(255, 255, 255, 0.82);
-  line-height: 1.65;
-}
-
-.rvp-quality-note strong {
-  color: #ffffff;
-}
-
 /* Attachments list ------------------------------------------------------- */
 
 .ranking-vote-panel .attachments-list {

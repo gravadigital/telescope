@@ -85,8 +85,20 @@ describe('rutas', () => {
   });
 
   it('TS-61: detalle de evento no cae en la 404', async () => {
+    (EventService.getEventById as jest.Mock).mockResolvedValue({
+      id: 'evt-1',
+      title: 'Concurso de afiches',
+      description: 'Desc',
+      stage: 'participation',
+      date: '2026-10-01',
+      organizer: 'Club',
+      participant_ids: [],
+      creator_id: 'org-1',
+      is_paused: false,
+      is_cancelled: false,
+    });
     renderWithProviders(<AppRoutes />, { route: '/events/evt-1', auth: guest });
-    await screen.findByRole('banner');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Concurso de afiches' })).toBeInTheDocument();
     expect(screen.queryByText('No encontramos esta página')).toBeNull();
   });
 

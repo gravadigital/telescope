@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { EventService, AttachmentService, DistributedVotingService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { Event, User, Attachment } from '../../types';
-import VotingResultsPanel from '../../components/voting-results-panel/VotingResultsPanel';
+import EventResults from '../../components/voting/event-results/EventResults';
 import VotingConfigurationPanel from '../../components/voting-configuration-panel/VotingConfigurationPanel';
 import StageAdvanceModal from '../../components/stage-advance-modal/StageAdvanceModal';
 import EventTimeline from '../../components/event-timeline/EventTimeline';
@@ -738,7 +738,7 @@ const getStageName = (stage: Event['stage']): string => {
         {/* Results Section (only show when in results stage) */}
         {event.stage === 'results' && (
           <div className="results-section">
-            <VotingResultsPanel eventId={event.id} />
+            <EventResults eventId={event.id} currentUserId={null} />
           </div>
         )}
 
