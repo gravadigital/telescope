@@ -4,7 +4,7 @@ This document lists the reusable code documented so far for this service (increm
 
 ## Components
 
-**Total: 26**
+**Total: 28**
 
 - **Button** (`src/components/ui/button/Button.tsx`) - Variants primary / secondary / tertiary / onBand / icon, sizes sm / md / lg, loading state; `icon` requires `aria-label`
 - **TextField** (`src/components/ui/text-field/TextField.tsx`) - Text, multiline with counter and search variants; label, help, error, password toggle
@@ -30,6 +30,8 @@ This document lists the reusable code documented so far for this service (increm
 - **StageTimeline** (`src/components/events/stage-timeline/StageTimeline.tsx`) - Four-stage timeline (full / compact) with editable deadline
 - **NextStepCard** (`src/components/events/next-step-card/NextStepCard.tsx`) - Raised card for the next step with checklist, consequence and actions
 - **ProgressChecklist** (`src/components/events/progress-checklist/ProgressChecklist.tsx`) - Numbered participant progress
+- **PendingCard** (`src/components/events/pending-card/PendingCard.tsx`) - Card for one pending task (upload / vote / results) with event, deadline or position and a single action link
+- **EventsTable** (`src/components/events/events-table/EventsTable.tsx`) - Event table on `DataTable` with variants `public` / `organizer` / `participant`; stage pill, capacity bar and one resolved action per row
 
 See full details in [components.md](./components.md)
 
@@ -43,7 +45,7 @@ See full details in [hooks.md](./hooks.md)
 
 ## Utils
 
-**Total: 10**
+**Total: 11**
 
 - **ApiError / getErrorCode** (`src/config/api.ts`) - Error thrown by `apiRequest`, `uploadFile` and `downloadFile` with `status`, `code` and `details`
 - **domain/stages** (`src/domain/stages.ts`) - Stage order, next stage, status, i18n key and `validateStageAdvance` (same codes as the backend)
@@ -52,6 +54,7 @@ See full details in [hooks.md](./hooks.md)
 - **domain/score** (`src/domain/score.ts`) - `formatScore` (MBC score on a 0-10 scale)
 - **domain/redirect** (`src/domain/redirect.ts`) - `safeNextPath` (internal routes only, default `/events`) and `loginPathFor(path)`
 - **domain/auth** (`src/domain/auth.ts`) - `isValidEmail`, `validateLogin`, `validateRegister`, `validateNewPassword`, `validateDisplayName` returning field errors as translation keys
+- **domain/events** (`src/domain/events.ts`) - `pendingTasks`, `rowAction`, `stagePill`, `myStatusLabel`, `currentDeadline`, `openEvents`, `parseStageFilter` and constants (`SEARCH_DEBOUNCE_MS`, `PENDING_LIMIT`, `EVENTS_PAGE_SIZE`)
 - **i18n helpers** (`src/i18n/`) - `translate`, `detectLocale`, `messageKeyForError`, `scopedMessageKeyForError`, `findVoseo` / `findGenderMarks` (neutral Spanish guard)
 - **domain/voting** (`src/domain/voting.ts`) - `validateThresholds` (in hundredths), `recommendedMinEvaluations`, `VotingConfigPreview`
 

@@ -14,6 +14,10 @@ export interface DataTableRowAction {
   label: string;
   onClick: () => void;
   variant?: Exclude<ButtonVariant, 'icon'>;
+  /** Texto de apoyo debajo del botón (p. ej. "Requiere cuenta"). */
+  hint?: string;
+  /** Nombre accesible único del botón cuando difiere del texto visible. */
+  accessibleLabel?: string;
 }
 
 export interface DataTableProps<T> {
@@ -110,9 +114,15 @@ function DataTable<T>({
                   ))}
                   {action && (
                     <td data-label="" className="ui-data-table__cell ui-data-table__cell--action">
-                      <Button size="sm" variant={action.variant ?? 'secondary'} onClick={action.onClick}>
+                      <Button
+                        size="sm"
+                        variant={action.variant ?? 'secondary'}
+                        onClick={action.onClick}
+                        aria-label={action.accessibleLabel}
+                      >
                         {action.label}
                       </Button>
+                      {action.hint && <span className="ui-data-table__hint">{action.hint}</span>}
                     </td>
                   )}
                 </tr>

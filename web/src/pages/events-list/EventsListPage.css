@@ -1,0 +1,191 @@
+.evl-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-lg);
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-padding-default) var(--space-padding-compact);
+}
+
+.evl-eyebrow {
+  margin: 0;
+  font: var(--type-eyebrow);
+  letter-spacing: var(--type-tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-signal);
+}
+
+.evl-header {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-stack-md);
+  align-items: start;
+}
+.evl-header__copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-sm);
+}
+.evl-title {
+  margin: 0;
+  font: var(--type-heading-l);
+  color: var(--text-primary);
+}
+.evl-subtitle {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-secondary);
+}
+.evl-header__cta {
+  width: 100%;
+}
+
+.evl-section-title {
+  margin: 0;
+  font: var(--type-eyebrow);
+  letter-spacing: var(--type-tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.evl-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font: var(--type-ui);
+  color: var(--text-action);
+}
+
+/* Pendientes */
+.evl-pending {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-md);
+}
+.evl-pending:empty {
+  display: none;
+}
+.evl-pending__list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-stack-md);
+}
+
+/* Cómo participar (visitante) */
+.evl-how {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-md);
+  padding: var(--space-padding-compact);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-surface);
+  background: var(--bg-surface-subtle);
+}
+.evl-how__steps {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-stack-sm);
+  margin: 0;
+  padding: 0 0 0 var(--space-padding-default);
+  font: var(--type-body);
+  color: var(--text-primary);
+}
+
+/* Filtros y búsqueda: en mobile la búsqueda va primero (order) */
+.evl-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-md);
+}
+.evl-filters {
+  min-width: 0;
+  overflow-x: auto;
+}
+.evl-search {
+  order: -1;
+}
+
+.evl-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-md);
+  min-width: 0;
+}
+
+.evl-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-inline-md);
+}
+.evl-pagination__text {
+  font: var(--type-ui);
+  color: var(--text-secondary);
+}
+
+.evl-skeleton {
+  display: block;
+  height: var(--ref-space-md);
+  width: 100%;
+  border-radius: var(--radius-control);
+  background: var(--bg-disabled);
+}
+.evl-skeleton--title {
+  width: 60%;
+}
+
+/* Franja de registro (visitante) */
+.evl-banner {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: center;
+  gap: var(--space-stack-md);
+}
+.evl-banner__copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-sm);
+}
+.evl-banner__title {
+  margin: 0;
+  font: var(--type-heading-s);
+}
+.evl-banner__text {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-inverse-secondary);
+}
+
+@media (min-width: 768px) {
+  .evl-page {
+    padding: var(--space-padding-spacious) var(--ref-space-xl);
+  }
+  .evl-header {
+    grid-template-columns: 9fr 3fr;
+  }
+  .evl-header__cta {
+    width: auto;
+    justify-self: end;
+  }
+  .evl-pending__list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .evl-how__steps {
+    grid-template-columns: repeat(4, 1fr);
+    padding-left: var(--space-padding-default);
+  }
+  .evl-toolbar {
+    flex-direction: row;
+    align-items: center;
+  }
+  .evl-filters {
+    flex: 2;
+  }
+  .evl-search {
+    order: 0;
+    flex: 1;
+  }
+  .evl-banner {
+    grid-template-columns: 9fr 3fr;
+  }
+}

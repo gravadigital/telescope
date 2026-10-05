@@ -10,7 +10,24 @@ const removed = [
   ['components', 'event-detail', 'EventDetail.tsx'],
 ];
 
+const read = (...parts: string[]): string => fs.readFileSync(path.join(SRC, ...parts), 'utf8');
+
 describe('código muerto', () => {
+  it('TS-61: el listado viejo y el HomePage placeholder fueron eliminados', () => {
+    ['Events.tsx', 'Events.css', 'Events.test.tsx'].forEach((file) =>
+      expect(fs.existsSync(path.join(SRC, 'components', 'events', file))).toBe(false)
+    );
+    const app = read('App.tsx');
+    expect(app).not.toContain('function ' + 'HomePage');
+    expect(app).not.toContain('function ' + 'EventsPage');
+    expect(app).not.toContain('WHY' + '?');
+    const css = read('App.css');
+    expect(css).not.toContain('.main-' + 'content');
+    expect(css).not.toMatch(/\.section\b/);
+    const api = read('services', 'api.ts');
+    expect(api).not.toContain('getAll' + 'Events');
+  });
+
   it('TS-94: los componentes sin uso fueron eliminados', () => {
     removed.forEach((parts) => expect(fs.existsSync(path.join(SRC, ...parts))).toBe(false));
   });

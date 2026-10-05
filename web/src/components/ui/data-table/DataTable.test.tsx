@@ -114,4 +114,26 @@ describe('DataTable', () => {
     expect(css).not.toMatch(/max-width:\s*\d+px\)/);
     expect(css).not.toMatch(/overflow-x/);
   });
+
+  it('TS-16: hint y nombre accesible en la acción', () => {
+    render(
+      <DataTable
+        caption="Eventos"
+        columns={[{ key: 'name', header: 'Evento' }]}
+        rows={[{ id: '1', name: 'Evento 1' }]}
+        rowKey={(r) => r.id}
+        rowAction={() => ({
+          label: 'Participar',
+          accessibleLabel: 'Participar Evento 1',
+          hint: 'Requiere cuenta',
+          onClick: jest.fn(),
+          variant: 'primary',
+        })}
+      />
+    );
+    const button = screen.getByRole('button', { name: 'Participar Evento 1' });
+    expect(button).toHaveTextContent('Participar');
+    const cell = button.closest('td') as HTMLElement;
+    expect(within(cell).getByText('Requiere cuenta')).toBeInTheDocument();
+  });
 });

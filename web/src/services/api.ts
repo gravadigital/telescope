@@ -1,6 +1,10 @@
 import { apiRequest, checkApiHealth, downloadFile, getErrorCode, API_CONFIG } from "../config/api";
 import {
   Event,
+  EventListItem,
+  EventListPage,
+  EventStage,
+  MyEvent,
   User,
   VotingConfiguration,
   AnonymousAssignment,
@@ -54,48 +58,54 @@ interface ApiUser {
 }
 
 export const EventService = {
-  async getAllEvents(): Promise<Event[]> {
+  async listEvents(params: {
+    q?: string;
+    stage?: EventStage;
+    page?: number;
+    limit?: number;
+  }): Promise<EventListPage> {
+    const query = new URLSearchParams();
+    const q = params.q?.trim();
+    if (q) query.append("q", q);
+    if (params.stage) query.append("stage", params.stage);
+    if (params.page !== undefined) query.append("page", String(params.page));
+    if (params.limit !== undefined) query.append("limit", String(params.limit));
+    const qs = query.toString();
+
     try {
-      // Request more events to avoid pagination issues (100 should be enough for now)
-      const response = await apiRequest<{ data: any[] }>(`${API_CONFIG.ENDPOINTS.EVENTS}?limit=100`);
-      
-      if (!response || !response.data || !Array.isArray(response.data)) {
-        console.warn("Invalid response format from API:", response);
-        throw new Error("No data received");
+      const response = await apiRequest<any>(`${API_CONFIG.ENDPOINTS.EVENTS}${qs ? `?${qs}` : ""}`);
+      if (!response || !Array.isArray(response.data)) {
+        throw new Error("Invalid response");
       }
-      
-      console.log("✅ Events loaded from backend:", response.data.length);
-      
-      const events = response.data.map(event => ({
-        id: event.id,
-        title: event.name || event.title,
-        description: event.description,
-        date: event.start_date || event.date,
-        organizer: event.organizer || "Organizador por determinar",
-        status: event.is_paused
-          ? "paused" as const
-          : event.is_cancelled
-            ? "cancelled" as const
-            : event.status === "completed"
-              ? "completed" as const
-              : "active" as const,
-        stage: (event.stage as "creation" | "participation" | "voting" | "results") || "participation",
-        participant_ids: event.participant_ids || [],
-        voteCount: {
-          yes: 0,
-          maybe: 0,
-          no: 0
+      const items: EventListItem[] = response.data.map((e: any) => {
+        const participantIds: string[] = e.participant_ids ?? [];
+        return {
+          id: e.id,
+          name: e.name,
+          description: e.description,
+          stage: e.stage,
+          author_id: e.author_id,
+          max_participants: e.max_participants ?? null,
+          participants_count: e.participants_count ?? participantIds.length,
+          participant_ids: participantIds,
+          participation_estimated_end_date: e.participation_estimated_end_date ?? null,
+          voting_estimated_end_date: e.voting_estimated_end_date ?? null,
+          is_paused: e.is_paused ?? false,
+          is_cancelled: e.is_cancelled ?? false,
+          created_at: e.created_at,
+        };
+      });
+      const pagination = response.pagination ?? {};
+      return {
+        items,
+        pagination: {
+          page: pagination.page ?? 1,
+          limit: pagination.limit ?? items.length,
+          total: pagination.total ?? items.length,
+          totalPages: pagination.total_pages ?? 1,
         },
-        attachmentCount: event.attachment_count || 0,
-        max_participants: event.max_participants,
-        creator_id: event.author_id,
-        created_at: event.created_at,
-        updated_at: event.updated_at,
-        is_paused: event.is_paused || false,
-        is_cancelled: event.is_cancelled || false
-      }));
-      
-      return events;
+        stageCounts: response.stage_counts ?? { participation: 0, voting: 0, results: 0 },
+      };
     } catch (error) {
       console.error("Failed to fetch events from API:", error);
       throw error;
@@ -478,6 +488,36 @@ export const UserService = {
       method: "POST",
       body: JSON.stringify({ token, password }),
     });
+  },
+
+  async getMyEvents(userId: string): Promise<MyEvent[]> {
+    try {
+      const response = await apiRequest<any>(
+        `${API_CONFIG.ENDPOINTS.USERS}/${userId}/events?scope=all`
+      );
+      if (!response || !Array.isArray(response.data)) {
+        throw new Error("Invalid response");
+      }
+      return response.data.map((e: any): MyEvent => ({
+        id: e.id,
+        name: e.name,
+        description: e.description,
+        stage: e.stage,
+        author_id: e.author_id,
+        max_participants: e.max_participants ?? null,
+        participants_count: e.participants_count ?? 0,
+        participation_estimated_end_date: e.participation_estimated_end_date ?? null,
+        voting_estimated_end_date: e.voting_estimated_end_date ?? null,
+        is_paused: e.is_paused ?? false,
+        is_cancelled: e.is_cancelled ?? false,
+        created_at: e.created_at,
+        role: e.role,
+        my_status: e.my_status ?? null,
+      }));
+    } catch (error) {
+      console.error("Failed to fetch my events:", error);
+      throw error;
+    }
   },
 
   async getUserEvents(userId: string): Promise<string[]> {

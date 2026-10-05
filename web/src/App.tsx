@@ -2,7 +2,6 @@ import React, { JSX } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import './App.css';
-import Events from './components/events/Events';
 import AppLayout from './components/layout/app-layout/AppLayout';
 import RequireAuth from './components/layout/require-auth/RequireAuth';
 import RedirectIfAuthenticated from './components/layout/redirect-if-authenticated/RedirectIfAuthenticated';
@@ -15,6 +14,9 @@ import { I18nProvider } from './i18n';
 import EventDetailPage from './pages/event-detail/EventDetailPage';
 import CreateEventPage from './pages/create-event/CreateEventPage';
 import ManageEventPage from './pages/manage-event/ManageEventPage';
+import HomePage from './pages/home/HomePage';
+import EventsListPage from './pages/events-list/EventsListPage';
+import MyEventsPage from './pages/my-events/MyEventsPage';
 import ResetPasswordPage from './pages/reset-password/ResetPasswordPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { RUNTIME_CONFIG } from './config/runtime';
@@ -22,54 +24,6 @@ import { RUNTIME_CONFIG } from './config/runtime';
 // Importar utilidades de testing en desarrollo
 if (process.env.NODE_ENV === 'development') {
   import('./utils/testData.js');
-}
-
-// Home Page Component
-function HomePage(): JSX.Element {
-  return (
-    <div className="main-content">
-      {/* Section 1: WHY? */}
-      <section id="why" className="section">
-        <div className="section-container">
-          <h1 className="section-title">WHY?</h1>
-          <div className="section-content">
-            <p>This is the WHY section where we explain the purpose and motivation behind Telescopio.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Section 2: HOW? */}
-      <section id="how" className="section">
-        <div className="section-container">
-          <h1 className="section-title">HOW?</h1>
-          <div className="section-content">
-            <p>This is the HOW section where we explain the process and methodology of Telescopio.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Section 3: DEMO */}
-      <section id="demo" className="section">
-        <div className="section-container">
-          <h1 className="section-title">DEMO</h1>
-          <div className="section-content">
-            <p>This is the DEMO section where we showcase the capabilities of Telescopio.</p>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-// Events List Page Component
-function EventsPage(): JSX.Element {
-  const navigate = useNavigate();
-
-  const handleViewEventDetail = (eventId: string): void => {
-    navigate(`/events/${eventId}`);
-  };
-
-  return <Events onViewEventDetail={handleViewEventDetail} />;
 }
 
 // Event Detail Page Wrapper Component
@@ -129,7 +83,8 @@ export function AppRoutes(): JSX.Element {
     <Routes>
       <Route element={<AppLayout />}>
         <Route path="/" element={<HomePage />} />
-        <Route path="/events" element={<EventsPage />} />
+        <Route path="/events" element={<EventsListPage />} />
+        <Route path="/my-events" element={<RequireAuth><MyEventsPage /></RequireAuth>} />
         <Route path="/events/create" element={<RequireAuth><CreateEventPage /></RequireAuth>} />
         <Route path="/events/:eventId/manage" element={<RequireAuth><ManageEventPage /></RequireAuth>} />
         <Route path="/events/:eventId" element={<EventDetailPageWrapper />} />
