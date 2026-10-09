@@ -13,6 +13,11 @@ export interface EventResultsProps {
   eventId: string;
   currentUserId: string | null;
   onLoaded?: (results: VotingResults) => void;
+  /**
+   * Gestión (S-016): si los resultados no están calculados, los recalcula una vez
+   * (`POST …/distributed-results/recalculate`). Por defecto no recalcula.
+   */
+  recalculateIfMissing?: boolean;
 }
 
 type State =
@@ -23,36 +28,64 @@ type State =
 
 /**
  * Resultados públicos: podio + ranking desde la 4.ª + nota del puntaje.
- * Solo lee: nunca recalcula (el cálculo ocurre al pasar a Resultados).
+ * Por defecto solo lee (el cálculo ocurre al pasar a Resultados); con `recalculateIfMissing`
+ * recalcula una vez cuando faltan.
  */
-const EventResults: React.FC<EventResultsProps> = ({ eventId, currentUserId, onLoaded }) => {
+const EventResults: React.FC<EventResultsProps> = ({
+  eventId,
+  currentUserId,
+  onLoaded,
+  recalculateIfMissing = false,
+}) => {
   const { t } = useT();
   const [state, setState] = React.useState<State>({ status: 'loading' });
   const [attempt, setAttempt] = React.useState(0);
   const onLoadedRef = React.useRef(onLoaded);
   onLoadedRef.current = onLoaded;
+  const recalculationRef = React.useRef<{ key: string; promise: Promise<VotingResults> } | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
     setState({ status: 'loading' });
+    const show = (results: VotingResults) => {
+      if (cancelled) return;
+      if (!results.adjusted_ranking || results.adjusted_ranking.length === 0) {
+        setState({ status: 'empty' });
+        return;
+      }
+      setState({ status: 'ready', results });
+      onLoadedRef.current?.(results);
+    };
+    const fail = () => {
+      if (!cancelled) setState({ status: 'error' });
+    };
     DistributedVotingService.getDistributedResults(eventId)
-      .then((results) => {
+      .then(show)
+      .catch((err) => {
         if (cancelled) return;
-        if (!results.adjusted_ranking || results.adjusted_ranking.length === 0) {
+        if (getErrorCode(err) !== 'RESULTS_NOT_CALCULATED') {
+          fail();
+          return;
+        }
+        if (!recalculateIfMissing) {
           setState({ status: 'empty' });
           return;
         }
-        setState({ status: 'ready', results });
-        onLoadedRef.current?.(results);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setState({ status: getErrorCode(err) === 'RESULTS_NOT_CALCULATED' ? 'empty' : 'error' });
+        // Un solo recálculo por carga (eventId + intento): si el efecto se re-ejecuta,
+        // reusa la misma promesa en vez de repetir el POST.
+        const key = `${eventId}:${attempt}`;
+        if (recalculationRef.current?.key !== key) {
+          recalculationRef.current = {
+            key,
+            promise: DistributedVotingService.recalculateDistributedResults(eventId),
+          };
+        }
+        recalculationRef.current.promise.then(show).catch(fail);
       });
     return () => {
       cancelled = true;
     };
-  }, [eventId, attempt]);
+  }, [eventId, attempt, recalculateIfMissing]);
 
   if (state.status === 'loading') {
     return (

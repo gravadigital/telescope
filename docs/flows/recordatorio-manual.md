@@ -4,17 +4,17 @@ title: Recordatorio manual del organizador
 type: feature
 status: Active
 created: 2026-10-02
-last_updated: 2026-10-04
+last_updated: 2026-10-09
 stories: [S-009, S-016]
 ---
 
 # Recordatorio manual del organizador
 
 **Tipo:** Feature
-**Status:** Active en `api` (S-009 implementada); la web queda pendiente en S-016
+**Status:** Active en `api` (S-009) y en `web` (S-016)
 **Creado:** 2026-10-02
-**Última actualización:** 2026-10-04
-**Stories:** S-009, S-016
+**Última actualización:** 2026-10-09
+**Stories:** S-009, S-016 (ambas implementadas)
 
 ## Descripción
 
@@ -61,15 +61,26 @@ sequenceDiagram
 
 **Origen:** `web` · **Destino:** `web` · **Tipo:** Interno
 
-`web/src/domain/manage.ts`: en `participation`, inscriptos sin propuesta; en `voting`,
-participantes con `participant_voting_status = false` de `GET …/voting-statistics`. El botón no se
-muestra con N = 0.
+`web/src/domain/manage.ts`: en `participation`, `pendingFiles` (inscriptos sin propuesta); en
+`voting`, `pendingVotes` (participantes con `participant_voting_status = false` de
+`GET …/voting-statistics`; quien no figura no participa de la votación). `reminderType` elige
+`file` o `vote` según la etapa.
+
+El botón no se muestra con N = 0 ni mientras haya un error de carga visible en la gestión, y queda
+deshabilitado con el evento pausado.
+
+**Ref:** `web/src/domain/manage.ts`; `web/src/pages/manage-event/ManageEventPage.tsx`
 
 ---
 
 ### Paso 2: Enviar el recordatorio
 
 **Origen:** `web` · **Destino:** `api` · **Tipo:** REST
+
+`ReminderDialog` lista los destinatarios (los primeros 5 y "y {n} más") y, al confirmar, envía el
+pedido. Tras el éxito, la gestión cierra el diálogo, muestra "Recordatorio enviado a {count}
+participante(s)." con `recipients_count` de la respuesta y deja el botón deshabilitado con
+"Recordatorio enviado" hasta recargar la página (estado local, no se persiste).
 
 - **Método:** POST
 - **Endpoint:** `/api/v1/events/{event_id}/reminders`
@@ -94,6 +105,9 @@ muestra con N = 0.
 - Orden de validaciones en la api: `event_id` (`400 INVALID_EVENT_ID`) → body (`400 INVALID_PAYLOAD`) → evento (`404 EVENT_NOT_FOUND`) → pausado o cancelado (`409`) → etapa (`409 INVALID_EVENT_STAGE` con `current_stage`) → pendientes (`409 NO_PENDING_RECIPIENTS`). Pausa y cancelación van antes que la etapa porque bloquean cualquier acción.
 - Una falla al leer los pendientes devuelve `500 RETRIEVAL_ERROR` y no se emite nada.
 - `recipients_count` es la cantidad de pendientes calculados; no depende de que la inserción de notificaciones funcione.
+
+**Ref:** `web/src/components/events/reminder-dialog/ReminderDialog.tsx`;
+`docs/apis/api.yaml` → `/api/v1/events/{event_id}/reminders`
 
 ---
 

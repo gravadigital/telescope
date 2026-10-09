@@ -211,6 +211,11 @@ func main() {
 				auth.RequireEventOwner(eventRepo),
 				distributedVoteHandler.PreviewVotingConfiguration)
 
+			// Applied voting configuration (read-only) - Only event owner/admin
+			events.GET("/:event_id/voting-config",
+				auth.RequireEventOwner(eventRepo),
+				distributedVoteHandler.GetVotingConfiguration)
+
 			// Generate assignments - Only event owner/organizer/admin
 			events.POST("/:event_id/generate-assignments",
 				auth.RequireEventOwnerOrOrganizer(eventRepo),

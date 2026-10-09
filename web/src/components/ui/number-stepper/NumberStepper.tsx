@@ -50,9 +50,13 @@ const NumberStepper: React.FC<NumberStepperProps> = ({
     setOutOfRange(false);
   }, [value]);
 
+  const decimalStep = !Number.isInteger(step);
   const clamp = (n: number): number => Math.min(max, Math.max(min, n));
+  // Con paso decimal se ajusta a la grilla del paso y a centésimos (evita 0.6500000001).
+  const snap = (n: number): number =>
+    decimalStep ? Math.round(Math.round(n / step) * step * 100) / 100 : n;
   const move = (direction: 1 | -1) => {
-    const next = clamp(value + direction * step);
+    const next = clamp(snap(value + direction * step));
     if (next !== value) onChange(next);
   };
 
@@ -64,7 +68,8 @@ const NumberStepper: React.FC<NumberStepperProps> = ({
       return;
     }
     const parsed = Number(text);
-    if (Number.isInteger(parsed) && parsed >= min && parsed <= max) {
+    const allowed = decimalStep ? Number.isFinite(parsed) : Number.isInteger(parsed);
+    if (allowed && parsed >= min && parsed <= max) {
       setOutOfRange(false);
       onChange(parsed);
     } else {
@@ -108,7 +113,7 @@ const NumberStepper: React.FC<NumberStepperProps> = ({
           className="ui-number-stepper__input"
           type="number"
           role="spinbutton"
-          inputMode="numeric"
+          inputMode={decimalStep ? 'decimal' : 'numeric'}
           min={min}
           max={max}
           step={step}

@@ -4,7 +4,7 @@ title: Evaluación por pares y envío del ranking
 type: feature
 status: Active
 created: 2026-09-18
-last_updated: 2026-10-04
+last_updated: 2026-10-09
 stories: [S-007, S-009, S-017]
 ---
 
@@ -13,8 +13,8 @@ stories: [S-007, S-009, S-017]
 **Tipo:** Feature
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-10-04
-**Stories:** S-007, S-009, S-017 (S-007 implementada en `api`; el resto, planificado por REQ-003)
+**Última actualización:** 2026-10-09
+**Stories:** S-007, S-009, S-017 (S-007 y S-009 en `api`; S-017 en `web`)
 
 ## Descripción
 
@@ -28,19 +28,13 @@ Ocurre durante la etapa `voting`, después de que se generaron las asignaciones.
 
 ## Cambios planificados (REQ-003)
 
-> Diseño aprobado, **pendiente de implementar** (lo de S-007 ya está incorporado en los pasos).
-> Al implementar, incorporar al paso correspondiente y quitar de acá.
-
-| Paso | Cambio | Story |
-|---|---|---|
-| 3 | La web guarda el borrador con debounce desde `SortableRankList` | S-017 |
-| Web | Lista ordenable ↑↓ (posición siempre única) en lugar de selects; solo lectura en `results`; copy del mecanismo real (la propia propuesta sube o baja) | S-017 |
+Ninguno pendiente: lo de S-007, S-009 y S-017 ya está incorporado en los pasos.
 
 ## Servicios Involucrados
 
 | Servicio | Rol | Tipo de Participación |
 |----------|-----|-----------------------|
-| `web` | Panel de ranking, guardado de borrador, envío | Iniciador |
+| `web` | Lista ordenable ↑↓ (`SortableRankList`), guardado de borrador con debounce, envío / reenvío, solo lectura en `results` | Iniciador |
 | `api` | Devuelve la asignación, persiste borradores y votos | Procesador |
 | PostgreSQL | Persiste `vote_drafts` y `votes`; **valida y deriva estado vía triggers** | Almacenamiento + Validador |
 
@@ -74,7 +68,7 @@ sequenceDiagram
 
     loop mientras ordena
         P->>WEB: reordena propuestas
-        WEB->>API: POST .../vote-draft (upsert)
+        WEB->>API: PUT .../vote-draft { rankings } (upsert, con debounce)
         API->>DB: UPSERT vote_drafts ON (assignment_id, participant_id)
     end
 
@@ -85,7 +79,7 @@ sequenceDiagram
     Note over DB: trigger update_assignment_completion (AFTER DELETE / INSERT)<br/>→ is_completed recalculado
     Note over DB: trigger update_attachment_vote_count (AFTER DELETE / INSERT)<br/>→ vote_count recalculado
     API-->>WEB: 201 { message, event_id, participant_id, votes_count, replaced }
-    WEB-->>P: "✅ Your rankings have been submitted successfully!"
+    WEB-->>P: "Recibimos tu ranking." · botón "Reenviar mi ranking" (secundario, habilitado si cambia el orden)
 ```
 
 ---
@@ -97,7 +91,7 @@ sequenceDiagram
 - **Método:** GET
 - **Endpoint:** `/api/v1/events/{event_id}/participants/{participant_id}/assignment`
 - **Auth:** JWT Bearer
-- **Etapas:** `voting` y `results` (otra etapa → 400)
+- **Etapas:** `voting` y `results` (otra etapa → 400). La web lo pide en ambas: en `results` muestra el ranking enviado en solo lectura
 
 **Response (éxito) — 200:** `AnonymousAssignment`: `assignment { id, event_id, is_completed,
 completed_at, attachments[{ id, label: "Propuesta N", mime_type, file_size, description }] }`,
@@ -127,7 +121,9 @@ trigger `validate_assignment_constraints` lo impidió al crearlas.
 El evaluador puede descargar una propuesta si la tiene en su asignación del mismo evento y el
 evento está en `voting` o `results`. El archivo se sirve con un nombre neutro
 `propuesta-{n}.{ext}` (`n` = posición en `attachment_ids`; la extensión sale del `mime_type`,
-`bin` si no está en el mapa), nunca con `original_name`. El dueño, el autor del evento y un
+`bin` si no está en el mapa), nunca con `original_name`. La web lo pide con token y abre el archivo
+en otra pestaña (la pestaña se abre en el click y navega al `blob:`; si el navegador la bloquea,
+descarga con ese nombre neutro). El dueño, el autor del evento y un
 `admin` reciben `original_name`. Cualquier otro caso → `403 FORBIDDEN`.
 
 `GET /api/v1/events/{event_id}/attachments` devuelve todas las propuestas solo al autor del
@@ -160,18 +156,21 @@ funcionalidad que sostiene el objetivo G-04 (fricción mínima para participar).
 
 **Origen:** `web` · **Destino:** `api` · **Tipo:** REST
 
-- **Método:** POST
+- **Método:** PUT
 - **Endpoint:** `/api/v1/events/{event_id}/participants/{participant_id}/vote-draft`
 - **Auth:** JWT Bearer
 - **Body:**
   ```json
   {
-    "assignment_id": "uuid — req",
     "rankings": [
       { "attachment_id": "uuid", "rank": "integer — 1 = mejor" }
     ]
   }
   ```
+
+La web lo envía con debounce (500 ms) tras cada cambio de orden desde `SortableRankList` y
+muestra "Borrador guardado"; si falla avisa y el orden queda en pantalla. Al enviar el ranking
+(Paso 4) cancela el borrador pendiente y, ya enviado, guarda el mismo orden como borrador.
 
 **Operación de BD:** **UPSERT** sobre `vote_drafts`, con la clave UNIQUE
 (`assignment_id`, `participant_id`) — **un solo borrador por asignación y participante**.
@@ -216,6 +215,17 @@ guardar un ranking parcial o inconsistente: es un guardado de progreso, no una e
 `code`** — a diferencia del resto de la API. Es una de las cuatro formas de respuesta que el
 cliente tiene que normalizar.
 
+**Reenvío en la web (S-017).** Tras un `201` la web guarda el orden enviado en `localStorage`
+(`telescopio_submitted_ranking:{assignment_id}`) y lo toma como referencia: "Reenviar mi ranking"
+solo se habilita si el orden en pantalla difiere de lo enviado. Si el envío falla con `400` y
+`current_stage` distinto de `voting`, muestra "La votación ya cerró…" y recarga (la lista pasa a
+solo lectura).
+
+> **Limitación conocida:** la api no expone los votos enviados (`AnonymousAssignment` solo trae
+> `is_completed`, y el borrador sigue guardándose tras el envío). En otro dispositivo, tras
+> modificar sin reenviar, la referencia de lo enviado puede no coincidir con lo enviado de verdad.
+> Resolverlo requiere un endpoint nuevo en `api`.
+
 **Notificación in-app (S-009).** Tras confirmar la transacción, el handler emite `ranking_submitted` con `data: { replaced }` al participante (best effort: si falla, `Warn` y la respuesta no cambia). No incluye ids de propuestas.
 
 **Operación de BD:** en una sola transacción, `DELETE FROM votes WHERE assignment_id = ?` y luego
@@ -241,13 +251,13 @@ se hace rollback y se conservan los votos anteriores. La aplicación no escribe 
 
 | Paso | Condición | Respuesta | Qué ve el participante |
 |---|---|---|---|
-| 1 | Sin asignación (no participó, o no se generaron) | 404 `NO_ASSIGNMENT` | La UI no muestra el panel de ranking |
-| 1b | Propuesta que no está en la asignación del evaluador, o evento fuera de `voting`/`results` | 403 `FORBIDDEN` | No puede abrirla |
-| 3 | Falla el guardado de borrador | 4xx/5xx | Depende del panel; el progreso local se mantiene |
-| 4 | Rangos no consecutivos o duplicados | 400 | Mensaje del backend, crudo |
+| 1 | Sin asignación (no participó, o no se generaron) | 404 `NO_ASSIGNMENT` | La UI no muestra la lista de ranking |
+| 1b | Propuesta que no está en la asignación del evaluador, o evento fuera de `voting`/`results` | 403 `FORBIDDEN` | "No pudimos abrir el archivo. Intenta de nuevo."; el orden se conserva |
+| 3 | Falla el guardado de borrador | 4xx/5xx | "No pudimos guardar el borrador. Tus cambios siguen en pantalla." |
+| 4 | Rangos no consecutivos o duplicados | 400 | "No pudimos enviar tu ranking. Intenta de nuevo." (la lista ordenable evita duplicados) |
 | 4 | Propuesta fuera de la asignación | 400 (o trigger) | Idem |
 | 4 | `rank_position > m` | **500** (trigger) | ⚠️ `RAISE EXCEPTION` sin forma de error de la API |
-| 4 | Evento fuera de `voting` | 400 | No se puede enviar ni reemplazar el ranking |
+| 4 | Evento fuera de `voting` | 400 con `current_stage` | "La votación ya cerró. No se puede modificar el ranking."; la lista pasa a solo lectura |
 | 4 | Falla al guardar los votos | 500 | Nada cambia: se conservan los votos anteriores |
 
 ## Estado Resultante

@@ -1,0 +1,83 @@
+.ev-open-voting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-md);
+  min-width: 0;
+}
+
+.ev-open-voting__text {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-secondary);
+}
+
+/* Resumen: 3 columnas (4/12) en ambos viewports. */
+.ev-open-voting__summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-inline-sm);
+  min-width: 0;
+}
+
+.ev-open-voting__live {
+  min-width: 0;
+}
+
+.ev-open-voting__skeleton {
+  min-height: 64px;
+  background: var(--bg-surface-subtle);
+  border-radius: var(--card-radius);
+}
+
+/* Campos: apilados en mobile; 6/12 + 6/12 desde 768px. */
+.ev-open-voting__fields,
+.ev-open-voting__advanced-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-stack-md);
+  min-width: 0;
+}
+
+.ev-open-voting__field {
+  min-width: 0;
+}
+
+.ev-open-voting__advanced {
+  min-width: 0;
+  border-top: 1px solid var(--border-default);
+  padding-top: var(--space-stack-sm);
+}
+
+.ev-open-voting__summary-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-sm);
+  cursor: pointer;
+  border-radius: var(--radius-field);
+}
+
+.ev-open-voting__summary-toggle:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.ev-open-voting__advanced-title {
+  font: var(--type-ui);
+  color: var(--text-primary);
+}
+
+.ev-open-voting__advanced-hint {
+  font: var(--type-caption);
+  color: var(--text-secondary);
+}
+
+.ev-open-voting__advanced-grid {
+  margin-top: var(--space-stack-md);
+}
+
+@media (min-width: 768px) {
+  .ev-open-voting__fields,
+  .ev-open-voting__advanced-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -1316,6 +1316,53 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
 
   /api/v1/events/{event_id}/voting-config:
+    get:
+      tags: [Votación distribuida]
+      summary: Configuración de votación aplicada al evento
+      description: |
+        S-016. Solo el autor (`RequireEventOwner`, como `GET /voting-config/preview`). Solo
+        lectura: devuelve los parámetros que guardó la apertura de la votación (`PATCH /stage`
+        con `voting_config`). La gestión del organizador la usa para mostrar la "Configuración
+        aplicada" en las etapas Votación y Resultados; es la única fuente en Votación
+        (`GET /distributed-results?include_metrics=true` solo la trae con el ranking calculado).
+
+        La respuesta **no incluye `updated_at`**. Si el evento todavía no abrió la votación no hay
+        configuración y responde `404 CONFIG_NOT_FOUND`.
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          description: Configuración aplicada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/VotingConfiguration' }
+              example:
+                data:
+                  id: 3f1c2d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f
+                  event_id: 9a8b7c6d-5e4f-4a3b-2c1d-0e9f8a7b6c5d
+                  attachments_per_evaluator: 4
+                  quality_good_threshold: 0.6
+                  quality_bad_threshold: 0.3
+                  adjustment_magnitude: 3
+                  min_evaluations_per_file: 3
+                  created_at: '2026-10-05T13:00:00Z'
+        '400':
+          description: '`MISSING_EVENT_ID`, `INVALID_EVENT_ID`'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
+        '403': { $ref: '#/components/responses/MiddlewareForbidden' }
+        '404':
+          description: |
+            `CONFIG_NOT_FOUND` — el evento todavía no abrió la votación (o, para un admin, el
+            evento no existe: el middleware no lo busca). Para quien no es admin, un evento
+            inexistente lo responde el middleware con `NOT_FOUND`.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '500':
+          description: '`CONFIG_LOOKUP_ERROR` — falla al leer la base (distinto de no encontrada)'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
     post:
       tags: [Votación distribuida]
       summary: Configurar los parámetros de votación

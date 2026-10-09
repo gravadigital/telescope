@@ -9,7 +9,7 @@ import ProgressChecklist from '../../components/events/progress-checklist/Progre
 import ShareDialog from '../../components/events/share-dialog/ShareDialog';
 import ParticipantsDialog from '../../components/events/participants-dialog/ParticipantsDialog';
 import EventResults from '../../components/voting/event-results/EventResults';
-import RankingVotePanel from '../../components/ranking-vote-panel/RankingVotePanel';
+import SortableRankList from '../../components/voting/sortable-rank-list/SortableRankList';
 import NotFoundPage from '../not-found/NotFoundPage';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, getErrorCode } from '../../config/api';
@@ -29,13 +29,16 @@ import type { FileRejection } from '../../domain/files';
 import { loginPathFor } from '../../domain/redirect';
 import { STAGE_ORDER, stageNameKey } from '../../domain/stages';
 import { scopedMessageKeyForError, useT } from '../../i18n';
+import { useRankingVote } from './useRankingVote';
 import type { TranslationKey } from '../../i18n';
 import {
   AttachmentService,
   DistributedVotingService,
   EventService,
+  VoteDraftService,
 } from '../../services/api';
-import type { AnonymousAssignment, Attachment, Event, EventStage, VotingResults } from '../../types';
+import type { VoteDraftResponse } from '../../services/api';
+import type { AnonymousAssignment, AssignedAttachment, Attachment, Event, EventStage, VotingResults } from '../../types';
 import '../../components/ui/visually-hidden.css';
 import './EventDetailPage.css';
 
@@ -76,6 +79,7 @@ const EventDetailPage: React.FC = () => {
   const [event, setEvent] = React.useState<Event | null>(null);
   const [myAttachment, setMyAttachment] = React.useState<Attachment | null>(null);
   const [assignment, setAssignment] = React.useState<AnonymousAssignment | null | undefined>(undefined);
+  const [draft, setDraft] = React.useState<VoteDraftResponse | null>(null);
   const [assignmentFailed, setAssignmentFailed] = React.useState(false);
   const [results, setResults] = React.useState<VotingResults | null>(null);
   const [openEvents, setOpenEvents] = React.useState(0);
@@ -130,17 +134,26 @@ const EventDetailPage: React.FC = () => {
 
         let attachment: Attachment | null = null;
         let nextAssignment: AnonymousAssignment | null | undefined;
+        let nextDraft: VoteDraftResponse | null = null;
         let failedAssignment = false;
         const mine = userId !== null && loaded.creator_id !== userId && isRegistered(loaded, userId);
         if (mine && !loaded.is_cancelled) {
           if (loaded.stage === 'participation') {
             const attachments = await AttachmentService.getEventAttachments(loaded.id);
             attachment = attachments.find((a) => a.participant_id === userId) ?? null;
-          } else if (loaded.stage === 'voting') {
+          } else if (loaded.stage === 'voting' || loaded.stage === 'results') {
             try {
               nextAssignment = await DistributedVotingService.getParticipantAssignment(loaded.id, userId!);
             } catch {
-              failedAssignment = true;
+              // En resultados la asignación es un extra: su falla no bloquea ni se muestra.
+              failedAssignment = loaded.stage === 'voting';
+            }
+            if (nextAssignment && (loaded.stage === 'voting' || nextAssignment.is_completed)) {
+              try {
+                nextDraft = (await VoteDraftService.getDraft(loaded.id, userId!)) ?? null;
+              } catch {
+                nextDraft = null; // el borrador es opcional: no bloquea la pantalla
+              }
             }
           }
         }
@@ -148,6 +161,7 @@ const EventDetailPage: React.FC = () => {
         setEvent(loaded);
         setMyAttachment(attachment);
         setAssignment(nextAssignment);
+        setDraft(nextDraft);
         setAssignmentFailed(failedAssignment);
         setLoadStatus('ready');
       } catch (err) {
@@ -190,6 +204,31 @@ const EventDetailPage: React.FC = () => {
       cancelled = true;
     };
   }, [isResultsStage]);
+
+  // ---------- Ranking (S-017) ----------
+  const rankingSource = React.useMemo(
+    () => (assignment ? { assignment, draft } : null),
+    [assignment, draft]
+  );
+  const ranking = useRankingVote({
+    eventId: event?.id,
+    userId,
+    source: rankingSource,
+    onVotingClosed: () => {
+      void loadAll(true);
+    },
+  });
+
+  const handleOpenFile = async (attachment: AssignedAttachment, number: number): Promise<void> => {
+    ranking.setError(null);
+    // La pestaña se abre en el click (sincrónico) para que el navegador no la bloquee.
+    const target = window.open('', '_blank');
+    try {
+      await AttachmentService.openAssignedAttachment(attachment.id, number, attachment.mime_type, target ?? null);
+    } catch {
+      ranking.setError('eventDetail.errors.openFile');
+    }
+  };
 
   // ---------- Acciones ----------
   const handleRegister = async (): Promise<void> => {
@@ -320,7 +359,7 @@ const EventDetailPage: React.FC = () => {
   }
 
   const assignmentStatus: AssignmentStatus =
-    assignment === undefined ? null : assignment === null ? 'none' : assignment.is_completed ? 'completed' : 'pending';
+    assignment === undefined ? null : assignment === null ? 'none' : ranking.completed ? 'completed' : 'pending';
   const state: NextStepState = nextStepState(event, userId, myAttachment, assignmentStatus);
   const pill = detailPill(state, event);
   const deadline = currentDeadline({
@@ -491,6 +530,18 @@ const EventDetailPage: React.FC = () => {
                 : t('eventDetail.pill.vote')
             }
             description={assignment ? t(`eventDetail.nextStep.${state}.text` as TranslationKey) : undefined}
+            primaryVariant={state === 'rankingSent' ? 'secondary' : 'primary'}
+            primaryAction={
+              assignment && user
+                ? {
+                    label: t(state === 'rankingSent' ? 'eventDetail.ranking.resubmit' : 'eventDetail.ranking.submit'),
+                    onClick: ranking.submit,
+                    disabled: state === 'rankingSent' && !ranking.canResubmit,
+                    loading: ranking.submitting,
+                    loadingLabel: t('eventDetail.ranking.submitting'),
+                  }
+                : undefined
+            }
           >
             {assignmentFailed && (
               <Callout tone="error" action={{ label: t('common.retry'), onClick: () => loadAll(true) }}>
@@ -498,13 +549,22 @@ const EventDetailPage: React.FC = () => {
               </Callout>
             )}
             {assignment && user && (
-              <RankingVotePanel
-                eventId={event.id}
-                participantId={user.id}
-                onVotesSubmitted={() => {
-                  loadAll(true);
-                }}
-              />
+              <>
+                <SortableRankList
+                  mode="editable"
+                  attachments={assignment.attachments}
+                  order={ranking.order}
+                  disabled={ranking.submitting}
+                  onChange={ranking.change}
+                  onOpenFile={handleOpenFile}
+                />
+                <p className="edp-ranking__help">{t('eventDetail.ranking.help')}</p>
+                <div role="status" aria-live="polite">
+                  {ranking.draftSaved && <p className="edp-ranking__saved">{t('eventDetail.ranking.draftSaved')}</p>}
+                  {ranking.received && <Callout tone="success">{t('eventDetail.rankingReceived')}</Callout>}
+                </div>
+                {ranking.error && <Callout tone="error">{t(ranking.error)}</Callout>}
+              </>
             )}
           </NextStepCard>
         );
@@ -530,6 +590,18 @@ const EventDetailPage: React.FC = () => {
                 : undefined
             }
           >
+            {assignment && ranking.completed && (
+              <section className="edp-ranking-readonly">
+                <h3 className="edp-ranking-readonly__title">{t('ranking.readonlyTitle')}</h3>
+                {ranking.error && <Callout tone="error">{t(ranking.error)}</Callout>}
+                <SortableRankList
+                  mode="readonly"
+                  attachments={assignment.attachments}
+                  order={ranking.submitted ?? ranking.order}
+                  onOpenFile={handleOpenFile}
+                />
+              </section>
+            )}
             <EventResults eventId={event.id} currentUserId={userId} onLoaded={setResults} />
           </NextStepCard>
         );

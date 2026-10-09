@@ -1,0 +1,21 @@
+.nt-bell {
+  position: relative;
+  display: inline-flex;
+}
+.ui-button.nt-bell__button {
+  gap: var(--space-inline-sm);
+  width: auto;
+  min-width: 44px;
+  padding: 0 var(--space-inline-sm);
+  color: var(--text-inverse);
+}
+.nt-bell__count {
+  min-width: var(--space-padding-compact);
+  padding: 0 var(--space-inline-sm);
+  background: transparent;
+  border-radius: var(--radius-pill);
+  color: var(--text-signal);
+  font: var(--type-caption);
+  font-weight: 700;
+  text-align: center;
+}

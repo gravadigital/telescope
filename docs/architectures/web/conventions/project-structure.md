@@ -41,7 +41,7 @@ src/
 ├── hooks/               # hooks propios
 ├── services/api.ts      # llamadas a la API por dominio
 ├── config/api.ts        # URL base, endpoints, cliente fetch
-├── styles/global.css    # tokens + utilidades
+├── styles/tokens.css    # única fuente de tokens del DS
 └── types/index.ts       # tipos compartidos
 ```
 
@@ -57,17 +57,18 @@ agregar un componente nuevo, seguila en vez de introducir una estructura por fea
 Componentes de función con tipado explícito de props:
 
 ```tsx
-interface RankingVotePanelProps {
-  eventId: string;
-  participantId: string;
-  onComplete: () => void;
+interface SortableRankListProps {
+  attachments: AssignedAttachment[];
+  order: string[];
+  mode: 'editable' | 'readonly';
+  onChange?: (order: string[]) => void;
 }
 
-const RankingVotePanel: React.FC<RankingVotePanelProps> = ({ eventId, participantId, onComplete }) => {
+const SortableRankList: React.FC<SortableRankListProps> = ({ attachments, order, mode, onChange }) => {
   // ...
 };
 
-export default RankingVotePanel;
+export default SortableRankList;
 ```
 
 - **`export default`** para el componente. Los tipos y helpers van con export nombrado.

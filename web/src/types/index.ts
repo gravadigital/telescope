@@ -62,9 +62,16 @@ export interface ApiConfig {
     EVENT_SHARE: (eventId: string) => string;
     EVENT_ATTACHMENT: (eventId: string, participantId: string) => string;
 
+    // Notificaciones (S-018)
+    NOTIFICATIONS: string;
+    NOTIFICATIONS_UNREAD_COUNT: string;
+    NOTIFICATION_READ: (id: string) => string;
+    NOTIFICATIONS_READ_ALL: string;
+
     // Nuevos endpoints del sistema de votación distribuida
     VOTING_CONFIG: (eventId: string) => string;
-    GENERATE_ASSIGNMENTS: (eventId: string) => string;
+    VOTING_CONFIG_PREVIEW: (eventId: string) => string;
+    EVENT_REMINDERS: (eventId: string) => string;
     GET_ASSIGNMENT: (eventId: string, participantId: string) => string;
     SUBMIT_RANKING_VOTES: (eventId: string, participantId: string) => string;
     DISTRIBUTED_RESULTS: (eventId: string) => string;
@@ -166,6 +173,32 @@ export interface VotingConfiguration {
   updated_at?: string;
 }
 
+/** Parámetros de reparto enviados al abrir la votación (`voting_config`). */
+export interface VotingConfigInput {
+  attachments_per_evaluator: number;
+  quality_good_threshold?: number;
+  quality_bad_threshold?: number;
+  adjustment_magnitude?: number;
+  min_evaluations_per_file?: number;
+}
+
+export type ReminderType = 'file' | 'vote';
+
+export interface ReminderResult {
+  type: ReminderType;
+  recipients_count: number;
+}
+
+/** Resultado de PATCH /events/{id}/stage. `voting` solo al pasar a votación. */
+export interface StageUpdateResult {
+  stage: EventStage;
+  voting?: {
+    configuration: VotingConfiguration;
+    assignments_count: number;
+    total_attachments: number;
+  };
+}
+
 export interface AssignedAttachment {
   id: string;
   label: string;               // "Propuesta N" (N = posición, 1-based)
@@ -237,6 +270,9 @@ export interface Attachment {
 }
 
 export interface VotingStatistics {
+  event_id?: string;
+  attachments_with_votes?: number;
+  unique_voters?: number;
   total_assignments: number;
   completed_assignments: number;
   total_votes: number;
@@ -256,3 +292,24 @@ export interface EventCreateInput {
 
 /** Body del PATCH /events/{id}: solo lo que cambió. */
 export type EventUpdate = Partial<EventCreateInput>;
+
+// Notificaciones in-app (S-018). `AppNotification` evita el choque con el `Notification` del DOM.
+export type NotificationType =
+  | 'stage_changed' | 'event_cancelled' | 'event_paused' | 'deadline_changed'
+  | 'participant_registered' | 'registration_confirmed' | 'ranking_submitted'
+  | 'file_reminder' | 'vote_reminder';
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  data: Record<string, unknown>;
+  event: { id: string; name: string; stage: EventStage };
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface NotificationPage {
+  notifications: AppNotification[];
+  unread_count: number;
+  next_cursor: string | null;
+}

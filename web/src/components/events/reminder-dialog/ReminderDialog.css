@@ -1,0 +1,43 @@
+.ev-reminder__text {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-primary);
+}
+
+.ev-reminder__list {
+  margin: 0;
+  padding-left: var(--space-padding-default);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-sm);
+  font: var(--type-body);
+  color: var(--text-primary);
+}
+
+.ev-reminder__item--more {
+  list-style: none;
+  color: var(--text-secondary);
+}
+
+/* Mobile: Cancelar 5/12 + Enviar 7/12. */
+.ev-reminder__actions {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--space-inline-md);
+  width: 100%;
+}
+
+.ev-reminder__actions > :first-child {
+  grid-column: span 5;
+}
+
+.ev-reminder__actions > :last-child {
+  grid-column: span 7;
+}
+
+@media (min-width: 768px) {
+  .ev-reminder__actions > :first-child,
+  .ev-reminder__actions > :last-child {
+    grid-column: span 6;
+  }
+}

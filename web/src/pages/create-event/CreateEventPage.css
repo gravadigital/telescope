@@ -56,7 +56,7 @@
   gap: var(--space-inline-sm);
   margin: 0;
   font: var(--type-caption);
-  color: var(--color-success);
+  color: var(--text-success);
   white-space: nowrap;
 }
 

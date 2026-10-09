@@ -1,8 +1,8 @@
 ---
 id: styling
-display_name: Estilado (CSS plano + variables)
+display_name: Estilado (CSS plano + tokens del DS)
 language: react
-description: Plain CSS file per component, design tokens as CSS custom properties, dark glassmorphism, desktop-first
+description: Plain CSS file per component, Design System web v2.0.0 tokens as CSS custom properties in tokens.css, mobile-first with a single 768px breakpoint
 applies_to: [frontend]
 required_by: []
 package: null
@@ -14,97 +14,39 @@ CSS plano, un archivo por componente, importado desde el `.tsx`. **Sin Tailwind,
 CSS-in-JS, sin CSS Modules, sin librería de componentes.**
 
 ```tsx
-import './RankingVotePanel.css';
+import './SortableRankList.css';
 ```
 
-Los nombres de clase son globales: no hay scoping automático. Se evitan colisiones por
-convención de nombres, prefijando con el nombre del componente.
+Los nombres de clase son globales: no hay scoping automático. Se evitan colisiones
+prefijando con el nombre del componente (`ui-`, `ev-`, `vt-`, `srl-`, `edp-`…; el test
+`components/ui/__tests__/static-rules.test.ts` exige un prefijo conocido).
 
 ## Tokens
 
-Variables CSS en `:root`. **Están definidas en dos archivos**:
+Los tokens del Design System `web` v2.0.0 viven **solo** en `src/styles/tokens.css` (lo
+importa `src/index.tsx`). No hay otra fuente: `index.css` solo tiene el reset y el `body`, y
+ningún otro CSS define variables (lo verifica `src/styles/tokens.test.ts`, que también falla
+si algún `var(--x)` no tiene definición).
 
-| Archivo | Variables |
-|---|---|
-| `src/index.css:4-85` | 57 |
-| `src/styles/global.css:9+` | 79 — incluye las mismas 57 con idénticos valores, más 22 propias |
+- Dos niveles: **referencia** (`--ref-*`, nunca se consumen desde componentes) y
+  **semánticos / de componente** (`--bg-*`, `--text-*`, `--border-*`, `--radius-*`,
+  `--space-*`, `--type-*`, `--shadow-*`, `--button-*`…), que son los que se usan.
+- Sin hex ni `rgb()` en código nuevo: el test de reglas estáticas lo comprueba.
+- Si el valor que necesitás no existe como token, se agrega al DS (`product-design-system-update`)
+  y a `tokens.css`; no se escribe el hex en el componente.
 
-`index.css` importa `global.css` en la línea 95. Las 57 compartidas tienen el mismo valor,
-así que hoy no hay diferencia visible, pero **es una fuente de verdad duplicada**.
+## Responsive: mobile-first
 
-**Al agregar un token, ponelo solo en `styles/global.css`** — es el superconjunto. No
-dupliques en `index.css`.
+La regla base es **mobile**; `@media (min-width: 768px)` pasa a desktop. **Único corte**
+(`--bp-mobile` / `--ref-bp-desktop`). No se usa `max-width` en componentes nuevos ni se
+agregan otros breakpoints. Áreas táctiles ≥ 44×44 px en mobile, sin scroll horizontal a 375 px.
 
-### Grupos disponibles
+## Movimiento
 
-| Grupo | Ejemplos |
-|---|---|
-| Marca | `--color-primary` `#6a5acd`, `--color-primary-hover`, `--color-primary-dark`, `--color-primary-light` |
-| Estado | `--color-success` `#22c55e`, `--color-warning` `#f59e0b`, `--color-danger` `#ef4444`, `--color-info` `#3b82f6` |
-| Grises | `--color-gray-50` … `--color-gray-900` |
-| Fondo | `--bg-dark-primary` `#1a1a3a`, `--bg-dark-secondary` `#2d2d5a`, `--bg-dark-tertiary` `#4a4a8a` |
-| Glass | `--glass-bg`, `--glass-bg-hover`, `--glass-border`, `--glass-border-hover` |
-| Espaciado | `--spacing-xs` `0.25rem` … `--spacing-3xl` |
-| Radio | `--radius-sm` `4px` … `--radius-full` `9999px` |
-| Sombra | `--shadow-sm` … `--shadow-2xl`, `--shadow-button` |
-| Texto | `--text-xs` … `--text-3xl` (solo en `global.css`) |
-| Transición | `--transition-fast` `150ms ease`, `base` `200ms`, `slow` `300ms` |
-| Z-index | `--z-dropdown`, `--z-fixed`, `--z-modal` (solo en `global.css`) |
+`--ref-motion-*` no se consumen directo. Preferir no animar o respetar
+`prefers-reduced-motion: reduce`.
 
-### Usá los tokens
+## Botones y avisos
 
-Hoy hay **350 colores hex literales contra 753 usos de `var()`**: cerca de un tercio está
-hardcodeado. Peor, algunos valores frecuentes (`#e2e8f0`, `#94a3b8`, `#cbd5e1`, `#fca5a5`,
-`#86efac`) **no tienen token equivalente**: son una segunda paleta implícita para textos
-secundarios y estados suaves.
-
-En código nuevo: usá el token. Si el color que necesitás no existe como token, **agregalo a
-`global.css`** en vez de escribir el hex. `#3b82f6` aparece 9 veces a mano existiendo como
-`--color-secondary`.
-
-## Lenguaje visual
-
-Tema oscuro con glassmorphism. El `body` lleva un degradado fijo entre los tres fondos
-(`index.css:100-107`), y las superficies son translúcidas:
-
-```css
-.panel {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
-  backdrop-filter: blur(10px);
-}
-```
-
-Ese patrón de tarjeta se repite en casi todos los CSS **sin estar factorizado**. Es el
-primer candidato del Design System.
-
-## Responsive: desktop-first
-
-**Todas las media queries son `max-width`**: la regla base describe el desktop y los
-`@media` van restando ancho.
-
-| Corte | Queries | Rol |
-|---|---|---|
-| `1024px` | 2 | Ajuste puntual |
-| **`768px`** | **13** | **El switch de layout real** |
-| `600px` | 3 | Ajuste puntual |
-| `480px` | 6 | Ajuste puntual (padding, tipografía) |
-
-**No están declarados como escala.** No hay variables de breakpoint: cada `@media` repite
-el número. Al escribir uno nuevo, usá uno de esos cuatro valores; no introduzcas un quinto.
-
-Los viewports reales son dos: **desktop** (base) y **mobile** (≤768px).
-
-## Tema claro: incompleto
-
-Solo `components/auth/Auth.css:290` y `components/modal/Modal.css:113` responden a
-`prefers-color-scheme: light`. El resto de la aplicación queda oscura siempre. **No agregues
-soporte parcial de tema claro a un componente suelto**: o se resuelve globalmente o se deja
-como está.
-
-## Botones
-
-No existen como componente React: son clases en `styles/global.css` (`.btn`, `.btn-primary`,
-`.btn-secondary`, …). Al necesitar un botón, usá las clases existentes antes de escribir CSS
-nuevo.
+Son componentes del DS: `components/ui/button/Button.tsx` y `components/ui/callout/Callout.tsx`
+(no hay clases globales `.btn`/`.alert`). Ver `docs/reusable-code/web/components.md`.

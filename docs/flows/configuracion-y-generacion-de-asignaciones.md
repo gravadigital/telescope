@@ -4,7 +4,7 @@ title: Configuración de la votación y generación de asignaciones
 type: feature
 status: Active
 created: 2026-09-18
-last_updated: 2026-10-02
+last_updated: 2026-10-09
 stories: [S-006, S-016]
 ---
 
@@ -13,8 +13,8 @@ stories: [S-006, S-016]
 **Tipo:** Feature
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-10-02
-**Stories:** S-006, S-016 (S-016 pendiente)
+**Última actualización:** 2026-10-09
+**Stories:** S-006, S-016 (S-016 implementada en `api` y `web`)
 
 ## Descripción
 
@@ -26,22 +26,14 @@ modelo no admiten corrección posterior.
 Ocurre **dentro de la propia apertura de la votación**: `PATCH /api/v1/events/{event_id}/stage` con
 `stage: "voting"` y `voting_config` avanza la etapa, guarda la configuración y genera las
 asignaciones en una única transacción. Solo evalúan (y solo son evaluados) los participantes que
-subieron una propuesta.
-
-## Cambios planificados (REQ-003)
-
-> Diseño aprobado, **pendiente de implementar**. Al implementar, incorporar al paso
-> correspondiente y quitar de acá.
-
-| Paso | Cambio | Story |
-|---|---|---|
-| 1 | El `web` deja de calcular el `m` recomendado y usa `GET /api/v1/events/{event_id}/voting-config/preview` (la api ya lo expone). Se elimina la fórmula del front (cierra D-09) | S-016 |
+subieron una propuesta. En la `web`, `OpenVotingDialog` (gestión del evento) hace esa única llamada:
+ya no usa `POST /voting-config` ni `POST /generate-assignments`.
 
 ## Servicios Involucrados
 
 | Servicio | Rol | Tipo de Participación |
 |----------|-----|-----------------------|
-| `web` | Sugiere `m` (hoy con su propia fórmula, ver Paso 1) y presenta la configuración | Iniciador |
+| `web` | Pide la vista previa, presenta la configuración en `OpenVotingDialog` y, desde la gestión, muestra la configuración aplicada (Paso 4) | Iniciador |
 | `api` | Calcula los límites de `m`, valida las restricciones matemáticas, ejecuta el algoritmo de asignación y escribe todo en una transacción | Procesador |
 | PostgreSQL | Persiste la configuración y las asignaciones; **valida las invariantes vía triggers** | Almacenamiento + Validador |
 
@@ -54,7 +46,7 @@ sequenceDiagram
     participant API as api
     participant DB as PostgreSQL
 
-    O->>WEB: abre la gestión del evento en etapa participation
+    O->>WEB: en la gestión (etapa participation) abre OpenVotingDialog
     WEB->>API: GET /api/v1/events/{event_id}/voting-config/preview
     API-->>WEB: { participants_with_proposal, can_open_voting, min_m, max_m, recommended_m, defaults }
     WEB-->>O: precarga m con el recomendado (editable)
@@ -116,14 +108,18 @@ min_m         = recommended_m, relajado a ⌈0,6 · max_m⌉ cuando k ≤ 10
 ```
 
 Para `k < 2` los tres valen 0. El `min_evaluations_per_file` recomendado es `min(3, m)` y lo
-recalcula el cliente. La respuesta no depende de la etapa del evento.
+recalcula el cliente (`recommendedMinEvaluations`). La respuesta no depende de la etapa del evento.
 
-⚠️ **Hasta S-016, `web` sigue calculando su propio recomendado** (`recommendedM = min(max(⌈2·log₂(max(k, 2))⌉, 1), k−1)`
-en `VotingConfigurationPanel.tsx:25-31`, con `k` = propuestas) en vez de llamar a este endpoint. Si
-divergen, el organizador ve un recomendado que la api rechaza (D-09).
+**Uso en la `web` (D-09 resuelta en S-016).** El front ya no calcula `m`: `OpenVotingDialog` pide
+este endpoint al abrirse, precarga `m` con `recommended_m` (editable entre `min_m` y `max_m`) y los
+umbrales y el peso del ajuste con `defaults`. Si `can_open_voting` es `false` explica que faltan
+propuestas y no permite confirmar. Los "Ajustes avanzados" (evaluaciones mínimas, peso del ajuste,
+umbrales) usan `NumberStepper`; los umbrales se validan en el cliente con `validateThresholds`
+(mismas reglas que `INVALID_THRESHOLDS`). Se borró `VotingConfigurationPanel` con su fórmula propia.
 
 **Ref:** `docs/apis/api.yaml` → `/api/v1/events/{event_id}/voting-config/preview`;
-`api/internal/domain/vote/configuration.go`
+`api/internal/domain/vote/configuration.go`;
+`web/src/components/events/open-voting-dialog/OpenVotingDialog.tsx`; `web/src/domain/voting.ts`
 
 ---
 
@@ -191,11 +187,61 @@ Si cualquier paso falla, rollback completo y `500 VOTING_SETUP_ERROR`.
 
 ---
 
+### Paso 4: Consultar la configuración aplicada desde la gestión
+
+**Origen:** `web` · **Destino:** `api` · **Tipo:** REST
+
+Una vez abierta la votación, la gestión del organizador muestra la "Configuración aplicada" en
+las etapas Votación y Resultados leyendo lo que guardó el Paso 3. Es la única fuente en Votación:
+`GET /distributed-results?include_metrics=true` solo trae `configuration` cuando el ranking ya
+está calculado.
+
+- **Método:** GET
+- **Endpoint:** `/api/v1/events/{event_id}/voting-config`
+- **Auth:** JWT Bearer — solo el autor del evento o un admin (`RequireEventOwner`, como el preview)
+
+**Response — 200:**
+```json
+{
+  "data": {
+    "id":                        "uuid",
+    "event_id":                  "uuid",
+    "attachments_per_evaluator": "integer — m",
+    "quality_good_threshold":    "number",
+    "quality_bad_threshold":     "number",
+    "adjustment_magnitude":      "integer — n",
+    "min_evaluations_per_file":  "integer",
+    "created_at":                "date-time"
+  }
+}
+```
+
+No incluye `updated_at`. Es solo lectura: la configuración sigue sin poder modificarse.
+
+| Condición | Respuesta |
+|---|---|
+| `event_id` no es un UUID | 400 `INVALID_EVENT_ID` |
+| Sin token / no es el autor ni admin | 401 / 403 del middleware |
+| El evento todavía no abrió la votación | 404 `CONFIG_NOT_FOUND` |
+| Falla la lectura de la base | 500 `CONFIG_LOOKUP_ERROR` |
+
+**En la `web`:** `ManageEventPage` lo pide en Votación y Resultados
+(`DistributedVotingService.getVotingConfig`). `404 CONFIG_NOT_FOUND` → el bloque no se muestra.
+Muestra "recomendados" si los valores coinciden con los defaults y con `min(3, m)`
+(`isRecommendedConfig`); si no, "personalizados". Otro error → `Callout` de error con "Reintentar"
+solo en ese bloque (no deshabilita acciones).
+
+**Ref:** `docs/apis/api.yaml` → `get /api/v1/events/{event_id}/voting-config`;
+`api/internal/handlers/distributed_vote_handler.go` (`GetVotingConfiguration`);
+`web/src/pages/manage-event/ManageEventPage.tsx`
+
+---
+
 ### Endpoints deprecados
 
 `POST /api/v1/events/{event_id}/voting-config` y `POST /api/v1/events/{event_id}/generate-assignments`
 siguen disponibles (`deprecated: true`) para destrabar eventos que ya estaban en `voting` sin
-asignaciones. Aplican la misma regla que la apertura:
+asignaciones. La `web` ya no los usa. Aplican la misma regla que la apertura:
 
 - Evaluadores = participantes con propuesta; mínimo de 3 propuestas
   (`400 INSUFFICIENT_ATTACHMENTS` con `current_count` y `required_minimum: 3`).
@@ -227,6 +273,7 @@ asignaciones. Aplican la misma regla que la apertura:
 - `assignments` — una fila por participante **con propuesta**, con exactamente `m` propuestas, ninguna propia,
   `is_completed = false` y `quality_score` NULL.
 - Los participantes pueden consultar su asignación y empezar a rankear.
+- El organizador puede leer la configuración aplicada (Paso 4), pero no modificarla.
 
 **Este estado es efectivamente irreversible desde la interfaz**: no hay endpoint para regenerar
 asignaciones ni para modificar la configuración una vez creada.

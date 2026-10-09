@@ -1,4 +1,4 @@
-import { apiRequest, downloadFile, ApiError } from "../config/api";
+import { apiRequest, downloadFile, fetchFile, ApiError } from "../config/api";
 import * as fs from "fs";
 import * as path from "path";
 import {
@@ -6,19 +6,25 @@ import {
   UserService,
   DistributedVotingService,
   AttachmentService,
+  VoteDraftService,
+  NotificationService,
   neutralFilename,
   extensionForMime,
 } from "./api";
-import { User } from "../types";
+import { VotingConfiguration } from "../types";
+import { VotingConfigPreview } from "../domain/voting";
+import { API_CONFIG } from "../config/api";
 
 jest.mock("../config/api", () => ({
   ...jest.requireActual("../config/api"),
   apiRequest: jest.fn(),
   downloadFile: jest.fn(),
+  fetchFile: jest.fn(),
 }));
 
 const mockedApiRequest = apiRequest as jest.MockedFunction<typeof apiRequest>;
 const mockedDownloadFile = downloadFile as jest.MockedFunction<typeof downloadFile>;
+const mockedFetchFile = fetchFile as jest.MockedFunction<typeof fetchFile>;
 
 describe("EventService.listEvents", () => {
   afterEach(() => {
@@ -149,52 +155,6 @@ describe("UserService.getUserEvents", () => {
   });
 });
 
-describe("EventService.getEventParticipants", () => {
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it("relanza el error de red en vez de devolver [] silencioso (TS-1)", async () => {
-    mockedApiRequest.mockRejectedValueOnce(new Error("Failed to fetch"));
-
-    await expect(EventService.getEventParticipants("ev-1")).rejects.toThrow("Failed to fetch");
-  });
-
-  it("sigue devolviendo [] en lista vacía real (TS-2)", async () => {
-    mockedApiRequest.mockResolvedValueOnce({
-      count: 0,
-      data: { event: { id: "ev-1", name: "E", stage: "participation" }, participants: [] },
-    });
-
-    const result = await EventService.getEventParticipants("ev-1");
-
-    expect(result).toEqual([]);
-  });
-
-  it("mapea el camino feliz sin cambios (TS-3)", async () => {
-    mockedApiRequest.mockResolvedValueOnce({
-      count: 1,
-      data: {
-        participants: [{ id: "u1", name: "Test User", email: "t@t.com", role: "participant" }],
-      },
-    });
-
-    const result = await EventService.getEventParticipants("ev-1");
-
-    const expected: User[] = [
-      {
-        id: "u1",
-        name: "Test User",
-        email: "t@t.com",
-        role: "participant",
-        joinedEventIDs: [],
-        createdEventIDs: [],
-      },
-    ];
-    expect(result).toEqual(expected);
-  });
-});
-
 describe("DistributedVotingService.getParticipantAssignment", () => {
   afterEach(() => {
     jest.clearAllMocks();
@@ -259,13 +219,89 @@ describe("neutralFilename", () => {
   });
 });
 
-describe("AttachmentService.downloadAssignedAttachment", () => {
-  it("descarga con nombre neutro (TS-10)", async () => {
-    mockedDownloadFile.mockResolvedValueOnce(undefined);
+describe("AttachmentService.openAssignedAttachment (S-017)", () => {
+  const originalCreate = window.URL.createObjectURL;
+  const originalRevoke = window.URL.revokeObjectURL;
 
-    await AttachmentService.downloadAssignedAttachment("f2", 2, "image/png");
+  beforeEach(() => {
+    jest.useFakeTimers();
+    window.URL.createObjectURL = jest.fn(() => "blob:neutral");
+    window.URL.revokeObjectURL = jest.fn();
+    mockedFetchFile.mockReset();
+  });
 
-    expect(mockedDownloadFile).toHaveBeenCalledWith("/api/v1/attachments/f2/download", "propuesta-2.png");
+  afterEach(() => {
+    jest.useRealTimers();
+    window.URL.createObjectURL = originalCreate;
+    window.URL.revokeObjectURL = originalRevoke;
+  });
+
+  it("TS-19 navega la pestaña abierta al blob", async () => {
+    mockedFetchFile.mockResolvedValueOnce(new Blob(["x"], { type: "application/pdf" }));
+    const target = { location: { href: "" }, close: jest.fn() } as unknown as Window;
+
+    await AttachmentService.openAssignedAttachment("f1", 1, "application/pdf", target);
+
+    expect(mockedFetchFile).toHaveBeenCalledWith("/api/v1/attachments/f1/download");
+    expect(target.location.href).toBe("blob:neutral");
+    expect(target.close).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(60_000);
+    expect(window.URL.revokeObjectURL).toHaveBeenCalledWith("blob:neutral");
+  });
+
+  it("TS-20 sin pestaña descarga con nombre neutro", async () => {
+    mockedFetchFile.mockResolvedValueOnce(new Blob(["x"], { type: "application/pdf" }));
+    const clicked: string[] = [];
+    const click = jest
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        clicked.push(this.download);
+      });
+
+    await AttachmentService.openAssignedAttachment("f1", 1, "application/pdf", null);
+
+    expect(clicked).toEqual(["propuesta-1.pdf"]);
+    click.mockRestore();
+  });
+
+  it("TS-21 si falla cierra la pestaña y relanza", async () => {
+    const error = new ApiError({ status: 404, body: { error: "nf" } });
+    mockedFetchFile.mockRejectedValueOnce(error);
+    const target = { location: { href: "" }, close: jest.fn() } as unknown as Window;
+
+    await expect(
+      AttachmentService.openAssignedAttachment("f1", 1, "application/pdf", target)
+    ).rejects.toBe(error);
+    expect(target.close).toHaveBeenCalled();
+  });
+});
+
+describe("DistributedVotingService.submitRankingVotes (S-017)", () => {
+  it("devuelve replaced de la api", async () => {
+    mockedApiRequest.mockResolvedValueOnce({ message: "ok", replaced: true });
+    const result = await DistributedVotingService.submitRankingVotes("e1", "p1", "a1", [
+      { attachment_id: "f1", rank: 1 },
+    ]);
+    expect(result).toEqual({ replaced: true });
+  });
+
+  it("replaced es false si la api no lo trae", async () => {
+    mockedApiRequest.mockResolvedValueOnce({ message: "ok" });
+    const result = await DistributedVotingService.submitRankingVotes("e1", "p1", "a1", []);
+    expect(result).toEqual({ replaced: false });
+  });
+});
+
+describe("VoteDraftService.getDraft (S-017)", () => {
+  it.each(["DRAFT_NOT_FOUND", "ASSIGNMENT_NOT_FOUND"])("devuelve null ante %s", async (code) => {
+    mockedApiRequest.mockRejectedValueOnce(new ApiError({ status: 404, body: { error: "x", code } }));
+    await expect(VoteDraftService.getDraft("e1", "p1")).resolves.toBeNull();
+  });
+
+  it("relanza DRAFT_GET_ERROR", async () => {
+    const error = new ApiError({ status: 500, body: { error: "x", code: "DRAFT_GET_ERROR" } });
+    mockedApiRequest.mockRejectedValueOnce(error);
+    await expect(VoteDraftService.getDraft("e1", "p1")).rejects.toBe(error);
   });
 });
 
@@ -430,5 +466,232 @@ describe("S-015 · servicios del detalle", () => {
   it("TS-19 no quedan metadatos de compartir en el servicio", () => {
     const source = fs.readFileSync(path.join(__dirname, "api.ts"), "utf8");
     expect(source).not.toContain("getShareable" + "EventInfo");
+  });
+});
+
+
+describe("S-016 · servicios de gestión (Task 2)", () => {
+  const config: VotingConfiguration = {
+    id: "c-1",
+    event_id: "e-1",
+    attachments_per_evaluator: 2,
+    quality_good_threshold: 0.6,
+    quality_bad_threshold: 0.3,
+    adjustment_magnitude: 3,
+    min_evaluations_per_file: 2,
+  };
+
+  beforeEach(() => {
+    jest.spyOn(console, "log").mockImplementation(() => undefined);
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.clearAllMocks();
+  });
+
+  it("TS-15 abrir inscripción manda solo stage y fecha", async () => {
+    mockedApiRequest.mockResolvedValueOnce({
+      data: { id: "e-1", stage: "participation", participation_estimated_end_date: "2026-10-12" },
+      code: "STAGE_UPDATED",
+      transition: { from: "creation", to: "participation" },
+    });
+
+    const result = await EventService.updateEventStage("e-1", "participation", "2026-10-12");
+
+    const [url, options] = mockedApiRequest.mock.calls[0];
+    expect(url).toBe("/api/v1/events/e-1/stage");
+    expect(options?.method).toBe("PATCH");
+    expect(options?.body).toBe('{"stage":"participation","estimated_end_date":"2026-10-12"}');
+    expect(result).toEqual({ stage: "participation" });
+  });
+
+  it("TS-16 abrir votación en una sola llamada con voting_config", async () => {
+    const input = {
+      attachments_per_evaluator: 2,
+      min_evaluations_per_file: 2,
+      adjustment_magnitude: 3,
+      quality_good_threshold: 0.6,
+      quality_bad_threshold: 0.3,
+    };
+    mockedApiRequest.mockResolvedValueOnce({
+      data: { stage: "voting" },
+      voting: { configuration: config, assignments_count: 3, total_attachments: 3 },
+    });
+
+    const result = await EventService.updateEventStage("e-1", "voting", "2026-10-12", input);
+
+    expect(mockedApiRequest).toHaveBeenCalledTimes(1);
+    const [url, options] = mockedApiRequest.mock.calls[0];
+    expect(url).toBe("/api/v1/events/e-1/stage");
+    expect(options?.method).toBe("PATCH");
+    expect(JSON.parse(options?.body as string)).toEqual({
+      stage: "voting",
+      estimated_end_date: "2026-10-12",
+      voting_config: input,
+    });
+    expect(result).toEqual({
+      stage: "voting",
+      voting: { configuration: config, assignments_count: 3, total_attachments: 3 },
+    });
+  });
+
+  it("TS-17 publicar manda solo stage", async () => {
+    mockedApiRequest.mockResolvedValueOnce({ data: { stage: "results" } });
+
+    await EventService.updateEventStage("e-1", "results");
+
+    expect(mockedApiRequest.mock.calls[0][1]?.body).toBe('{"stage":"results"}');
+  });
+
+  it("TS-18 propaga el ApiError con code", async () => {
+    mockedApiRequest.mockRejectedValueOnce(
+      new ApiError({ status: 500, body: { error: "x", code: "VOTING_SETUP_ERROR" } })
+    );
+
+    await expect(
+      EventService.updateEventStage("e-1", "voting", "2026-10-12", { attachments_per_evaluator: 2 })
+    ).rejects.toMatchObject({ status: 500, code: "VOTING_SETUP_ERROR" });
+  });
+
+  it("updateEstimatedEndDate no escribe en consola", async () => {
+    mockedApiRequest.mockResolvedValueOnce({
+      data: { event_id: "e-1", stage: "voting", estimated_end_date: "2026-10-20", previous_date: "" },
+      code: "ESTIMATED_DATE_UPDATED",
+    });
+
+    await EventService.updateEstimatedEndDate("e-1", "voting", "2026-10-20");
+
+    expect(console.log).not.toHaveBeenCalled();
+  });
+
+  it("TS-19 vista previa del reparto", async () => {
+    const preview: VotingConfigPreview = {
+      participants_count: 4,
+      participants_with_proposal: 3,
+      can_open_voting: true,
+      min_m: 1,
+      max_m: 2,
+      recommended_m: 2,
+      defaults: { quality_good_threshold: 0.6, quality_bad_threshold: 0.3, adjustment_magnitude: 3 },
+    };
+    mockedApiRequest.mockResolvedValueOnce({ data: preview });
+
+    const result = await DistributedVotingService.getVotingConfigPreview("e-1");
+
+    expect(mockedApiRequest).toHaveBeenCalledWith("/api/v1/events/e-1/voting-config/preview");
+    expect(result).toEqual(preview);
+  });
+
+  it("TS-20 configuración aplicada: datos, null en CONFIG_NOT_FOUND, relanza el resto", async () => {
+    mockedApiRequest.mockResolvedValueOnce({ data: config });
+    await expect(DistributedVotingService.getVotingConfig("e-1")).resolves.toEqual(config);
+    expect(mockedApiRequest).toHaveBeenCalledWith("/api/v1/events/e-1/voting-config");
+
+    mockedApiRequest.mockRejectedValueOnce(
+      new ApiError({ status: 404, body: { error: "x", code: "CONFIG_NOT_FOUND" } })
+    );
+    await expect(DistributedVotingService.getVotingConfig("e-1")).resolves.toBeNull();
+
+    mockedApiRequest.mockRejectedValueOnce(
+      new ApiError({ status: 500, body: { error: "x", code: "CONFIG_LOOKUP_ERROR" } })
+    );
+    await expect(DistributedVotingService.getVotingConfig("e-1")).rejects.toMatchObject({
+      status: 500,
+      code: "CONFIG_LOOKUP_ERROR",
+    });
+  });
+
+  it("TS-21 recordatorio", async () => {
+    mockedApiRequest.mockResolvedValueOnce({
+      data: { type: "file", recipients_count: 1 },
+      message: "x",
+      code: "REMINDER_SENT",
+    });
+
+    const result = await EventService.sendReminder("e-1", "file");
+
+    const [url, options] = mockedApiRequest.mock.calls[0];
+    expect(url).toBe("/api/v1/events/e-1/reminders");
+    expect(options?.method).toBe("POST");
+    expect(options?.body).toBe('{"type":"file"}');
+    expect(result).toEqual({ type: "file", recipients_count: 1 });
+  });
+
+  it("TS-22 deprecados fuera y endpoints nuevos", () => {
+    expect("getEventParticipants" in EventService).toBe(false);
+    expect("createVotingConfig" in DistributedVotingService).toBe(false);
+    expect("generateAssignments" in DistributedVotingService).toBe(false);
+    expect("GENERATE_ASSIGNMENTS" in API_CONFIG.ENDPOINTS).toBe(false);
+    expect(API_CONFIG.ENDPOINTS.EVENT_REMINDERS("e-1")).toBe("/api/v1/events/e-1/reminders");
+    expect(API_CONFIG.ENDPOINTS.VOTING_CONFIG_PREVIEW("e-1")).toBe("/api/v1/events/e-1/voting-config/preview");
+  });
+});
+
+describe("NotificationService (S-018)", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const n1 = {
+    id: "n-1",
+    type: "stage_changed" as const,
+    data: { stage: "voting", can_vote: true, assigned_count: 3, deadline: "2026-10-20" },
+    event: { id: "e-1", name: "Cúmulos 2026", stage: "voting" as const },
+    read_at: null,
+    created_at: "2026-10-09T10:00:00Z",
+  };
+
+  it("TS-1 listar (panel)", async () => {
+    mockedApiRequest.mockResolvedValueOnce({ data: [n1], unread_count: 2, next_cursor: null });
+    const page = await NotificationService.list({ limit: 10 });
+    expect(mockedApiRequest).toHaveBeenCalledWith("/api/v1/notifications?limit=10");
+    expect(page).toEqual({ notifications: [n1], unread_count: 2, next_cursor: null });
+  });
+
+  it("TS-2 listar con cursor tal cual, codificado", async () => {
+    mockedApiRequest.mockResolvedValueOnce({ data: [], unread_count: 0, next_cursor: null });
+    await NotificationService.list({ limit: 20, before: "2026-09-30T08:15:30.000123Z" });
+    expect(mockedApiRequest).toHaveBeenCalledWith(
+      "/api/v1/notifications?limit=20&before=2026-09-30T08%3A15%3A30.000123Z"
+    );
+  });
+
+  it("TS-3 contador", async () => {
+    mockedApiRequest.mockResolvedValueOnce({ data: { unread_count: 2 } });
+    await expect(NotificationService.unreadCount()).resolves.toBe(2);
+    expect(mockedApiRequest).toHaveBeenCalledWith("/api/v1/notifications/unread-count");
+  });
+
+  it("TS-4 marcar una", async () => {
+    mockedApiRequest.mockResolvedValueOnce({
+      data: { id: "n-1", read_at: "2026-10-09T12:00:00Z" },
+      code: "NOTIFICATION_READ",
+    });
+    const result = await NotificationService.markRead("n-1");
+    const [url, options] = mockedApiRequest.mock.calls[0];
+    expect(url).toBe("/api/v1/notifications/n-1/read");
+    expect(options?.method).toBe("PATCH");
+    expect(result).toEqual({ id: "n-1", read_at: "2026-10-09T12:00:00Z" });
+  });
+
+  it("TS-5 marcar todas", async () => {
+    mockedApiRequest.mockResolvedValueOnce({ data: { updated: 3 }, code: "NOTIFICATIONS_READ" });
+    const result = await NotificationService.markAllRead();
+    const [url, options] = mockedApiRequest.mock.calls[0];
+    expect(url).toBe("/api/v1/notifications/read-all");
+    expect(options?.method).toBe("POST");
+    expect(result).toEqual({ updated: 3 });
+  });
+
+  it("TS-6 el error del listado se propaga", async () => {
+    mockedApiRequest.mockRejectedValueOnce(
+      new ApiError({ status: 500, body: { error: "Failed to retrieve notifications", code: "RETRIEVAL_ERROR" } })
+    );
+    await expect(NotificationService.list({ limit: 10 })).rejects.toMatchObject({
+      status: 500,
+      code: "RETRIEVAL_ERROR",
+    });
   });
 });

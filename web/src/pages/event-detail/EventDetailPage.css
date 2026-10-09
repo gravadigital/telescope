@@ -234,3 +234,23 @@
     grid-column: span 3;
   }
 }
+
+/* Ranking (S-017) */
+.edp-ranking__help,
+.edp-ranking__saved {
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--text-muted);
+}
+
+.edp-ranking-readonly {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-md);
+}
+
+.edp-ranking-readonly__title {
+  margin: 0;
+  font: var(--type-heading-s);
+  color: var(--text-primary);
+}

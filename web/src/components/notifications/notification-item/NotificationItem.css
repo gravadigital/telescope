@@ -1,0 +1,107 @@
+.nt-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-sm);
+  padding: var(--space-padding-compact);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-default);
+  list-style: none;
+}
+.nt-item--unread {
+  background: var(--bg-unread);
+}
+.nt-item__row,
+.nt-item__button {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-inline-md);
+  min-width: 0;
+}
+.nt-item__button {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.nt-item--panel {
+  padding: 0;
+}
+.nt-item--panel .nt-item__button {
+  min-height: 44px;
+  padding: var(--space-padding-compact);
+}
+.nt-item--panel .nt-item__button:hover {
+  background: var(--bg-surface-subtle);
+}
+.nt-item--panel .nt-item__button:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}
+.nt-item__dot {
+  position: absolute;
+  top: var(--space-padding-compact);
+  left: var(--space-inline-sm);
+  width: var(--space-inline-sm);
+  height: var(--space-inline-sm);
+  background: var(--bg-accent);
+  border-radius: var(--radius-pill);
+}
+.nt-item__icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-action);
+}
+.nt-item__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-sm);
+  min-width: 0;
+}
+.nt-item__title {
+  color: var(--text-primary);
+  font: var(--type-body);
+  overflow-wrap: anywhere;
+}
+.nt-item--unread .nt-item__title {
+  font-weight: 700;
+}
+.nt-item__body {
+  color: var(--text-secondary);
+  font: var(--type-caption);
+  overflow-wrap: anywhere;
+}
+.nt-item__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-inline-sm);
+  color: var(--text-muted);
+  font: var(--type-caption);
+}
+.nt-item__action-text {
+  color: var(--text-action);
+}
+.nt-item__action {
+  align-self: flex-start;
+}
+
+@media (min-width: 768px) {
+  .nt-item--page {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .nt-item--page .nt-item__row {
+    flex: 1;
+  }
+  .nt-item__action {
+    flex: none;
+    align-self: center;
+  }
+}

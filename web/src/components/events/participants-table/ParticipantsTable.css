@@ -1,3 +1,10 @@
 .ev-participants-table {
   min-width: 0;
 }
+
+/* El nombre del archivo no rompe el ancho de la celda apilada (mobile). */
+.ev-participants-table__file {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: start;
+}

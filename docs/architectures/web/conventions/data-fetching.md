@@ -105,8 +105,15 @@ Reglas:
 ## Descarga de archivos
 
 La descarga exige token, así que no alcanza con un `<a href>`: el link no manda el header
-`Authorization`. Usá `AttachmentService.downloadAttachment`, que pide el archivo con
-`downloadFile` (`config/api.ts`) y dispara la descarga desde un blob.
+`Authorization`. `config/api.ts` expone `fetchFile(endpoint): Promise<Blob>` (token y `ApiError`
+ante no-OK), `saveBlob(blob, filename)` y `downloadFile(endpoint, filename)` (= `fetchFile` +
+`saveBlob`). Para una descarga común usá `AttachmentService.downloadAttachment`.
 
-**Excepción a corregir:** `RankingVotePanel` todavía abre la descarga con un `<a href>` y la
-URL `http://localhost:8080` fija. Ver D-15 en `docs/prd/requirements.md`.
+**Abrir en otra pestaña (propuestas del evaluador, S-017).** El navegador bloquea un
+`window.open` que no ocurre en el click, así que el componente abre la pestaña vacía de forma
+sincrónica (`window.open('', '_blank')`) y la pasa a
+`AttachmentService.openAssignedAttachment(id, position, mimeType, target)`, que pide el archivo
+con `fetchFile` y navega la pestaña al `blob:` URL (que no expone nombre de archivo). Si no se
+pudo abrir la pestaña (`null`) descarga con el nombre neutro `propuesta-{n}.{ext}`; si el pedido
+falla, cierra la pestaña y relanza el error (la pantalla muestra su mensaje traducido).
+`window.open` no va nunca en el servicio.

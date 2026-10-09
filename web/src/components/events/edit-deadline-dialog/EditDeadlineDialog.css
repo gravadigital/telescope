@@ -1,0 +1,16 @@
+.ev-edit-deadline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-md);
+  min-width: 0;
+}
+
+.ev-edit-deadline__current {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-secondary);
+}
+
+.ev-edit-deadline__field {
+  min-width: 0;
+}

@@ -9,16 +9,14 @@ import {
   AttachmentService,
   DistributedVotingService,
   EventService,
+  VoteDraftService,
+  extensionForMime,
 } from '../../services/api';
 import { ApiError } from '../../config/api';
 import type { AttachmentResult, Attachment, Event, VotingResults } from '../../types';
 
 jest.mock('../../context/AuthContext');
 jest.mock('../../services/api');
-jest.mock('../../components/ranking-vote-panel/RankingVotePanel', () => {
-  const ReactActual = jest.requireActual('react');
-  return { __esModule: true, default: () => ReactActual.createElement('p', null, 'panel-ranking') };
-});
 
 const getEvent = EventService.getEventById as jest.Mock;
 const listEvents = EventService.listEvents as jest.Mock;
@@ -29,6 +27,10 @@ const upload = AttachmentService.uploadAttachment as jest.Mock;
 const remove = AttachmentService.deleteAttachment as jest.Mock;
 const getAssignment = DistributedVotingService.getParticipantAssignment as jest.Mock;
 const getResults = DistributedVotingService.getDistributedResults as jest.Mock;
+const submitRanking = DistributedVotingService.submitRankingVotes as jest.Mock;
+const getDraft = VoteDraftService.getDraft as jest.Mock;
+const saveDraft = VoteDraftService.saveDraft as jest.Mock;
+const openAttachment = AttachmentService.openAssignedAttachment as jest.Mock;
 
 const now = new Date(2026, 9, 5, 10, 0);
 
@@ -128,6 +130,7 @@ describe('EventDetailPage', () => {
     jest.setSystemTime(now);
     jest.clearAllMocks();
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    (extensionForMime as jest.Mock).mockImplementation(jest.requireActual('../../services/api').extensionForMime);
     getEvent.mockResolvedValue(ev);
     getAttachments.mockResolvedValue([]);
     getAssignment.mockResolvedValue(null);
@@ -540,7 +543,8 @@ describe('EventDetailPage', () => {
       expect(getAssignment).toHaveBeenCalledWith('e-1', 'u-1');
       expect(screen.getByText('Votación en curso')).toBeInTheDocument();
       expect(screen.getByText(/No subiste una propuesta durante la inscripción/)).toBeInTheDocument();
-      expect(screen.queryByText('panel-ranking')).toBeNull();
+      expect(screen.queryByRole('list', { name: 'Tu ranking de propuestas' })).toBeNull();
+      expect(getDraft).not.toHaveBeenCalled();
       expect(screen.getByText('Al cerrar la votación se publica el ranking final para todos.')).toBeInTheDocument();
     });
 
@@ -575,7 +579,7 @@ describe('EventDetailPage', () => {
       const first = renderPage(signedIn());
       expect(await screen.findByRole('heading', { level: 2, name: 'Ordena las 3 propuestas' })).toBeInTheDocument();
       expect(screen.getByText('Te toca votar · cierra en 7 días')).toBeInTheDocument();
-      expect(screen.getByText('panel-ranking')).toBeInTheDocument();
+      expect(screen.getByRole('list', { name: 'Tu ranking de propuestas' })).toBeInTheDocument();
       const aside = screen.getByRole('complementary');
       expect(within(aside).getByText('¿Cómo cuenta tu voto?')).toBeInTheDocument();
       expect(within(aside).getByText(/Tu orden se compara con el de los demás evaluadores/)).toBeInTheDocument();
@@ -594,9 +598,330 @@ describe('EventDetailPage', () => {
       getAssignment.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(null);
       renderPage(signedIn());
       expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cargar tus propuestas asignadas.');
-      expect(screen.queryByText('panel-ranking')).toBeNull();
+      expect(screen.queryByRole('list', { name: 'Tu ranking de propuestas' })).toBeNull();
       userEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
       expect(await screen.findByRole('heading', { level: 2, name: 'No participas en esta votación' })).toBeInTheDocument();
+    });
+  });
+
+  describe('Ranking (S-017)', () => {
+    const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const A = {
+      id: 'a1',
+      event_id: 'e-1',
+      is_completed: false,
+      completed_at: null,
+      attachments: [
+        { id: 'f1', label: 'Propuesta 1', mime_type: 'application/pdf', file_size: 1048576, description: 'Logo' },
+        { id: 'f2', label: 'Propuesta 2', mime_type: 'image/png', file_size: 524288, description: null },
+        { id: 'f3', label: 'Propuesta 3', mime_type: DOCX, file_size: 2097152, description: null },
+      ],
+    };
+    const voting: Event = {
+      ...ev,
+      stage: 'voting',
+      voting_estimated_end_date: '2026-10-12',
+      participant_ids: ['u-1', 'u-2'],
+    };
+    const draftOf = (...ids: string[]) => ({
+      assignment_id: 'a1',
+      participant_id: 'u-1',
+      rankings: ids.map((id, i) => ({ attachment_id: id, rank: i + 1 })),
+      updated_at: '2026-10-05T10:00:00Z',
+    });
+    const rankingOf = (...ids: string[]) => ids.map((id, i) => ({ attachment_id: id, rank: i + 1 }));
+    const SUBMITTED_KEY = 'telescopio_submitted_ranking:a1';
+    const titles = () =>
+      within(screen.getByRole('list', { name: 'Tu ranking de propuestas' }))
+        .getAllByRole('listitem')
+        .map((li) => /Propuesta \d/.exec(li.textContent ?? '')?.[0]);
+    const ready = async () => screen.findByRole('list', { name: 'Tu ranking de propuestas' });
+
+    beforeEach(() => {
+      localStorage.clear();
+      getEvent.mockResolvedValue(voting);
+      getAssignment.mockResolvedValue(A);
+      getDraft.mockResolvedValue(null);
+      saveDraft.mockResolvedValue(undefined);
+      submitRanking.mockResolvedValue({ replaced: false });
+      openAttachment.mockResolvedValue(undefined);
+      jest.spyOn(window, 'open').mockReturnValue(null);
+    });
+
+    it('TS-24: lista con el borrador', async () => {
+      getDraft.mockResolvedValue(draftOf('f3', 'f1', 'f2'));
+      renderPage(signedIn());
+      await ready();
+      expect(screen.getByRole('heading', { level: 2, name: 'Ordena las 3 propuestas' })).toBeInTheDocument();
+      expect(titles()).toEqual(['Propuesta 3', 'Propuesta 1', 'Propuesta 2']);
+      const send = screen.getByRole('button', { name: 'Enviar mi ranking' });
+      expect(send).toBeEnabled();
+      expect(send).toHaveClass('ui-button--primary');
+      expect(screen.getByText('¿Cómo cuenta tu voto?')).toBeInTheDocument();
+    });
+
+    it('TS-25: el borrador se guarda una vez con debounce', async () => {
+      renderPage(signedIn());
+      await ready();
+      // Dos cambios seguidos dentro de la ventana: 1,2,3 → 1,3,2 → 3,1,2 → un solo guardado.
+      userEvent.click(screen.getByRole('button', { name: 'Subir Propuesta 3' }));
+      userEvent.click(screen.getByRole('button', { name: 'Subir Propuesta 3' }));
+      expect(saveDraft).not.toHaveBeenCalled();
+      await act(async () => {
+        jest.advanceTimersByTime(500);
+      });
+      expect(saveDraft).toHaveBeenCalledTimes(1);
+      expect(saveDraft).toHaveBeenCalledWith('e-1', 'u-1', rankingOf('f3', 'f1', 'f2'));
+      expect(within(screen.getByRole('status', { name: '' })).getByText('Borrador guardado')).toBeInTheDocument();
+    });
+
+    it('TS-26: falla el borrador', async () => {
+      saveDraft.mockRejectedValue(new ApiError({ status: 500, body: { error: 'x', code: 'DRAFT_SAVE_ERROR' } }));
+      renderPage(signedIn());
+      await ready();
+      userEvent.click(screen.getByRole('button', { name: 'Bajar Propuesta 1' }));
+      await act(async () => {
+        jest.advanceTimersByTime(500);
+      });
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'No pudimos guardar el borrador. Tus cambios siguen en pantalla.'
+      );
+      expect(titles()).toEqual(['Propuesta 2', 'Propuesta 1', 'Propuesta 3']);
+      expect(screen.queryByText('Borrador guardado')).toBeNull();
+    });
+
+    it('TS-27: sin borrador usa el orden de la asignación', async () => {
+      renderPage(signedIn());
+      await ready();
+      expect(titles()).toEqual(['Propuesta 1', 'Propuesta 2', 'Propuesta 3']);
+    });
+
+    it('TS-28: falla al leer el borrador no bloquea', async () => {
+      getDraft.mockRejectedValue(new ApiError({ status: 500, body: { error: 'x', code: 'DRAFT_GET_ERROR' } }));
+      renderPage(signedIn());
+      await ready();
+      expect(titles()).toEqual(['Propuesta 1', 'Propuesta 2', 'Propuesta 3']);
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
+
+    it('TS-29: envío', async () => {
+      getDraft.mockResolvedValue(draftOf('f3', 'f1', 'f2'));
+      renderPage(signedIn());
+      await ready();
+      userEvent.click(screen.getByRole('button', { name: 'Enviar mi ranking' }));
+      expect(await screen.findByText('Recibimos tu ranking.')).toBeInTheDocument();
+      expect(submitRanking).toHaveBeenCalledWith('e-1', 'u-1', 'a1', rankingOf('f3', 'f1', 'f2'));
+      await waitFor(() => expect(saveDraft).toHaveBeenCalledWith('e-1', 'u-1', rankingOf('f3', 'f1', 'f2')));
+      expect(screen.getByRole('heading', { level: 2, name: 'Tu ranking está enviado' })).toBeInTheDocument();
+      expect(screen.getByText('Ranking enviado')).toBeInTheDocument();
+      const aside = screen.getByRole('complementary');
+      const progress = within(aside).getByRole('heading', { level: 2, name: 'Tu progreso' }).closest('section')!;
+      expect(within(progress).getByText('Enviado')).toBeInTheDocument();
+      const resend = screen.getByRole('button', { name: 'Reenviar mi ranking' });
+      expect(resend).toHaveClass('ui-button--secondary');
+      expect(resend).toBeDisabled();
+      expect(localStorage.getItem(SUBMITTED_KEY)).toBe('["f3","f1","f2"]');
+    });
+
+    it('TS-30: envío en curso', async () => {
+      let resolve: (v: { replaced: boolean }) => void = () => undefined;
+      submitRanking.mockReturnValue(new Promise((r) => (resolve = r)));
+      renderPage(signedIn());
+      await ready();
+      userEvent.click(screen.getByRole('button', { name: 'Enviar mi ranking' }));
+      const busy = await screen.findByRole('button', { name: 'Enviando ranking…' });
+      expect(busy).toHaveAttribute('aria-busy', 'true');
+      userEvent.click(busy);
+      expect(submitRanking).toHaveBeenCalledTimes(1);
+      screen.getAllByRole('button', { name: /^(Subir|Bajar)/ }).forEach((b) => expect(b).toBeDisabled());
+      await act(async () => {
+        resolve({ replaced: false });
+      });
+    });
+
+    it('TS-31: el envío cancela el borrador pendiente', async () => {
+      renderPage(signedIn());
+      await ready();
+      userEvent.click(screen.getByRole('button', { name: 'Bajar Propuesta 1' }));
+      userEvent.click(screen.getByRole('button', { name: 'Enviar mi ranking' }));
+      await screen.findByText('Recibimos tu ranking.');
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+      expect(saveDraft).toHaveBeenCalledTimes(1);
+      expect(saveDraft).toHaveBeenCalledWith('e-1', 'u-1', rankingOf('f2', 'f1', 'f3'));
+    });
+
+    it('TS-32: Reenviar se habilita solo si cambia el orden', async () => {
+      getAssignment.mockResolvedValue({ ...A, is_completed: true });
+      localStorage.setItem(SUBMITTED_KEY, '["f1","f2","f3"]');
+      renderPage(signedIn());
+      await ready();
+      const resend = () => screen.getByRole('button', { name: 'Reenviar mi ranking' });
+      expect(resend()).toBeDisabled();
+      userEvent.click(screen.getByRole('button', { name: 'Bajar Propuesta 1' }));
+      expect(resend()).toBeEnabled();
+      userEvent.click(screen.getByRole('button', { name: 'Subir Propuesta 1' }));
+      expect(resend()).toBeDisabled();
+    });
+
+    it('TS-33: reenvío', async () => {
+      getAssignment.mockResolvedValue({ ...A, is_completed: true });
+      localStorage.setItem(SUBMITTED_KEY, '["f1","f2","f3"]');
+      submitRanking.mockResolvedValue({ replaced: true });
+      renderPage(signedIn());
+      await ready();
+      userEvent.click(screen.getByRole('button', { name: 'Bajar Propuesta 1' }));
+      userEvent.click(screen.getByRole('button', { name: 'Reenviar mi ranking' }));
+      expect(await screen.findByText('Recibimos tu ranking.')).toBeInTheDocument();
+      expect(submitRanking).toHaveBeenCalledWith('e-1', 'u-1', 'a1', rankingOf('f2', 'f1', 'f3'));
+      expect(screen.getByText('Puedes modificarlo hasta el cierre de la votación.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Reenviar mi ranking' })).toBeDisabled();
+      expect(localStorage.getItem(SUBMITTED_KEY)).toBe('["f2","f1","f3"]');
+    });
+
+    it('el aviso de recibido se cierra solo', async () => {
+      renderPage(signedIn());
+      await ready();
+      userEvent.click(screen.getByRole('button', { name: 'Enviar mi ranking' }));
+      await screen.findByText('Recibimos tu ranking.');
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      expect(screen.queryByText('Recibimos tu ranking.')).toBeNull();
+    });
+
+    it('TS-34: volver con cambios sin reenviar (D-1)', async () => {
+      getAssignment.mockResolvedValue({ ...A, is_completed: true });
+      localStorage.setItem(SUBMITTED_KEY, '["f1","f2","f3"]');
+      getDraft.mockResolvedValue(draftOf('f2', 'f1', 'f3'));
+      renderPage(signedIn());
+      await ready();
+      expect(titles()).toEqual(['Propuesta 2', 'Propuesta 1', 'Propuesta 3']);
+      expect(screen.getByRole('button', { name: 'Reenviar mi ranking' })).toBeEnabled();
+    });
+
+    it('TS-35: sin referencia local el borrador es la referencia (D-1)', async () => {
+      getAssignment.mockResolvedValue({ ...A, is_completed: true });
+      getDraft.mockResolvedValue(draftOf('f2', 'f1', 'f3'));
+      renderPage(signedIn());
+      await ready();
+      expect(titles()).toEqual(['Propuesta 2', 'Propuesta 1', 'Propuesta 3']);
+      expect(screen.getByRole('button', { name: 'Reenviar mi ranking' })).toBeDisabled();
+    });
+
+    it('TS-36: falla el envío', async () => {
+      submitRanking.mockRejectedValue(new ApiError({ status: 500, body: { error: 'Failed to save votes' } }));
+      renderPage(signedIn());
+      await ready();
+      userEvent.click(screen.getByRole('button', { name: 'Bajar Propuesta 1' }));
+      userEvent.click(screen.getByRole('button', { name: 'Enviar mi ranking' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos enviar tu ranking. Intenta de nuevo.');
+      expect(titles()).toEqual(['Propuesta 2', 'Propuesta 1', 'Propuesta 3']);
+      expect(screen.getByRole('button', { name: 'Enviar mi ranking' })).toBeEnabled();
+      expect(localStorage.getItem(SUBMITTED_KEY)).toBeNull();
+    });
+
+    it('TS-37: error de red en el envío', async () => {
+      submitRanking.mockRejectedValue(new TypeError('Failed to fetch'));
+      renderPage(signedIn());
+      await ready();
+      userEvent.click(screen.getByRole('button', { name: 'Enviar mi ranking' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(/conexión|red|Internet/i);
+      expect(titles()).toEqual(['Propuesta 1', 'Propuesta 2', 'Propuesta 3']);
+    });
+
+    it('TS-38: la votación cerró mientras tanto (D-3)', async () => {
+      submitRanking.mockRejectedValue(
+        new ApiError({ status: 400, body: { error: 'Voting is not open', current_stage: 'results' } })
+      );
+      renderPage(signedIn());
+      await ready();
+      const before = getEvent.mock.calls.length;
+      userEvent.click(screen.getByRole('button', { name: 'Enviar mi ranking' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'La votación ya cerró. No se puede modificar el ranking.'
+      );
+      await waitFor(() => expect(getEvent.mock.calls.length).toBe(before + 1));
+    });
+
+    it('TS-39: resultados, solo lectura si votó', async () => {
+      getEvent.mockResolvedValue(resultsEv);
+      getAssignment.mockResolvedValue({ ...A, is_completed: true });
+      localStorage.setItem(SUBMITTED_KEY, '["f2","f3","f1"]');
+      renderPage(signedIn());
+      const heading = await screen.findByRole('heading', { level: 3, name: 'Tu ranking' });
+      expect(titles()).toEqual(['Propuesta 2', 'Propuesta 3', 'Propuesta 1']);
+      expect(screen.queryByRole('button', { name: /^(Subir|Bajar)/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: /ranking$/ })).toBeNull();
+      const podium = await screen.findByRole('list', { name: 'Podio' });
+      expect(heading.compareDocumentPosition(podium) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(saveDraft).not.toHaveBeenCalled();
+    });
+
+    it('TS-40: resultados sin voto', async () => {
+      getEvent.mockResolvedValue(resultsEv);
+      getAssignment.mockResolvedValue({ ...A, is_completed: false });
+      const first = renderPage(signedIn());
+      await screen.findByRole('list', { name: 'Podio' });
+      expect(screen.queryByRole('heading', { name: 'Tu ranking' })).toBeNull();
+      first.unmount();
+
+      getAssignment.mockResolvedValue(null);
+      renderPage(signedIn());
+      await screen.findByRole('list', { name: 'Podio' });
+      expect(screen.queryByRole('heading', { name: 'Tu ranking' })).toBeNull();
+    });
+
+    it('TS-41: resultados con falla en la asignación no bloquea', async () => {
+      getEvent.mockResolvedValue(resultsEv);
+      getAssignment.mockRejectedValue(new TypeError('Failed to fetch'));
+      renderPage(signedIn());
+      await screen.findByRole('list', { name: 'Podio' });
+      expect(screen.queryByRole('heading', { name: 'Tu ranking' })).toBeNull();
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
+
+    it('TS-42: visitante o no inscripto no piden la asignación', async () => {
+      getEvent.mockResolvedValue(resultsEv);
+      const first = renderPage(guest);
+      await screen.findByRole('list', { name: 'Podio' });
+      first.unmount();
+      getEvent.mockResolvedValue({ ...resultsEv, participant_ids: ['u-2'] });
+      renderPage(signedIn());
+      await screen.findByRole('list', { name: 'Podio' });
+      expect(getAssignment).not.toHaveBeenCalled();
+    });
+
+    it('TS-43: explicación del mecanismo real', async () => {
+      renderPage(signedIn());
+      await ready();
+      const aside = screen.getByRole('complementary');
+      expect(within(aside).getByText('¿Cómo cuenta tu voto?')).toBeInTheDocument();
+      expect(within(aside).getByText(/Tu orden se compara con el de los demás evaluadores/)).toBeInTheDocument();
+      expect(aside.textContent).not.toMatch(/pese más|pesa más/);
+    });
+
+    it('TS-44: sin asignación no hay lista ni borrador', async () => {
+      getAssignment.mockResolvedValue(null);
+      renderPage(signedIn());
+      expect(await screen.findByRole('heading', { level: 2, name: 'No participas en esta votación' })).toBeInTheDocument();
+      expect(screen.queryByRole('list', { name: 'Tu ranking de propuestas' })).toBeNull();
+      expect(getDraft).not.toHaveBeenCalled();
+    });
+
+    it('TS-18: Ver archivo abre la pestaña y, si falla, avisa sin tocar el orden', async () => {
+      const tab = {} as Window;
+      (window.open as jest.Mock).mockReturnValue(tab);
+      openAttachment.mockRejectedValue(new ApiError({ status: 403, body: { error: 'Forbidden', code: 'FORBIDDEN' } }));
+      renderPage(signedIn());
+      await ready();
+      userEvent.click(screen.getByRole('button', { name: 'Ver archivo de Propuesta 2' }));
+      expect(window.open).toHaveBeenCalledWith('', '_blank');
+      expect(openAttachment).toHaveBeenCalledWith('f2', 2, 'image/png', tab);
+      expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos abrir el archivo. Intenta de nuevo.');
+      expect(titles()).toEqual(['Propuesta 1', 'Propuesta 2', 'Propuesta 3']);
+      expect(saveDraft).not.toHaveBeenCalled();
     });
   });
 

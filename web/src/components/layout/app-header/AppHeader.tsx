@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import Button from '../../ui/button/Button';
 import Menu from '../../ui/menu/Menu';
 import { MenuIcon } from '../../ui/icons/Icons';
+import NotificationBell from '../../notifications/notification-bell/NotificationBell';
 import { useAuth } from '../../../context/AuthContext';
 import { useT } from '../../../i18n';
 import LanguageSelect from '../language-select/LanguageSelect';
@@ -60,7 +61,9 @@ const AppHeader: React.FC = () => {
           <div className="ly-header__actions">
             {user ? (
               <>
-                <span data-slot="notifications" className="ly-header__slot--notifications" />
+                <span data-slot="notifications" className="ly-header__slot--notifications">
+                  <NotificationBell />
+                </span>
                 <UserMenu />
               </>
             ) : (

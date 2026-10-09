@@ -37,6 +37,7 @@ describe('react/jsx-no-literals', () => {
   it('TS-30: dispara en pages/not-found y components/ui', async () => {
     expect(await literalErrors(HOLA, 'src/pages/not-found/Fake.tsx')).toHaveLength(1);
     expect(await literalErrors(HOLA, 'src/components/ui/fake/Fake.tsx')).toHaveLength(1);
+    expect(await literalErrors(HOLA, 'src/pages/manage-event/Fake.tsx')).toHaveLength(1);
   });
 
   it('TS-31: texto del catálogo y puntuación permitida', async () => {
@@ -47,7 +48,7 @@ describe('react/jsx-no-literals', () => {
   });
 
   it('TS-32: fuera del alcance no dispara', async () => {
-    expect(await literalErrors(HOLA, 'src/pages/manage-event/Fake.tsx')).toHaveLength(0);
+    expect(await literalErrors(HOLA, 'src/services/fake/Fake.tsx')).toHaveLength(0);
   });
 
   it('TS-60: dispara en las carpetas de las páginas de auth', async () => {

@@ -7,6 +7,15 @@ import AppHeader from './AppHeader';
 import { renderWithProviders, sampleUser } from '../../../test-utils/renderWithProviders';
 
 jest.mock('../../../context/AuthContext');
+jest.mock('../../../context/NotificationsContext', () => ({
+  useNotifications: () => ({
+    unreadCount: 2,
+    refresh: jest.fn(),
+    markRead: jest.fn(),
+    markAllRead: jest.fn(),
+    syncUnreadCount: jest.fn(),
+  }),
+}));
 
 const guest = { user: null, isAuthenticated: false, loading: false };
 const member = { user: sampleUser, isAuthenticated: true, loading: false };
@@ -40,6 +49,7 @@ describe('AppHeader', () => {
     const nav = screen.getByRole('navigation', { name: 'Navegación principal' });
     expect(within(nav).getAllByRole('link')).toHaveLength(3);
     expect(container.querySelector('[data-slot="notifications"]')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Notificaciones, 2 sin leer' })).toBeInTheDocument();
     const trigger = screen.getByRole('button', { name: 'Menú de usuario de Ana Pérez' });
     expect(trigger).toHaveTextContent('AP');
     expect(trigger).toHaveTextContent('Ana Pérez');
@@ -60,20 +70,22 @@ describe('AppHeader', () => {
     const menu = screen.getByRole('menu', { name: 'Menú de usuario de Ana Pérez' });
     const items = [
       within(menu).getByRole('menuitem', { name: 'Mis eventos' }),
+      within(menu).getByRole('menuitem', { name: 'Notificaciones' }),
       within(menu).getByRole('menuitemradio', { name: 'Español' }),
       within(menu).getByRole('menuitemradio', { name: 'English' }),
       within(menu).getByRole('menuitem', { name: 'Cerrar sesión' }),
     ];
     expect(Array.from(menu.children)).toEqual(items);
-    expect(items.map((i) => i.textContent)).toEqual(['Mis eventos', 'Español', 'English', 'Cerrar sesión']);
+    expect(items.map((i) => i.textContent)).toEqual(['Mis eventos', 'Notificaciones', 'Español', 'English', 'Cerrar sesión']);
     expect(items.map((i) => i.getAttribute('role'))).toEqual([
+      'menuitem',
       'menuitem',
       'menuitemradio',
       'menuitemradio',
       'menuitem',
     ]);
-    expect(items[1]).toHaveAttribute('aria-checked', 'true');
-    expect(items[2]).toHaveAttribute('aria-checked', 'false');
+    expect(items[2]).toHaveAttribute('aria-checked', 'true');
+    expect(items[3]).toHaveAttribute('aria-checked', 'false');
   });
 
   it('TS-37: cambia el idioma desde el menú de usuario', () => {
@@ -101,6 +113,13 @@ describe('AppHeader', () => {
     userEvent.click(screen.getByRole('button', { name: 'Menú de usuario de Ana Pérez' }));
     userEvent.click(screen.getByRole('menuitem', { name: 'Cerrar sesión' }));
     expect(second.auth.logout).toHaveBeenCalledTimes(1);
+  });
+
+  it('TS-58: Notificaciones en el menú de usuario navega a /notifications', () => {
+    renderWithProviders(<AppHeader />, { auth: member });
+    userEvent.click(screen.getByRole('button', { name: 'Menú de usuario de Ana Pérez' }));
+    userEvent.click(screen.getByRole('menuitem', { name: 'Notificaciones' }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/notifications');
   });
 
   it('TS-39: selector de idioma del visitante', () => {

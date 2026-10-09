@@ -71,3 +71,15 @@ export const addDays = (date: string, days: number): string => {
 };
 
 export const todayISO = (now: Date = new Date()): string => toISODate(now);
+
+export const DURATION_PRESETS = [3, 7, 14] as const;
+export const DEFAULT_DURATION_DAYS = 7;
+
+export type DeadlineIssue = 'not_after_today' | 'not_postponed';
+
+/** Compara strings `YYYY-MM-DD` (calendario local). */
+export const validateNewDeadline = (date: string, today: string): DeadlineIssue | null =>
+  date <= today ? 'not_after_today' : null;
+
+export const validatePostpone = (date: string, current: string): DeadlineIssue | null =>
+  date <= current ? 'not_postponed' : null;

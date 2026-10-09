@@ -1,0 +1,27 @@
+.ev-publish-results__text {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-primary);
+}
+
+/* Mobile: apiladas con la principal arriba (sin cambiar el orden del DOM ni el foco inicial). */
+.ev-publish-results__actions {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--space-inline-md);
+  width: 100%;
+}
+
+.ev-publish-results__actions > * {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .ev-publish-results__actions {
+    flex-direction: row;
+  }
+  .ev-publish-results__actions > * {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}

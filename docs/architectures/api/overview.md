@@ -113,9 +113,10 @@ Relevada del código, para que no se confunda con decisión de diseño:
 6. **Paginación en memoria con N+1**: `GET /events` trae todo y pagina después, haciendo
    una consulta de participantes por evento.
 7. **Handlers implementados sin rutas**: `DeleteEvent` (devuelve 501),
-   `GetVotingConfiguration`, `UpdateVotingConfiguration`, `DeleteVotingConfiguration`,
+   `UpdateVotingConfiguration`, `DeleteVotingConfiguration`,
    `GetAttachment`, `RemoveParticipant`. (`PreviewVotingConfiguration` ya tiene ruta:
-   `GET /events/:event_id/voting-config/preview`, desde S-006.)
+   `GET /events/:event_id/voting-config/preview`, desde S-006; `GetVotingConfiguration` también:
+   `GET /events/:event_id/voting-config`, desde S-016.)
 8. **Código sin `gofmt`**: hay bloques con indentación rota que hacen difícil leer el
    control de flujo (por ejemplo `event_handler.go:196-207`, cuya lógica es correcta pero
    parece rota). `_base` exige `gofumpt`.

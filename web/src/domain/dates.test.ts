@@ -7,6 +7,10 @@ import {
   formatRelative,
   addDays,
   todayISO,
+  validateNewDeadline,
+  validatePostpone,
+  DURATION_PRESETS,
+  DEFAULT_DURATION_DAYS,
 } from './dates';
 
 describe('dates', () => {
@@ -48,5 +52,23 @@ describe('dates', () => {
     expect(addDays('2026-10-04', 7)).toBe('2026-10-11');
     expect(addDays('2026-10-28', 7)).toBe('2026-11-04');
     expect(todayISO(new Date(2026, 9, 4, 23, 30))).toBe('2026-10-04');
+  });
+
+  it('TS-3: fecha nueva posterior a hoy', () => {
+    expect(validateNewDeadline('2026-10-05', '2026-10-05')).toBe('not_after_today');
+    expect(validateNewDeadline('2026-10-04', '2026-10-05')).toBe('not_after_today');
+    expect(validateNewDeadline('2026-10-06', '2026-10-05')).toBeNull();
+  });
+
+  it('TS-4: solo posponer', () => {
+    expect(validatePostpone('2026-10-08', '2026-10-10')).toBe('not_postponed');
+    expect(validatePostpone('2026-10-10', '2026-10-10')).toBe('not_postponed');
+    expect(validatePostpone('2026-10-17', '2026-10-10')).toBeNull();
+  });
+
+  it('TS-5: presets', () => {
+    expect(DURATION_PRESETS).toEqual([3, 7, 14]);
+    expect(addDays('2026-10-05', DEFAULT_DURATION_DAYS)).toBe('2026-10-12');
+    expect(addDays('2026-10-10', 7)).toBe('2026-10-17');
   });
 });

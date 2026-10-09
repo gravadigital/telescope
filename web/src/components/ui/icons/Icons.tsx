@@ -24,6 +24,18 @@ const BaseIcon: React.FC<IconProps & { children: React.ReactNode }> = ({ childre
   </svg>
 );
 
+export const ArrowUpIcon: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M12 19V5M5 12l7-7 7 7" />
+  </BaseIcon>
+);
+
+export const ArrowDownIcon: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M12 5v14M19 12l-7 7-7-7" />
+  </BaseIcon>
+);
+
 export const CloseIcon: React.FC<IconProps> = (props) => (
   <BaseIcon {...props}>
     <path d="M6 6l12 12M18 6L6 18" />
@@ -134,4 +146,39 @@ export const LinkedInIcon: React.FC<IconProps> = (props) => (
 
 export const FacebookIcon: React.FC<IconProps> = (props) => (
   <BrandIcon {...props} box="0 0 320 512" d="M80 299.3l0 212.7 116 0 0-212.7 86.5 0 18-97.8-104.5 0 0-34.6c0-51.7 20.3-71.5 72.7-71.5 16.3 0 29.4 .4 37 1.2l0-88.7C291.4 4 256.4 0 236.2 0 129.3 0 80 50.5 80 159.4l0 42.1-66 0 0 97.8 66 0z" />
+);
+
+export const EditIcon: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+  </BaseIcon>
+);
+
+export const BellIcon: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+  </BaseIcon>
+);
+
+export const UsersIcon: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+  </BaseIcon>
+);
+
+export const TrophyIcon: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z" />
+    <path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3" />
+  </BaseIcon>
+);
+
+export const ArrowRightIcon: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M5 12h14M12 5l7 7-7 7" />
+  </BaseIcon>
 );

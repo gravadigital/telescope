@@ -5,7 +5,6 @@ import YAML from 'yaml';
 import { es } from './catalogs/es';
 import { en } from './catalogs/en';
 import { findGenderMarks, findVoseo } from './neutral-spanish';
-import type { StageAdvanceIssue } from '../domain/stages';
 
 type Tree = { [key: string]: unknown };
 
@@ -55,7 +54,7 @@ const collectApiCodes = (): Set<string> => {
 describe('catálogo', () => {
   it('TS-23: cubre todos los códigos de api.yaml', () => {
     const codes = collectApiCodes();
-    expect(codes.size).toBe(104);
+    expect(codes.size).toBe(105);
     ['EVENT_NOT_FOUND', 'UNAUTHORIZED', 'FORBIDDEN', 'INSUFFICIENT_ATTACHMENTS'].forEach((c) =>
       expect(codes.has(c)).toBe(true)
     );
@@ -72,7 +71,8 @@ describe('catálogo', () => {
   });
 
   it('TS-24: códigos de dominio traducidos', () => {
-    const issues: StageAdvanceIssue[] = [
+    // Los códigos de avance de etapa que muestran los diálogos de la gestión (S-016).
+    const issues = [
       'INVALID_TRANSITION',
       'MISSING_ESTIMATED_DATE',
       'INVALID_ESTIMATED_DATE',

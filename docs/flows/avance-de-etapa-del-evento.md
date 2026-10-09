@@ -4,7 +4,7 @@ title: Avance de etapa del evento
 type: event
 status: Active
 created: 2026-09-18
-last_updated: 2026-10-05
+last_updated: 2026-10-09
 stories: [S-006, S-009, S-015, S-016]
 ---
 
@@ -13,8 +13,8 @@ stories: [S-006, S-009, S-015, S-016]
 **Tipo:** Evento
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-10-05
-**Stories:** S-006, S-009, S-015, S-016 (S-015 implementada; el resto, planificado por REQ-003)
+**Última actualización:** 2026-10-09
+**Stories:** S-006, S-009, S-015, S-016 (S-015 y S-016 implementadas)
 
 ## Descripción
 
@@ -23,33 +23,15 @@ Es la acción de control del organizador y el disparador de las notificaciones p
 
 **Sin retroceso ni saltos.** Cada avance es irreversible desde la interfaz.
 
-⚠️ **Este flujo tiene una inconsistencia conocida (D-05): la misma acción se comporta distinto
-según desde qué pantalla se ejecute.** Está documentada en el Paso 1.
-
-## Cambios planificados (REQ-003)
-
-> Diseño aprobado, **pendiente de implementar**. Lo de arriba describe el código actual; al
-> implementar cada story, incorporar estos cambios al paso correspondiente y quitarlos de acá.
-
-| Paso | Cambio | Story |
-|---|---|---|
-| 1 | La validación de `ManageEventPage` pasa a un único módulo `web/src/domain/stages.ts`. Se elimina "todos votaron". Cierra D-05 (`EventDetailPage` ya dejó de avanzar etapas en S-015) | S-016 |
-| 2 | El modal pasa a `Dialog` + `DateQuickPicker` (atajos 3 días / 1 semana / 2 semanas). Para `voting` el diálogo incluye la configuración (`GET /api/v1/events/{event_id}/voting-config/preview`) | S-016 |
-| Acciones | "Posponer deadline" también se valida en el cliente (cierra D-06) | S-016 |
-
-**Tabla de transiciones resultante:**
-
-| Transición | Precondición |
-|---|---|
-| `creation → participation` | `estimated_end_date` requerida. El evento pasa a ser visible (hasta ahí, 404 para quien no es el autor — S-008) |
-| `participation → voting` | `estimated_end_date` + `voting_config` · **≥ 3 participantes con propuesta** |
-| `voting → results` | Confirmación explícita en el diálogo, aun con rankings faltantes |
+La inconsistencia D-05 (la misma acción validada distinto según la pantalla) quedó **resuelta en
+S-016**: solo `ManageEventPage` avanza etapas y las reglas del cliente viven en un único lugar
+(`web/src/domain/stages.ts` + `web/src/domain/manage.ts`). Ver Paso 1.
 
 ## Servicios Involucrados
 
 | Servicio | Rol | Tipo de Participación |
 |----------|-----|-----------------------|
-| `web` | Presenta el modal de avance (solo en la gestión) y valida precondiciones | Iniciador |
+| `web` | Presenta el diálogo de avance de cada etapa (solo en la gestión) y valida fechas y precondiciones | Iniciador |
 | `api` | Valida la transición, actualiza la etapa, dispara los emails | Procesador |
 | PostgreSQL | Persiste `events.stage` y los deadlines estimados | Almacenamiento |
 | SMTP | Entrega la notificación a los participantes | Notificador |
@@ -64,13 +46,18 @@ sequenceDiagram
     participant DB as PostgreSQL
     participant SMTP as Servidor SMTP
 
-    O->>WEB: click en "Advance to {Stage}" (solo en ManageEventPage)
+    O->>WEB: click en la acción de "Próximo paso" (solo en ManageEventPage)
+    Note over WEB: domain/stages.ts elige el diálogo de la etapa<br/>(OpenRegistrationDialog · OpenVotingDialog · PublishResultsDialog)
 
-    WEB->>WEB: valida participantes > 0
-    WEB->>WEB: valida todos votaron (si voting→results)
-    Note over WEB: si falla, throw → el modal muestra el error
-
-    WEB-->>O: modal pide estimated_end_date
+    alt a participation o voting
+        WEB-->>O: Dialog + DateQuickPicker (3 días / 1 semana / 2 semanas)
+        opt a voting
+            WEB->>API: GET /api/v1/events/{event_id}/voting-config/preview
+            API-->>WEB: { can_open_voting, min_m, max_m, recommended_m, defaults, ... }
+        end
+    else a results
+        WEB-->>O: PublishResultsDialog (avisa rankings faltantes)
+    end
     O->>WEB: confirma
     WEB->>API: PATCH /api/v1/events/{event_id}/stage
     API->>API: valida transición (sin saltos ni retroceso)
@@ -81,54 +68,63 @@ sequenceDiagram
         API->>DB: BEGIN · UPDATE events · INSERT/UPDATE voting_configurations · INSERT assignments · COMMIT
         API-->>WEB: 200 { data, voting }
         API->>SMTP: emails a los participantes (en segundo plano)
-        WEB-->>O: recarga los datos del evento
+        WEB-->>O: cierra el diálogo, aviso de éxito y recarga la gestión
     else otra transición
         API->>DB: UPDATE events SET stage, estimated_end_date
         API-->>WEB: 200 { data }
         API->>SMTP: emails a los participantes (en segundo plano)
-        WEB-->>O: recarga los datos del evento
+        WEB-->>O: cierra el diálogo, aviso de éxito y recarga la gestión
     end
 ```
 
 ---
 
-### Paso 1: Validaciones previas en el cliente
+### Paso 1: Elegir la transición y validar en el cliente
 
 **Origen:** `web` · **Destino:** `web` · **Tipo:** Interno
 
-⚠️ **D-05 (parcialmente resuelta).** Las validaciones de `participation` → `voting` ahora están en
-ambas pantallas y coinciden con el backend; el resto de las transiciones todavía depende de la pantalla.
+**D-05 resuelta en S-016.** Solo `ManageEventPage` avanza etapas (`EventDetailPage` dejó de hacerlo
+en S-015) y las reglas del cliente viven en un único módulo de dominio: `web/src/domain/stages.ts`
+(`getNextStage`, `transitionDialog`, `MIN_PROPOSALS_TO_VOTE = 3`) más `web/src/domain/manage.ts`
+(`pendingFiles`, `votingProgress`). Se borraron `validateStageAdvance`, `StageAdvanceModal` y la regla
+"todos votaron".
 
-**Desde `ManageEventPage`** (`:232-252`) — valida antes de llamar a la API:
+| Etapa actual | Diálogo | Qué informa la tarjeta "Próximo paso" |
+|---|---|---|
+| `creation` | `OpenRegistrationDialog` | Checklist del evento (datos, cupo, fecha) |
+| `participation` | `OpenVotingDialog` | Consecuencia: menos de 3 propuestas, o inscriptos sin propuesta (`pendingFiles`) |
+| `voting` | `PublishResultsDialog` | Consecuencia: rankings faltantes (`votingProgress`) |
 
-| Validación | Regla |
-|---|---|
-| Sin participantes | Bloquea si se avanza desde `participation` con `participants.length === 0` → `Cannot advance: No participants registered yet.` |
-| Participantes insuficientes | Bloquea si se avanza de `participation` a `voting` con 1 o 2 participantes → `Cannot advance to voting: only {n} participant(s) registered. At least 3 participants are required.` |
-| Votación incompleta | Bloquea si se avanza de `voting` a `results` con `votedCount < totalParticipants` → `Cannot advance: Only {x} of {y} participants have voted.` |
+El botón del próximo paso queda deshabilitado con el evento pausado o mientras falle/cargue un bloque
+de datos de la gestión. Las reglas de negocio de la transición (≥ 3 participantes con propuesta,
+configuración válida) las decide el backend; el cliente las anticipa con la vista previa (Paso 2).
 
-El error se lanza con `throw` y lo captura `StageAdvanceModal`, que lo muestra en su propio bloque.
+**Cerrar la votación con evaluaciones pendientes está permitido y es explícito.**
+`PublishResultsDialog` muestra cuántos rankings faltan y pide confirmar ("publicar igual"). Quien no
+completó recibe `Q_i = 0` y **su propia propuesta baja `n` posiciones**.
 
-**`EventDetailPage` ya no avanza etapas (S-015).** El detalle público no tiene botón de avanzar,
-`StageAdvanceModal` ni `VotingConfigurationPanel`: solo `ManageEventPage` ejecuta este flujo, así que
-la doble validación (D-05) deja de existir por pantalla; falta unificarla en `domain/stages.ts` (S-016).
-
-**Consecuencia real (sigue en la gestión):** un organizador puede cerrar la votación con
-evaluaciones pendientes. Quien no completó recibe `Q_i = 0` y **su propia propuesta baja `n`
-posiciones**: un cierre prematuro penaliza a gente que todavía tenía plazo.
-
-> Un comentario en `ManageEventPage.tsx:238-239` indica que se **eliminó deliberadamente** la
-> validación de que todos hubieran subido archivo antes de votar.
-
-**Ref:** `web/src/pages/manage-event/ManageEventPage.tsx:232-252`
+**Ref:** `web/src/domain/stages.ts`; `web/src/domain/manage.ts`;
+`web/src/pages/manage-event/ManageEventPage.tsx`
 
 ---
 
 ### Paso 2: Confirmar la etapa destino y el deadline
 
-**Origen:** `web` (modal) · **Destino:** `web` · **Tipo:** Interno
+**Origen:** `web` (diálogo) · **Destino:** `web` · **Tipo:** Interno
 
-`StageAdvanceModal` pide la fecha estimada de fin de la etapa destino. El campo tiene `min` = hoy.
+Los diálogos usan `Dialog` + `DateQuickPicker` con atajos **3 días / 1 semana / 2 semanas** sobre hoy
+(valor inicial: hoy + 7). La fecha se valida en el cliente con `validateNewDeadline` (debe ser
+posterior a hoy) y se muestra como fin del día con fecha larga.
+
+- **`OpenRegistrationDialog`** (`creation → participation`): solo la fecha.
+- **`OpenVotingDialog`** (`participation → voting`): fecha + configuración de la votación. Pide
+  `GET /api/v1/events/{event_id}/voting-config/preview`, precarga `m` con `recommended_m` y los
+  defaults, y no permite confirmar si `can_open_voting` es `false`. Ajustes avanzados con
+  `NumberStepper`. Ver
+  [configuración y generación de asignaciones](configuracion-y-generacion-de-asignaciones.md).
+- **`PublishResultsDialog`** (`voting → results`): sin fecha; avisa los rankings faltantes y pide
+  confirmación explícita. En la etapa `results`, la gestión muestra `EventResults`, que recalcula con
+  `POST /api/v1/events/{event_id}/distributed-results/recalculate` si todavía no hay resultados.
 
 ---
 
@@ -154,6 +150,8 @@ posiciones**: un cierre prematuro penaliza a gente que todavía tenía plazo.
   }
   ```
   `voting_config` es obligatorio cuando `stage = voting` y se ignora en el resto de las transiciones.
+  Desde la web, `OpenVotingDialog` abre la votación con **una sola llamada** a este endpoint con
+  `voting_config` (ya no usa `POST /voting-config` ni `POST /generate-assignments`).
 
 **Response (éxito) — 200:** envelope `data` con el evento actualizado, `message`, `code:
 STAGE_UPDATED` y `transition: { from, to }`. Cuando `stage = voting` suma
@@ -214,8 +212,10 @@ participante se entera de que se abrió la votación.
 | Transición | Precondición | Qué habilita |
 |---|---|---|
 | `creation → participation` | `estimated_end_date` requerida | Registro de participantes y carga de propuestas |
-| `participation → voting` | `estimated_end_date` + `voting_config` · **≥ 3 participantes con propuesta** · (desde Manage: ≥ 1 participante) | La votación: configuración y asignaciones ya quedan creadas por la propia transición |
-| `voting → results` | (desde Manage: todos votaron) | Panel de resultados |
+| `participation → voting` | `estimated_end_date` + `voting_config` · **≥ 3 participantes con propuesta** | La votación: configuración y asignaciones ya quedan creadas por la propia transición |
+| `voting → results` | Confirmación explícita en `PublishResultsDialog`, aun con rankings faltantes | Panel de resultados |
+
+`creation → participation` además hace visible el evento (hasta ahí, 404 para quien no es el autor — S-008).
 
 ## Acciones Independientes de la Etapa
 
@@ -226,18 +226,18 @@ cancelarse en cualquier etapa.
 |---|---|---|
 | Pausar / reanudar | `PATCH /api/v1/events/{event_id}/pause` | Con el evento pausado no se puede registrar ni subir propuestas |
 | Cancelar | `PATCH /api/v1/events/{event_id}/cancel` | Dispara email de cancelación |
-| Posponer deadline | `PATCH /api/v1/events/{event_id}/estimated-end-date` | **Solo posponer, no adelantar** — regla activa en el backend. ⚠️ El cliente no la valida (D-06) |
+| Posponer deadline | `PATCH /api/v1/events/{event_id}/estimated-end-date` | **Solo posponer, no adelantar** — regla del backend, validada también en el cliente con `validatePostpone` desde `EditDeadlineDialog` (D-06 resuelta en S-016) |
 
-> La confirmación de pausa usa **`window.confirm` nativo** (`ManageEventPage.tsx:258`), el único
-> diálogo no-React de la aplicación.
+> Pausar abre un `Dialog variant="alert"` de confirmación; reanudar llama directo a `PATCH /pause`.
+> `EditDeadlineDialog` usa `DateQuickPicker` con atajos sobre el cierre actual.
 
 ## Manejo de Errores
 
 | Paso | Condición | Respuesta | Qué ve el organizador |
 |---|---|---|---|
-| 1 | Participantes insuficientes para `voting` | — | `Cannot advance to voting: ... At least 3 participants are required.` |
-| 1 | Votación incompleta (solo desde Manage) | — | `Cannot advance: Only {x} of {y} participants have voted.` |
-| 3 | Salto de etapa o retroceso | 400 | Mensaje del backend |
+| 2 | Fecha no posterior a hoy | — | Error de validación en el diálogo; no se llama a la API |
+| 2 | Menos de 3 propuestas (`can_open_voting = false`) | — | `OpenVotingDialog` lo explica y no permite confirmar |
+| 3 | Salto de etapa o retroceso | 400 | Mensaje traducido en el diálogo |
 | 3 | Falta `estimated_end_date` | 400 | Idem |
 | 3 | Menos de 3 participantes con propuesta al pasar a `voting` | 400 | `INSUFFICIENT_ATTACHMENTS` con `current_count` y `required_minimum: 3` |
 | 3 | Falta `voting_config` al pasar a `voting` | 400 | `MISSING_VOTING_CONFIG` |
@@ -246,8 +246,9 @@ cancelarse en cualquier etapa.
 | 3 | No es el autor del evento | 403 | — |
 | 4 | Falla el envío de email | — | ⚠️ **Nada.** Falla en silencio |
 
-⚠️ **`ManageEventPage` no muestra ningún mensaje de éxito** tras avanzar de etapa: el único
-feedback es que los datos se recargan.
+Tras cada transición exitosa, `ManageEventPage` cierra el diálogo, muestra un aviso de éxito
+(`Callout tone="success"` en una región `role="status"`, 5 s), recarga la gestión y mueve el foco al
+título del próximo paso.
 
 ## Estado Resultante
 

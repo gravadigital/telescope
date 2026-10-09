@@ -80,8 +80,10 @@ siguiente de forma confusa.
 
 ## Qué priorizar
 
-1. **`RankingVotePanel`** — donde el participante arma su ranking. Es la interacción más
-   compleja y la de mayor costo si falla.
+1. **El ranking** (`SortableRankList`, `useRankingVote` y `EventDetailPage`) — donde el
+   participante arma, guarda y reenvía su ranking. Es la interacción más compleja y la de
+   mayor costo si falla; ya tiene tests de componente y de página (borrador con debounce,
+   envío / reenvío, solo lectura en resultados).
 2. **`AuthContext`** — restauración de sesión, logout, manejo de `auth:logout`.
 3. **`apiRequest`** — inyección del token, manejo del 401, normalización del error.
 4. **Formularios** — creación de evento y configuración de votación, con sus validaciones.

@@ -1,4 +1,4 @@
-import { apiRequest, checkApiHealth, downloadFile, getErrorCode, API_CONFIG } from "../config/api";
+import { apiRequest, checkApiHealth, downloadFile, fetchFile, saveBlob, getErrorCode, API_CONFIG } from "../config/api";
 import {
   Event,
   EventCreateInput,
@@ -10,13 +10,19 @@ import {
   User,
   EventParticipant,
   VotingConfiguration,
+  VotingConfigInput,
+  StageUpdateResult,
+  ReminderType,
+  ReminderResult,
   AnonymousAssignment,
   RankingVote,
   VotingResults,
   VotingStatistics,
-  Attachment
+  Attachment,
+  NotificationPage
 } from "../types";
 import { automaticEventDates } from "../domain/eventForm";
+import { VotingConfigPreview } from "../domain/voting";
 
 // Mantener en sync con `neutralExtensions` de api/internal/handlers/attachment_handler.go
 export const NEUTRAL_EXTENSIONS: Record<string, string> = {
@@ -167,46 +173,34 @@ export const EventService = {
 
   async updateEventStage(
     eventId: string,
-    newStage: string,
-    estimatedEndDate?: string
-  ): Promise<Event> {
-    try {
-      const body: { stage: string; estimated_end_date?: string } = {
-        stage: newStage
-      };
+    newStage: EventStage,
+    estimatedEndDate?: string,
+    votingConfig?: VotingConfigInput
+  ): Promise<StageUpdateResult> {
+    const response = await apiRequest<{
+      data: { stage: EventStage };
+      voting?: StageUpdateResult["voting"];
+    }>(API_CONFIG.ENDPOINTS.EVENT_STAGE(eventId), {
+      method: "PATCH",
+      body: JSON.stringify({
+        stage: newStage,
+        ...(estimatedEndDate && { estimated_end_date: estimatedEndDate }),
+        ...(votingConfig && { voting_config: votingConfig }),
+      }),
+    });
+    return {
+      stage: response.data.stage,
+      ...(response.voting && { voting: response.voting }),
+    };
+  },
 
-      if (estimatedEndDate) {
-        body.estimated_end_date = estimatedEndDate;
-      }
-
-      const response = await apiRequest<{ data: any }>(
-        API_CONFIG.ENDPOINTS.EVENT_STAGE(eventId),
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        }
-      );
-
-      // Map response to Event type
-      const event = response.data;
-      return {
-        id: event.id,
-        title: event.name || event.title,
-        description: event.description,
-        date: event.start_date || event.date,
-        stage: event.stage,
-        participation_estimated_end_date: event.participation_estimated_end_date,
-        voting_estimated_end_date: event.voting_estimated_end_date,
-        creator_id: event.author_id,
-        updated_at: event.updated_at
-      } as Event;
-    } catch (error) {
-      console.error("Failed to update event stage:", error);
-      throw error;
-    }
+  /** Envía un recordatorio a los destinatarios pendientes (S-016). */
+  async sendReminder(eventId: string, type: ReminderType): Promise<ReminderResult> {
+    const response = await apiRequest<{ data: ReminderResult }>(
+      API_CONFIG.ENDPOINTS.EVENT_REMINDERS(eventId),
+      { method: "POST", body: JSON.stringify({ type }) }
+    );
+    return { type: response.data.type, recipients_count: response.data.recipients_count };
   },
 
   /**
@@ -221,12 +215,6 @@ export const EventService = {
     estimatedEndDate: string
   ): Promise<{ previousDate: string | null; newDate: string }> {
     try {
-      console.log('📅 Updating estimated end date:', {
-        eventId,
-        stage,
-        estimatedEndDate
-      });
-
       const response = await apiRequest<{
         data: {
           event_id: string;
@@ -249,8 +237,6 @@ export const EventService = {
           }),
         }
       );
-
-      console.log('✅ Estimated end date updated:', response.data);
 
       return {
         previousDate: response.data.previous_date || null,
@@ -292,29 +278,6 @@ export const EventService = {
       );
     } catch (error) {
       console.error("❌ Failed to register for event:", error);
-      throw error;
-    }
-  },
-
-  async getEventParticipants(eventId: string): Promise<User[]> {
-    try {
-      const response = await apiRequest<{ count: number; data: { participants: any[] } }>(
-        API_CONFIG.ENDPOINTS.EVENT_PARTICIPANTS(eventId)
-      );
-
-      // El backend devuelve { count, data: { event, participants } }
-      const participants = response.data?.participants || [];
-
-      return participants.map(participant => ({
-        id: participant.id,
-        name: participant.name,
-        email: participant.email,
-        role: participant.role || "participant",
-        joinedEventIDs: participant.joined_event_ids || [],
-        createdEventIDs: participant.created_event_ids || []
-      }));
-    } catch (error) {
-      console.error("❌ Failed to fetch event participants:", error);
       throw error;
     }
   },
@@ -551,17 +514,30 @@ export const AttachmentService = {
   },
 
   /**
-   * Descarga de una propuesta asignada al evaluador, con nombre neutro (anonimato).
+   * Abre una propuesta asignada al evaluador (S-017). La pestaña (`target`) la abre el
+   * componente en el click, de forma sincrónica, para que el navegador no la bloquee.
+   * Sin pestaña se descarga con nombre neutro (anonimato).
    */
-  async downloadAssignedAttachment(
+  async openAssignedAttachment(
     attachmentId: string,
     position: number,
-    mimeType: string
+    mimeType: string,
+    target: Window | null
   ): Promise<void> {
-    await downloadFile(
-      API_CONFIG.ENDPOINTS.DOWNLOAD_ATTACHMENT(attachmentId),
-      neutralFilename(position, mimeType)
-    );
+    try {
+      const blob = await fetchFile(API_CONFIG.ENDPOINTS.DOWNLOAD_ATTACHMENT(attachmentId));
+      if (!target) {
+        saveBlob(blob, neutralFilename(position, mimeType));
+        return;
+      }
+      const url = window.URL.createObjectURL(blob);
+      target.location.href = url;
+      // Se revoca más tarde para que la pestaña llegue a cargarlo.
+      setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      target?.close();
+      throw error;
+    }
   },
 
   async deleteAttachment(attachmentId: string): Promise<void> {
@@ -576,54 +552,24 @@ export const AttachmentService = {
 // ========================================
 
 export const DistributedVotingService = {
-  /**
-   * Crear configuración de votación para un evento
-   */
-  async createVotingConfig(
-    eventId: string,
-    config: Partial<VotingConfiguration>
-  ): Promise<VotingConfiguration> {
-    try {
-      const response = await apiRequest<{ data: VotingConfiguration }>(
-        API_CONFIG.ENDPOINTS.VOTING_CONFIG(eventId),
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config)
-        }
-      );
-      console.log('✅ Voting configuration created:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('Failed to create voting configuration:', error);
-      throw error;
-    }
+  /** Vista previa del reparto para el organizador (S-016). */
+  async getVotingConfigPreview(eventId: string): Promise<VotingConfigPreview> {
+    const response = await apiRequest<{ data: VotingConfigPreview }>(
+      API_CONFIG.ENDPOINTS.VOTING_CONFIG_PREVIEW(eventId)
+    );
+    return response.data;
   },
 
-  /**
-   * Generar asignaciones distribuidas para todos los participantes
-   */
-  async generateAssignments(eventId: string): Promise<void> {
+  /** Configuración aplicada; `null` si el evento aún no abrió la votación. */
+  async getVotingConfig(eventId: string): Promise<VotingConfiguration | null> {
     try {
-      const response = await apiRequest<{ 
-        data: { 
-          assignments_count: number;
-          total_participants: number;
-          total_attachments: number;
-          total_evaluations: number;
-        };
-        message: string;
-      }>(
-        API_CONFIG.ENDPOINTS.GENERATE_ASSIGNMENTS(eventId),
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        }
+      const response = await apiRequest<{ data: VotingConfiguration }>(
+        API_CONFIG.ENDPOINTS.VOTING_CONFIG(eventId)
       );
-      console.log('✅ Assignments generated:', response.data.assignments_count, 'assignments for', response.data.total_participants, 'participants');
-    } catch (error) {
-      console.error('Failed to generate assignments:', error);
-      throw error;
+      return response.data;
+    } catch (err) {
+      if (getErrorCode(err) === 'CONFIG_NOT_FOUND') return null;
+      throw err;
     }
   },
 
@@ -640,14 +586,12 @@ export const DistributedVotingService = {
         event_name: string;
         participant_id: string;
       }>(API_CONFIG.ENDPOINTS.GET_ASSIGNMENT(eventId, participantId));
-      console.log('✅ Assignment loaded for participant:', participantId);
       return response.assignment;
     } catch (error) {
       // Inscripto sin propuesta: no es un error, simplemente no evalúa
       if (getErrorCode(error) === 'NO_ASSIGNMENT') {
         return null;
       }
-      console.error('Failed to get participant assignment:', error);
       throw error;
     }
   },
@@ -660,24 +604,19 @@ export const DistributedVotingService = {
     participantId: string,
     assignmentId: string,
     rankings: RankingVote[]
-  ): Promise<void> {
-    try {
-      await apiRequest<{ message: string }>(
-        API_CONFIG.ENDPOINTS.SUBMIT_RANKING_VOTES(eventId, participantId),
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            assignment_id: assignmentId,
-            rankings 
-          })
-        }
-      );
-      console.log('✅ Ranking votes submitted successfully');
-    } catch (error) {
-      console.error('Failed to submit ranking votes:', error);
-      throw error;
-    }
+  ): Promise<{ replaced: boolean }> {
+    const response = await apiRequest<{ message: string; replaced?: boolean }>(
+      API_CONFIG.ENDPOINTS.SUBMIT_RANKING_VOTES(eventId, participantId),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assignment_id: assignmentId,
+          rankings
+        })
+      }
+    );
+    return { replaced: response.replaced === true };
   },
 
   /**
@@ -755,8 +694,9 @@ export const VoteDraftService = {
         API_CONFIG.ENDPOINTS.VOTE_DRAFT(eventId, participantId)
       );
       return response.data;
-    } catch (err: any) {
-      if (err?.message?.includes('404') || err?.message?.includes('DRAFT_NOT_FOUND')) {
+    } catch (err) {
+      const code = getErrorCode(err);
+      if (code === 'DRAFT_NOT_FOUND' || code === 'ASSIGNMENT_NOT_FOUND') {
         return null;
       }
       throw err;
@@ -847,5 +787,46 @@ export const GoogleAuthService = {
       },
       token: response.token,
     };
+  },
+};
+
+export const NotificationService = {
+  /** Lista las notificaciones del usuario; `before` es el `next_cursor` recibido, tal cual. */
+  async list({ limit, before }: { limit: number; before?: string | null }): Promise<NotificationPage> {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (before) params.set("before", before);
+    const response = await apiRequest<{
+      data: NotificationPage["notifications"];
+      unread_count: number;
+      next_cursor: string | null;
+    }>(`${API_CONFIG.ENDPOINTS.NOTIFICATIONS}?${params.toString()}`);
+    return {
+      notifications: response.data,
+      unread_count: response.unread_count,
+      next_cursor: response.next_cursor,
+    };
+  },
+
+  async unreadCount(): Promise<number> {
+    const response = await apiRequest<{ data: { unread_count: number } }>(
+      API_CONFIG.ENDPOINTS.NOTIFICATIONS_UNREAD_COUNT
+    );
+    return response.data.unread_count;
+  },
+
+  async markRead(id: string): Promise<{ id: string; read_at: string }> {
+    const response = await apiRequest<{ data: { id: string; read_at: string } }>(
+      API_CONFIG.ENDPOINTS.NOTIFICATION_READ(id),
+      { method: "PATCH" }
+    );
+    return { id: response.data.id, read_at: response.data.read_at };
+  },
+
+  async markAllRead(): Promise<{ updated: number }> {
+    const response = await apiRequest<{ data: { updated: number } }>(
+      API_CONFIG.ENDPOINTS.NOTIFICATIONS_READ_ALL,
+      { method: "POST" }
+    );
+    return { updated: response.data.updated };
   },
 };

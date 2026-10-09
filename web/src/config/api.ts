@@ -29,8 +29,10 @@ export const API_CONFIG: ApiConfig = {
     // Sistema de Votación Distribuida (MBC)
     VOTING_CONFIG: (eventId: string) =>
       `/api/v1/events/${eventId}/voting-config`,
-    GENERATE_ASSIGNMENTS: (eventId: string) =>
-      `/api/v1/events/${eventId}/generate-assignments`,
+    VOTING_CONFIG_PREVIEW: (eventId: string) =>
+      `/api/v1/events/${eventId}/voting-config/preview`,
+    EVENT_REMINDERS: (eventId: string) =>
+      `/api/v1/events/${eventId}/reminders`,
     GET_ASSIGNMENT: (eventId: string, participantId: string) =>
       `/api/v1/events/${eventId}/participants/${participantId}/assignment`,
     SUBMIT_RANKING_VOTES: (eventId: string, participantId: string) =>
@@ -58,6 +60,12 @@ export const API_CONFIG: ApiConfig = {
     // Google OAuth (E-002.S-03)
     GOOGLE_VERIFY: '/api/v1/auth/google/verify',
     GOOGLE_REGISTER: '/api/v1/auth/google/register',
+
+    // Notificaciones in-app (S-018)
+    NOTIFICATIONS: '/api/v1/notifications',
+    NOTIFICATIONS_UNREAD_COUNT: '/api/v1/notifications/unread-count',
+    NOTIFICATION_READ: (id: string) => `/api/v1/notifications/${id}/read`,
+    NOTIFICATIONS_READ_ALL: '/api/v1/notifications/read-all',
 
     // Recuperación de contraseña
     USER_FORGOT_PASSWORD: '/api/v1/users/forgot-password',
@@ -205,9 +213,9 @@ export const uploadFile = async (endpoint: string, formData: FormData): Promise<
   }
 };
 
-// Descarga un archivo protegido por JWT y dispara el guardado en el navegador.
+// Pide un archivo protegido por JWT y devuelve su contenido.
 // No puede ser un <a href> directo: el backend exige Authorization: Bearer.
-export const downloadFile = async (endpoint: string, filename: string): Promise<void> => {
+export const fetchFile = async (endpoint: string): Promise<Blob> => {
   const url = `${API_CONFIG.BASE_URL}${endpoint}`;
   const token = localStorage.getItem('telescopio_token');
 
@@ -220,7 +228,11 @@ export const downloadFile = async (endpoint: string, filename: string): Promise<
     throw new ApiError({ status: response.status, body: errorData });
   }
 
-  const blob = await response.blob();
+  return response.blob();
+};
+
+// Dispara el guardado de un blob en el navegador con el nombre dado.
+export const saveBlob = (blob: Blob, filename: string): void => {
   const blobUrl = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = blobUrl;
@@ -229,6 +241,11 @@ export const downloadFile = async (endpoint: string, filename: string): Promise<
   link.click();
   link.remove();
   window.URL.revokeObjectURL(blobUrl);
+};
+
+// Descarga un archivo protegido por JWT y dispara el guardado en el navegador.
+export const downloadFile = async (endpoint: string, filename: string): Promise<void> => {
+  saveBlob(await fetchFile(endpoint), filename);
 };
 
 // Helper para verificar conectividad con la API
