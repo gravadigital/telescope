@@ -29,8 +29,10 @@ export const API_CONFIG: ApiConfig = {
     // Sistema de Votación Distribuida (MBC)
     VOTING_CONFIG: (eventId: string) =>
       `/api/v1/events/${eventId}/voting-config`,
-    GENERATE_ASSIGNMENTS: (eventId: string) =>
-      `/api/v1/events/${eventId}/generate-assignments`,
+    VOTING_CONFIG_PREVIEW: (eventId: string) =>
+      `/api/v1/events/${eventId}/voting-config/preview`,
+    EVENT_REMINDERS: (eventId: string) =>
+      `/api/v1/events/${eventId}/reminders`,
     GET_ASSIGNMENT: (eventId: string, participantId: string) =>
       `/api/v1/events/${eventId}/participants/${participantId}/assignment`,
     SUBMIT_RANKING_VOTES: (eventId: string, participantId: string) =>

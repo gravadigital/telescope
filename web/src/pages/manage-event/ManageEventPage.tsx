@@ -1,856 +1,921 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { EventService, AttachmentService, DistributedVotingService } from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
-import { Event, User, Attachment } from '../../types';
-import EventResults from '../../components/voting/event-results/EventResults';
-import VotingConfigurationPanel from '../../components/voting-configuration-panel/VotingConfigurationPanel';
-import StageAdvanceModal from '../../components/stage-advance-modal/StageAdvanceModal';
-import EventTimeline from '../../components/event-timeline/EventTimeline';
+import React from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Button, Callout, Card, Dialog, EmptyState, ProgressBar, StatTile, StatusPill } from '../../components/ui';
+import { BellIcon, EditIcon, LinkIcon, ShareIcon } from '../../components/ui/icons/Icons';
+import EventHero from '../../components/events/event-hero/EventHero';
+import StageTimeline from '../../components/events/stage-timeline/StageTimeline';
+import NextStepCard from '../../components/events/next-step-card/NextStepCard';
+import ParticipantsTable from '../../components/events/participants-table/ParticipantsTable';
 import EditEventDialog from '../../components/events/edit-event-dialog/EditEventDialog';
-import { Button, Callout } from '../../components/ui';
-import { canEditEvent } from '../../domain';
-import { useT } from '../../i18n';
-import '../../components/stage-advance-modal/StageAdvanceModal.css';
-import '../../components/link-button/styles.css';
+import ShareDialog from '../../components/events/share-dialog/ShareDialog';
+import OpenRegistrationDialog from '../../components/events/open-registration-dialog/OpenRegistrationDialog';
+import OpenVotingDialog from '../../components/events/open-voting-dialog/OpenVotingDialog';
+import PublishResultsDialog from '../../components/events/publish-results-dialog/PublishResultsDialog';
+import ReminderDialog from '../../components/events/reminder-dialog/ReminderDialog';
+import EditDeadlineDialog from '../../components/events/edit-deadline-dialog/EditDeadlineDialog';
+import EventResults from '../../components/voting/event-results/EventResults';
+import NotFoundPage from '../not-found/NotFoundPage';
+import { useAuth } from '../../context/AuthContext';
+import { ApiError, getErrorCode } from '../../config/api';
+import {
+  COPY_FEEDBACK_MS,
+  MIN_PROPOSALS_TO_VOTE,
+  STAGE_ORDER,
+  SUCCESS_NOTICE_MS,
+  canEditEvent,
+  canPause,
+  capacityOf,
+  currentDeadline,
+  daysUntilClose,
+  isRecommendedConfig,
+  managePill,
+  manageStage,
+  pendingFiles,
+  pendingVotes,
+  reminderType,
+  shareUrl,
+  stageNameKey,
+  stageStatus,
+  transitionDialog,
+  votingProgress,
+} from '../../domain';
+import type { ManageStage, TransitionDialog } from '../../domain';
+import { scopedMessageKeyForError, useT } from '../../i18n';
+import type { Params, TranslationKey } from '../../i18n';
+import { AttachmentService, DistributedVotingService, EventService } from '../../services/api';
+import type {
+  Attachment,
+  Event,
+  EventParticipant,
+  EventStage,
+  ReminderResult,
+  VotingConfiguration,
+  VotingStatistics,
+} from '../../types';
+import '../../components/ui/visually-hidden.css';
 import './ManageEventPage.css';
 
-// Banner de error por recurso con reintento puntual (Registered Participants,
-// Files Submitted, Voting Statistics). No se comparte fuera de esta página.
-const LoadErrorAlert: React.FC<{ message: string; onRetry: () => Promise<void> }> = ({
-  message,
-  onRetry,
-}) => {
-  const [retrying, setRetrying] = useState<boolean>(false);
+const PAUSE_ERROR_CODES = ['EVENT_CANCELLED', 'FORBIDDEN'];
 
-  const handleRetry = async (): Promise<void> => {
-    setRetrying(true);
-    try {
-      await onRetry();
-    } finally {
-      setRetrying(false);
-    }
-  };
+const NOT_FOUND_CODES = ['EVENT_NOT_FOUND', 'INVALID_EVENT_ID', 'MISSING_EVENT_ID'];
 
-  return (
-    <div className="alert alert-danger" role="alert">
-      <p>{message}</p>
-      <button
-        onClick={handleRetry}
-        disabled={retrying}
-        className="btn btn-secondary btn-sm"
-      >
-        {retrying ? 'Retrying...' : 'Retry'}
-      </button>
-    </div>
-  );
+/** Celda / valor vacío del DS. */
+const EMPTY_VALUE = '—';
+
+type LoadStatus = 'loading' | 'ready' | 'notFound' | 'forbidden' | 'error';
+type BlockStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+interface Block<T> {
+  status: BlockStatus;
+  data?: T;
+}
+
+/** Diálogos de la gestión (`pause` es la confirmación de pausa, D-1). */
+export type ManageDialog = TransitionDialog | 'reminder' | 'deadline' | 'edit' | 'share' | 'pause';
+
+interface Notice {
+  key: TranslationKey;
+  params?: Params;
+}
+
+const IDLE: Block<never> = { status: 'idle' };
+const LOADING: Block<never> = { status: 'loading' };
+
+/** Bloques que pide cada estado de la gestión (D-5). */
+const BLOCKS: Record<ManageStage, { roster: boolean; stats: boolean; config: boolean }> = {
+  creation: { roster: false, stats: false, config: false },
+  participation: { roster: true, stats: false, config: false },
+  voting: { roster: true, stats: true, config: true },
+  results: { roster: false, stats: false, config: true },
+  cancelled: { roster: false, stats: false, config: false },
 };
+
+function settledBlock<T>(result: PromiseSettledResult<T>): Block<T> {
+  return result.status === 'fulfilled' ? { status: 'ready', data: result.value } : { status: 'error' };
+}
 
 const ManageEventPage: React.FC = () => {
+  const { t, fmt } = useT();
   const { eventId } = useParams<{ eventId: string }>();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useT();
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const userId = user?.id ?? null;
 
-  const [event, setEvent] = useState<Event | null>(null);
-  const [participants, setParticipants] = useState<User[]>([]);
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [downloadError, setDownloadError] = useState<string>('');
-  const [votingStatus, setVotingStatus] = useState<{ [key: string]: boolean }>({});
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>('');
-  const [participantsError, setParticipantsError] = useState<string>('');
-  const [attachmentsError, setAttachmentsError] = useState<string>('');
-  const [votingStatsError, setVotingStatsError] = useState<string>('');
-  const [updatingStage, setUpdatingStage] = useState<boolean>(false);
-  const [votingConfigured, setVotingConfigured] = useState<boolean>(false);
-  
-  // Estados para modales de fecha estimativa (S-003)
-  const [showStageModal, setShowStageModal] = useState<boolean>(false);
-  const [showEditDateModal, setShowEditDateModal] = useState<boolean>(false);
-  const [editingStage, setEditingStage] = useState<'participation' | 'voting' | null>(null);
-  // Edición de datos del evento (S-014, provisoria hasta S-016).
-  const [editOpen, setEditOpen] = useState<boolean>(false);
-  const [notice, setNotice] = useState<'created' | 'updated' | null>(null);
+  const [loadStatus, setLoadStatus] = React.useState<LoadStatus>('loading');
+  const [event, setEvent] = React.useState<Event | null>(null);
+  const [participants, setParticipants] = React.useState<Block<EventParticipant[]>>(IDLE);
+  const [attachments, setAttachments] = React.useState<Block<Attachment[]>>(IDLE);
+  const [stats, setStats] = React.useState<Block<VotingStatistics>>(IDLE);
+  const [config, setConfig] = React.useState<Block<VotingConfiguration | null>>(IDLE);
+  const [notice, setNotice] = React.useState<Notice | null>(null);
+  const [openDialog, setOpenDialog] = React.useState<ManageDialog | null>(null);
+  // Se conserva entre recargas de la gestión: solo se reinicia al recargar la pestaña (D-9).
+  const [reminderSent, setReminderSent] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const [downloadError, setDownloadError] = React.useState<string | null>(null);
+  const [pausing, setPausing] = React.useState(false);
+  const [pauseError, setPauseError] = React.useState<TranslationKey | null>(null);
+  const [resumeError, setResumeError] = React.useState<TranslationKey | null>(null);
 
-  // Aviso de "Evento creado" que llega por el state de navegación; se limpia para que un reload no lo repita.
-  const arrivedWithCreatedNotice =
-    (location.state as { notice?: string } | null)?.notice === 'eventCreated';
-  useEffect(() => {
+  const pageRef = React.useRef<HTMLDivElement>(null);
+  const nextStepRef = React.useRef<HTMLDivElement>(null);
+  const pauseCancelRef = React.useRef<HTMLButtonElement>(null);
+  /** Etapa desde la que se lanzó una transición: al cambiar, el foco va al nuevo próximo paso. */
+  const focusFromStage = React.useRef<EventStage | null>(null);
+
+  const requestRef = React.useRef(0);
+  const noticeTimer = React.useRef<number | undefined>(undefined);
+  const copyTimer = React.useRef<number | undefined>(undefined);
+
+  // ---------- Avisos ----------
+  const showNotice = React.useCallback((key: TranslationKey, params?: Params): void => {
+    if (noticeTimer.current !== undefined) window.clearTimeout(noticeTimer.current);
+    setNotice({ key, params });
+    noticeTimer.current = window.setTimeout(() => {
+      noticeTimer.current = undefined;
+      setNotice(null);
+    }, SUCCESS_NOTICE_MS);
+  }, []);
+
+  React.useEffect(
+    () => () => {
+      if (noticeTimer.current !== undefined) window.clearTimeout(noticeTimer.current);
+      if (copyTimer.current !== undefined) window.clearTimeout(copyTimer.current);
+    },
+    []
+  );
+
+  // Aviso "Evento creado" (S-014): llega por el state y se limpia para que recargar no lo repita.
+  const arrivedWithCreatedNotice = (location.state as { notice?: string } | null)?.notice === 'eventCreated';
+  React.useEffect(() => {
     if (!arrivedWithCreatedNotice) return;
-    setNotice('created');
+    showNotice('manageEvent.created');
     navigate(location.pathname, { replace: true, state: null });
-  }, [arrivedWithCreatedNotice, location.pathname, navigate]);
+  }, [arrivedWithCreatedNotice, location.pathname, navigate, showNotice]);
 
-  useEffect(() => {
-    // The session is restored from localStorage in an AuthContext effect, so
-    // on the first render after a refresh isAuthenticated is still false.
+  // ---------- Carga por bloques ----------
+  const loadRoster = React.useCallback(async (id: string, request: number): Promise<void> => {
+    setParticipants(LOADING);
+    setAttachments(LOADING);
+    const [loadedParticipants, loadedAttachments] = await Promise.allSettled([
+      EventService.getParticipants(id),
+      AttachmentService.getEventAttachments(id),
+    ]);
+    if (request !== requestRef.current) return;
+    setParticipants(settledBlock(loadedParticipants));
+    setAttachments(settledBlock(loadedAttachments));
+  }, []);
+
+  const loadStats = React.useCallback(async (id: string, request: number): Promise<void> => {
+    setStats(LOADING);
+    const [result] = await Promise.allSettled([DistributedVotingService.getVotingStatistics(id)]);
+    if (request !== requestRef.current) return;
+    setStats(settledBlock(result));
+  }, []);
+
+  const loadConfig = React.useCallback(async (id: string, request: number): Promise<void> => {
+    setConfig(LOADING);
+    const [result] = await Promise.allSettled([DistributedVotingService.getVotingConfig(id)]);
+    if (request !== requestRef.current) return;
+    setConfig(settledBlock(result));
+  }, []);
+
+  const loadBlocks = React.useCallback(
+    async (loaded: Event, request: number): Promise<void> => {
+      const needs = BLOCKS[manageStage(loaded)];
+      setParticipants(needs.roster ? LOADING : IDLE);
+      setAttachments(needs.roster ? LOADING : IDLE);
+      setStats(needs.stats ? LOADING : IDLE);
+      setConfig(needs.config ? LOADING : IDLE);
+      await Promise.all([
+        needs.roster ? loadRoster(loaded.id, request) : undefined,
+        needs.stats ? loadStats(loaded.id, request) : undefined,
+        needs.config ? loadConfig(loaded.id, request) : undefined,
+      ]);
+    },
+    [loadConfig, loadRoster, loadStats]
+  );
+
+  /** Pide el evento y, si se puede gestionar, los bloques de su etapa. `silent` no vuelve al skeleton. */
+  const loadAll = React.useCallback(
+    async (silent: boolean): Promise<void> => {
+      if (!eventId) {
+        setLoadStatus('notFound');
+        return;
+      }
+      const request = ++requestRef.current;
+      if (!silent) setLoadStatus('loading');
+      try {
+        const loaded = await EventService.getEventById(eventId);
+        if (request !== requestRef.current) return;
+        if (!loaded) {
+          setLoadStatus('notFound');
+          return;
+        }
+        setEvent(loaded);
+        if (loaded.creator_id !== userId) {
+          setLoadStatus('forbidden');
+          return;
+        }
+        setLoadStatus('ready');
+        await loadBlocks(loaded, request);
+      } catch (err) {
+        if (request !== requestRef.current) return;
+        const notFound =
+          (err instanceof ApiError && err.status === 404) || NOT_FOUND_CODES.includes(getErrorCode(err) ?? '');
+        setLoadStatus(notFound ? 'notFound' : 'error');
+      }
+    },
+    [eventId, userId, loadBlocks]
+  );
+
+  /** Recarga el evento y los bloques de su etapa (tras cada diálogo exitoso). */
+  const reload = React.useCallback((): Promise<void> => loadAll(true), [loadAll]);
+
+  React.useEffect(() => {
     if (authLoading) return;
+    loadAll(false);
+    return () => {
+      requestRef.current += 1;
+    };
+  }, [authLoading, loadAll]);
 
-    if (!isAuthenticated) {
-      navigate('/events');
-      return;
-    }
+  const retryRoster = (): void => {
+    if (event) loadRoster(event.id, requestRef.current);
+  };
+  const retryStats = (): void => {
+    if (event) loadStats(event.id, requestRef.current);
+  };
+  const retryConfig = (): void => {
+    if (event) loadConfig(event.id, requestRef.current);
+  };
 
-    if (eventId) {
-      loadEventData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventId, authLoading, isAuthenticated, navigate]);
-
-  const loadParticipants = async (id: string): Promise<void> => {
-    setParticipantsError('');
+  // ---------- Acciones ----------
+  const handleCopy = async (): Promise<void> => {
+    if (!event) return;
     try {
-      const participantsData = await EventService.getEventParticipants(id);
-      setParticipants(participantsData);
-    } catch (err) {
-      console.error('Could not load participants:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setParticipantsError(`Could not load participants: ${errorMessage}.`);
+      if (!navigator.clipboard?.writeText) throw new Error('clipboard');
+      await navigator.clipboard.writeText(shareUrl(window.location.origin, event.id));
+      if (copyTimer.current !== undefined) window.clearTimeout(copyTimer.current);
+      setCopied(true);
+      copyTimer.current = window.setTimeout(() => {
+        copyTimer.current = undefined;
+        setCopied(false);
+      }, COPY_FEEDBACK_MS);
+    } catch {
+      setOpenDialog('share');
     }
   };
 
-  const loadAttachments = async (id: string): Promise<void> => {
-    setAttachmentsError('');
-    try {
-      const attachmentsData = await AttachmentService.getEventAttachments(id);
-      setAttachments(attachmentsData);
-    } catch (err) {
-      console.error('Could not load submitted files:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setAttachmentsError(`Could not load submitted files: ${errorMessage}.`);
-    }
-  };
-
-  const loadVotingStats = async (id: string, stage: Event['stage']): Promise<void> => {
-    if (stage !== 'voting' && stage !== 'results') {
-      setVotingConfigured(false);
-      setVotingStatsError('');
-      return;
-    }
-
-    setVotingStatsError('');
-    try {
-      const statsData = await DistributedVotingService.getVotingStatistics(id);
-
-      if (statsData && statsData.participant_voting_status) {
-        setVotingStatus(statsData.participant_voting_status);
-
-        // Check if there are actual assignments (voting is configured)
-        // If participant_voting_status is not empty, voting is configured
-        const hasAssignments = Object.keys(statsData.participant_voting_status).length > 0;
-        setVotingConfigured(hasAssignments);
-      } else {
-        setVotingConfigured(false);
-      }
-    } catch (err) {
-      console.error('Could not load voting statistics:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setVotingStatsError(`Could not load voting statistics: ${errorMessage}.`);
-    }
-  };
-
-  const loadEventData = async (): Promise<void> => {
-    if (!eventId) return;
-
-    setLoading(true);
-    setError('');
-
-    try {
-      // Load event details
-      const eventData = await EventService.getEventById(eventId);
-
-      // Check if event exists
-      if (!eventData) {
-        setError('Event not found.');
-        setLoading(false);
-        return;
-      }
-
-      // Check if user is the creator
-      if (eventData.creator_id !== user?.id) {
-        setError('You do not have permission to manage this event.');
-        setLoading(false);
-        return;
-      }
-
-      setEvent(eventData);
-
-      await loadParticipants(eventId);
-      await loadAttachments(eventId);
-      await loadVotingStats(eventId, eventData.stage);
-    } catch (err) {
-      console.error('Error loading event:', err);
-      setError('Error loading event data. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Abrir modal para avanzar etapa (S-003)
-  const handleAdvanceStageClick = (): void => {
-    const next = getNextStage(event!.stage);
-    if (next) {
-      setShowStageModal(true);
-    }
-  };
-
-  // Confirmar avance de etapa con fecha estimativa (S-003)
-  const handleStageConfirm = async (estimatedEndDate?: string): Promise<void> => {
-    if (!eventId || !event) return;
-
-    const nextStage = getNextStage(event.stage);
-    if (!nextStage) return;
-
-    // Validations before advancing
-    const validationError = validateStageAdvance(event.stage, nextStage);
-    if (validationError) {
-      throw new Error(validationError);
-    }
-
-    setUpdatingStage(true);
-    setError('');
-
-    try {
-      await EventService.updateEventStage(eventId, nextStage, estimatedEndDate);
-      setShowStageModal(false);
-
-      // Reload event data
-      await loadEventData();
-
-      console.log(`Event stage updated to: ${nextStage}`);
-    } catch (err: any) {
-      console.error('Error updating stage:', err);
-      throw new Error(err.message || 'Error updating event stage');
-    } finally {
-      setUpdatingStage(false);
-    }
-  };
-
-  // Abrir modal para editar fecha (S-003)
-  const handleEditDeadlineClick = (stage: 'participation' | 'voting'): void => {
-    setEditingStage(stage);
-    setShowEditDateModal(true);
-  };
-
-  // Confirmar edición de fecha (S-003)
-  const handleEditDeadlineConfirm = async (newDate: string): Promise<void> => {
-    if (!eventId || !editingStage) return;
-
-    setUpdatingStage(true);
-
-    try {
-      await EventService.updateEstimatedEndDate(eventId, editingStage, newDate);
-      setShowEditDateModal(false);
-      setEditingStage(null);
-
-      // Reload event data
-      await loadEventData();
-    } catch (err: any) {
-      console.error('Error updating deadline:', err);
-      throw new Error(err.message || 'Error updating deadline');
-    } finally {
-      setUpdatingStage(false);
-    }
-  };
-
-  // Formatear fecha con tiempo relativo (S-003)
-  const formatEstimatedDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    date.setHours(0, 0, 0, 0);
-
-    const diffTime = date.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    const formattedDate = date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-
-    let relative = '';
-    if (diffDays === 0) {
-      relative = '(today)';
-    } else if (diffDays === 1) {
-      relative = '(tomorrow)';
-    } else if (diffDays > 1) {
-      relative = `(in ${diffDays} days)`;
-    } else if (diffDays === -1) {
-      relative = '(yesterday)';
-    } else {
-      relative = `(${Math.abs(diffDays)} days ago)`;
-    }
-
-    return `${formattedDate} ${relative}`;
-  };
-
-  const validateStageAdvance = (currentStage: Event['stage'], targetStage: Event['stage']): string | null => {
-    // Data not verified: block the decision instead of deciding on stale/empty data.
-    if (participantsError) {
-      return 'Cannot advance: the participant list could not be verified. Retry before continuing.';
-    }
-    if (currentStage === 'voting' && targetStage === 'results' && votingStatsError) {
-      return 'Cannot advance: voting progress could not be verified. Retry before continuing.';
-    }
-
-    // Can't advance from participation if no participants
-    if (currentStage === 'participation' && participants.length === 0) {
-      return 'Cannot advance: No participants registered yet.';
-    }
-
-    // Can't advance to voting without enough participants for meaningful voting
-    if (currentStage === 'participation' && targetStage === 'voting' && participants.length < 3) {
-      return `Cannot advance to voting: only ${participants.length} participant${participants.length > 1 ? 's' : ''} registered. At least 3 participants are required.`;
-    }
-
-    // Note: We no longer require all participants to submit files before advancing to voting
-    // This allows flexibility in the participation stage
-
-    // Can't advance to results from voting without voting configuration
-    if (currentStage === 'voting' && targetStage === 'results') {
-      // Check if all participants have voted
-      const totalParticipants = participants.length;
-      const votedCount = Object.values(votingStatus).filter(voted => voted).length;
-      if (votedCount < totalParticipants) {
-        return `Cannot advance: Only ${votedCount} of ${totalParticipants} participants have voted.`;
-      }
-    }
-
-    return null;
-  };
-
-  const handlePauseToggle = async (): Promise<void> => {
-    if (!eventId || !event) return;
-
-    const action = event.is_paused ? 'resume' : 'pause';
-    if (!window.confirm(`${action === 'pause' ? '⏸️ Pause' : '▶️ Resume'} this event? ${action === 'pause' ? 'Participants will not be able to register or upload files while the event is paused.' : ''}`)) {
-      return;
-    }
-
-    setUpdatingStage(true);
-    setError('');
-
-    try {
-      await EventService.pauseEvent(eventId);
-      await loadEventData();
-    } catch (err) {
-      console.error('Error toggling event pause:', err);
-      setError('Error updating event. Please try again.');
-    } finally {
-      setUpdatingStage(false);
-    }
-  };
-
-  const handleDownloadAttachment = async (attachment: Attachment): Promise<void> => {
-    setDownloadError('');
+  const handleDownload = async (attachment: Attachment): Promise<void> => {
+    setDownloadError(null);
     try {
       await AttachmentService.downloadAttachment(attachment.id, attachment.original_name);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setDownloadError(`Failed to download "${attachment.original_name}": ${errorMessage}.`);
+    } catch {
+      setDownloadError(attachment.original_name);
     }
   };
 
-const getNextStage = (currentStage: Event['stage']): Event['stage'] | null => {
-  const stageOrder: Event['stage'][] = ['creation', 'participation', 'voting', 'results'];
-  const currentIndex = stageOrder.indexOf(currentStage);
+  const closeDialog = (): void => setOpenDialog(null);
 
-  if (currentIndex >= 0 && currentIndex < stageOrder.length - 1) {
-    return stageOrder[currentIndex + 1];
-  }
+  // Tras un cambio de etapa, foco al título del próximo paso (h1 en Resultados).
+  React.useEffect(() => {
+    const from = focusFromStage.current;
+    if (from === null || loadStatus !== 'ready' || !event || event.stage === from) return;
+    focusFromStage.current = null;
+    const target =
+      event.stage === 'results'
+        ? pageRef.current?.querySelector('h1')
+        : nextStepRef.current?.querySelector('h2');
+    if (target instanceof HTMLElement) {
+      target.setAttribute('tabindex', '-1');
+      target.focus();
+    }
+  }, [event, loadStatus]);
 
-  return null;
-};
-
-
-const getStageName = (stage: Event['stage']): string => {
-  const stageNames: Record<Event['stage'], string> = {
-    'creation': 'Creation',
-    'participation': 'Participation',
-    'voting': 'Voting',
-    'results': 'Results'
+  /** Cierre común de los diálogos que terminan bien (D-10). */
+  const finishDialog = (key: TranslationKey, params?: Params, stageChanges = false): void => {
+    if (stageChanges && event) focusFromStage.current = event.stage;
+    closeDialog();
+    showNotice(key, params);
+    reload();
   };
-  return stageNames[stage] || stage;
-};
 
-  const handleBack = (): void => {
-    navigate(`/events/${eventId}`);
+  const handleReminderDone = (result: ReminderResult): void => {
+    setReminderSent(true);
+    finishDialog('manage.success.reminderSent', { count: result.recipients_count });
   };
 
-  if (loading) {
-    return (
-      <div className="manage-event-page">
-        <div className="loading-state">
-          <div className="loading-spinner"></div>
-          <h2>Loading event...</h2>
-        </div>
-      </div>
-    );
-  }
-
-  if (error && !event) {
-    return (
-      <div className="manage-event-page">
-        <div className="error-state">
-          <h2>Error</h2>
-          <p>{error}</p>
-          <button onClick={() => navigate('/events')} className="btn btn-primary">
-            Back to Events
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!event) {
-    return (
-      <div className="manage-event-page">
-        <div className="error-state">
-          <h2>Event not found</h2>
-          <button onClick={() => navigate('/events')} className="btn btn-primary">
-            Back to Events
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const nextStage = getNextStage(event.stage);
-
-  return (
-    <div className="manage-event-page">
-      <div className="manage-event-container">
-        {/* Header */}
-        <div className="manage-header">
-          <button onClick={handleBack} className="btn btn-secondary btn-sm back-button">
-            ← Back to Event Details
-          </button>
-          <h1>Manage Event</h1>
-          <p className="subtitle">Control event stages and view participants</p>
-        </div>
-
-        {notice && (
-          <div className="manage-notice">
-            <Callout tone="success">
-              {t(notice === 'created' ? 'manageEvent.created' : 'manageEvent.updated')}
-            </Callout>
-          </div>
-        )}
-
-        {/* Error Message */}
-        {error && (
-          <div className="alert alert-danger">
-            <p>{error}</p>
-          </div>
-        )}
-
-        {/* Event Info Card */}
-        <div className="event-info-card">
-          <div className="manage-title-row">
-            <h2>{event.title}</h2>
-            {canEditEvent(event.stage) && (
-              <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
-                {t('manageEvent.editData')}
-              </Button>
-            )}
-          </div>
-          <p className="event-description">{event.description}</p>
-
-          <div className="event-meta">
-            <div className="meta-item">
-              <span className="meta-label">Created:</span>
-              <span className="meta-value">
-                {new Date(event.created_at || event.date).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </span>
-            </div>
-
-            <div className="meta-item">
-              <span className="meta-label">Current Stage:</span>
-              <span className={`badge badge-${
-                event.stage === 'participation' ? 'success' :
-                event.stage === 'voting' ? 'warning' : 'primary'
-              }`}>
-                {getStageName(event.stage)}
-              </span>
-              {event.is_paused && (
-                <span className="badge badge-paused" style={{ marginLeft: '8px' }}>
-                  ⏸ PAUSED
-                </span>
-              )}
-            </div>
-
-            <div className="meta-item">
-              <span className="meta-label">Participants:</span>
-              <span className="meta-value">
-                {participantsError ? '—' : `${participants.length} / ${event.max_participants || 20}`}
-              </span>
-            </div>
-
-            <div className="meta-item">
-              <span className="meta-label">Files Submitted:</span>
-              <span className="meta-value">
-                {participantsError || attachmentsError
-                  ? '—'
-                  : `${new Set(attachments.map(a => a.participant_id)).size} / ${participants.length}`}
-              </span>
-            </div>
-
-            {/* Deadline de la etapa actual */}
-            {event.stage === 'participation' && (
-              <div className="meta-item deadline-meta">
-                <span className="meta-label">Participation Deadline:</span>
-                <span className="meta-value">
-                  {event.participation_estimated_end_date
-                    ? <>
-                        {formatEstimatedDate(event.participation_estimated_end_date)}
-                        <button
-                          className="btn-edit-deadline"
-                          onClick={() => handleEditDeadlineClick('participation')}
-                          title="Edit deadline"
-                        >✏️</button>
-                      </>
-                    : <button
-                        className="btn-set-deadline"
-                        onClick={() => handleEditDeadlineClick('participation')}
-                      >
-                        + Set deadline
-                      </button>
-                  }
-                </span>
-              </div>
-            )}
-
-            {event.stage === 'voting' && (
-              <div className="meta-item deadline-meta">
-                <span className="meta-label">Voting Deadline:</span>
-                <span className="meta-value">
-                  {event.voting_estimated_end_date
-                    ? <>
-                        {formatEstimatedDate(event.voting_estimated_end_date)}
-                        <button
-                          className="btn-edit-deadline"
-                          onClick={() => handleEditDeadlineClick('voting')}
-                          title="Edit deadline"
-                        >✏️</button>
-                      </>
-                    : <button
-                        className="btn-set-deadline"
-                        onClick={() => handleEditDeadlineClick('voting')}
-                      >
-                        + Set deadline
-                      </button>
-                  }
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Stage Control Section */}
-        <div className="stage-control-section">
-          <h3>Event Stage Control</h3>
-
-          <EventTimeline
-            currentStage={event.stage}
-            participantCount={participants.length}
-            maxParticipants={event.max_participants || 20}
-            deadlines={{
-              participation: event.participation_estimated_end_date,
-              voting: event.voting_estimated_end_date,
-            }}
-          />
-
-          <div className="stage-actions">
-            {nextStage && (
-              <button
-                onClick={handleAdvanceStageClick}
-                disabled={
-                  updatingStage ||
-                  !!participantsError ||
-                  (event.stage === 'voting' && !!votingStatsError)
-                }
-                className="btn btn-primary btn-lg"
-              >
-                {updatingStage ? (
-                  <>
-                    <span className="loading-spinner-small"></span>
-                    Updating...
-                  </>
-                ) : (
-                  `Advance to ${getStageName(nextStage)}`
-                )}
-              </button>
-            )}
-
-            {!event.is_cancelled && event.stage !== 'results' && (
-              <button
-                onClick={handlePauseToggle}
-                disabled={updatingStage}
-                className={`btn btn-lg ${event.is_paused ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ marginLeft: '10px' }}
-              >
-                {updatingStage ? 'Updating...' : event.is_paused ? '▶ Resume Event' : '⏸ Pause Event'}
-              </button>
-            )}
-
-            {event.stage === 'results' && (
-              <div className="completed-message">
-                <span className="completed-icon">✓</span>
-                Event has reached final results
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Voting Statistics Error (replaces configuration panel / underway message) */}
-        {event.stage === 'voting' && votingStatsError && (
-          <LoadErrorAlert
-            message={votingStatsError}
-            onRetry={() => loadVotingStats(event.id, event.stage)}
-          />
-        )}
-
-        {/* Voting Configuration Section (only show in voting stage if not configured) */}
-        {event.stage === 'voting' &&
-          !votingConfigured &&
-          !votingStatsError &&
-          !participantsError &&
-          !attachmentsError && (
-            <div className="voting-configuration-section">
-              <VotingConfigurationPanel
-                eventId={event.id}
-                totalAttachments={attachments.length}
-                totalParticipants={participants.length}
-                onConfigured={() => {
-                  setVotingConfigured(true);
-                  loadEventData();
-                }}
-              />
-            </div>
-        )}
-
-        {/* Voting Configured Message */}
-        {event.stage === 'voting' && votingConfigured && !votingStatsError && (
-          <div className="voting-configured-section">
-            <div className="alert alert-success">
-              <h3>✅ Voting is underway</h3>
-              <p>Reviewers have been assigned their submissions and can now submit their rankings.</p>
-              <p>Once everyone has voted, advance to "Results" to publish the final ranking.</p>
-            </div>
-          </div>
-        )}
-
-        {/* Load errors for participants/attachments: shown even in results stage,
-            since the participants section itself is hidden there (TS-24). */}
-        {participantsError && (
-          <LoadErrorAlert message={participantsError} onRetry={() => loadParticipants(event.id)} />
-        )}
-        {attachmentsError && (
-          <LoadErrorAlert message={attachmentsError} onRetry={() => loadAttachments(event.id)} />
-        )}
-
-        {/* Participants Section (only show if not in results stage) */}
-        {event.stage !== 'results' && (
-          <div className="participants-section">
-            <h3>
-              {participantsError
-                ? 'Registered Participants'
-                : `Registered Participants (${participants.filter(p => p.id !== event.creator_id).length})`}
-            </h3>
-
-            {!participantsError && (
-              participants.filter(p => p.id !== event.creator_id).length === 0 ? (
-                <div className="empty-state">
-                  <p>No participants have registered yet.</p>
-                  <p>Share the event link to invite participants!</p>
-                </div>
-              ) : (
-                <div className="participants-table">
-                  <div className="table-header">
-                    <div className="header-cell">Name</div>
-                    <div className="header-cell">Email</div>
-                    <div className="header-cell">File Status</div>
-                    <div className="header-cell">Voting Status</div>
-                  </div>
-
-                  {downloadError && (
-                    <div className="download-error" role="alert">{downloadError}</div>
-                  )}
-                  <div className="table-body">
-                    {participants
-                      .filter(p => p.id !== event.creator_id)
-                      .map((participant) => {
-                      const participantAttachment = attachments.find(
-                        att => att.participant_id === participant.id
-                      );
-                      const hasVoted = votingStatus[participant.id] === true;
-
-                      return (
-                        <div key={participant.id} className="table-row">
-                          <div className="table-cell">{participant.name}</div>
-                          <div className="table-cell">{participant.email}</div>
-                          <div className="table-cell">
-                            {attachmentsError ? (
-                              <span className="meta-value">—</span>
-                            ) : participantAttachment ? (
-                              <button
-                                type="button"
-                                className="link-button-component-button"
-                                onClick={() => handleDownloadAttachment(participantAttachment)}
-                                title={participantAttachment.description
-                                  ? `Download ${participantAttachment.original_name} — ${participantAttachment.description}`
-                                  : `Download ${participantAttachment.original_name}`}
-                              >
-                                ✓ {participantAttachment.original_name}
-                              </button>
-                            ) : (
-                              <span className="badge badge-warning">⏳ Pending</span>
-                            )}
-                          </div>
-                          <div className="table-cell">
-                            {votingStatsError ? (
-                              <span className="meta-value">—</span>
-                            ) : event.stage === 'voting' || event.stage === 'results' ? (
-                              hasVoted
-                                ? <span className="badge badge-success">✓ Voted</span>
-                                : <span className="badge badge-warning">⏳ Not Voted</span>
-                            ) : (
-                              <span className="badge badge-secondary">N/A</span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )
-            )}
-          </div>
-        )}
-
-        {/* Results Section (only show when in results stage) */}
-        {event.stage === 'results' && (
-          <div className="results-section">
-            <EventResults eventId={event.id} currentUserId={null} />
-          </div>
-        )}
-
-        {/* Stage Advance Modal - S-003 */}
-        {showStageModal && nextStage && (
-          <StageAdvanceModal
-            currentStage={event.stage}
-            nextStage={nextStage}
-            onConfirm={handleStageConfirm}
-            onCancel={() => setShowStageModal(false)}
-            isLoading={updatingStage}
-          />
-        )}
-
-        {/* Edit Deadline Modal - S-003 */}
-        {showEditDateModal && editingStage && (
-          <EditDeadlineModal
-            stage={editingStage}
-            currentDate={
-              editingStage === 'participation'
-                ? event.participation_estimated_end_date
-                : event.voting_estimated_end_date
-            }
-            onConfirm={handleEditDeadlineConfirm}
-            onCancel={() => {
-              setShowEditDateModal(false);
-              setEditingStage(null);
-            }}
-            isLoading={updatingStage}
-            formatEstimatedDate={formatEstimatedDate}
-          />
-        )}
-
-        {/* Editar datos - S-014 */}
-        <EditEventDialog
-          open={editOpen}
-          event={event}
-          onClose={() => setEditOpen(false)}
-          onSaved={(updated) => {
-            setEvent((prev) => (prev ? { ...prev, ...updated } : updated));
-            setNotice('updated');
-          }}
-        />
-      </div>
-    </div>
-  );
-};
-
-// Componente inline para editar fecha - S-003
-const EditDeadlineModal: React.FC<{
-  stage: 'participation' | 'voting';
-  currentDate?: string | null;
-  onConfirm: (newDate: string) => Promise<void>;
-  onCancel: () => void;
-  isLoading: boolean;
-  formatEstimatedDate: (date: string) => string;
-}> = ({ stage, currentDate, onConfirm, onCancel, isLoading, formatEstimatedDate }) => {
-  const [newDate, setNewDate] = useState(currentDate || '');
-  const [error, setError] = useState('');
-
-  const minDate = new Date().toISOString().split('T')[0];
-
-  const handleConfirm = async () => {
-    setError('');
+  const handlePauseConfirm = async (): Promise<void> => {
+    if (!event || pausing) return;
+    setPausing(true);
+    setPauseError(null);
     try {
-      await onConfirm(newDate);
-    } catch (err: any) {
-      setError(err.message || 'Failed to update deadline');
+      await EventService.pauseEvent(event.id);
+      closeDialog();
+      reload();
+    } catch (err) {
+      setPauseError(scopedMessageKeyForError(err, PAUSE_ERROR_CODES, 'manage.pause.error'));
+    } finally {
+      setPausing(false);
     }
   };
 
-  return (
-    <div className="stage-modal-overlay" onClick={onCancel}>
-      <div className="stage-modal" onClick={e => e.stopPropagation()}>
-        <div className="stage-modal-header">
-          <h2>Edit {stage === 'participation' ? 'Participation' : 'Voting'} Deadline</h2>
-          <button className="stage-modal-close" onClick={onCancel}>×</button>
-        </div>
-        <div className="stage-modal-body">
-          {currentDate && (
-            <p className="current-date-info">
-              Current deadline: <strong>{formatEstimatedDate(currentDate)}</strong>
-            </p>
-          )}
-          <div className="stage-modal-date-field">
-            <label>New Deadline<span className="required">*</span></label>
-            <p className="field-hint">
-              Note: You can only postpone the deadline, not bring it forward.
-            </p>
-            <input
-              type="date"
-              value={newDate}
-              onChange={(e) => setNewDate(e.target.value)}
-              min={minDate}
-              disabled={isLoading}
-            />
+  const handleResume = async (): Promise<void> => {
+    if (!event || pausing) return;
+    setPausing(true);
+    setResumeError(null);
+    try {
+      await EventService.pauseEvent(event.id);
+      reload();
+    } catch (err) {
+      setResumeError(scopedMessageKeyForError(err, PAUSE_ERROR_CODES, 'manage.pause.error'));
+    } finally {
+      setPausing(false);
+    }
+  };
+
+  const openPauseDialog = (): void => {
+    setPauseError(null);
+    setOpenDialog('pause');
+  };
+
+  // ---------- Render: carga, no encontrado, error, sin permiso ----------
+  if (loadStatus === 'loading') {
+    return (
+      <div className="mep-page">
+        <p role="status" className="ui-visually-hidden">
+          {t('manage.loading')}
+        </p>
+        <div className="mep-skeleton mep-skeleton--hero" aria-hidden="true" />
+        <div className="mep-container" aria-hidden="true">
+          <div className="mep-skeleton mep-skeleton--line" />
+          <div className="mep-metrics">
+            <StatTile label="" value="" loading />
+            <StatTile label="" value="" loading />
           </div>
-          {error && <div className="stage-modal-error">⚠️ {error}</div>}
-        </div>
-        <div className="stage-modal-footer">
-          <button className="btn btn-secondary" onClick={onCancel} disabled={isLoading}>
-            Cancel
-          </button>
-          <button 
-            className="btn btn-primary" 
-            onClick={handleConfirm} 
-            disabled={isLoading || !newDate}
-          >
-            {isLoading ? 'Updating...' : 'Update Deadline'}
-          </button>
+          <div className="mep-skeleton mep-skeleton--block" />
         </div>
       </div>
+    );
+  }
+
+  if (loadStatus === 'notFound') return <NotFoundPage />;
+
+  if (loadStatus === 'error' || !event) {
+    return (
+      <div className="mep-page">
+        <div className="mep-container mep-load-error">
+          <Callout tone="error" action={{ label: t('common.retry'), onClick: () => loadAll(false) }}>
+            {t('manage.loadError')}
+          </Callout>
+          <Link to="/events" className="mep-load-error__link">
+            {t('manage.goToEvents')}
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadStatus === 'forbidden') {
+    return (
+      <div className="mep-page">
+        <div className="mep-container">
+          <EmptyState
+            variant="page"
+            title={t('manage.forbidden.title')}
+            description={t('manage.forbidden.text')}
+            action={{ label: t('manage.goToEvents'), onClick: () => navigate('/events') }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ---------- Render: gestión ----------
+  const state = manageStage(event);
+  const cancelled = state === 'cancelled';
+  const paused = Boolean(event.is_paused) && !cancelled;
+  const needs = BLOCKS[state];
+
+  const rosterError = participants.status === 'error' || attachments.status === 'error';
+  const rosterReady = participants.status === 'ready' && attachments.status === 'ready';
+  const rosterLoading = needs.roster && !rosterReady && !rosterError;
+  const statsError = stats.status === 'error';
+  const statsReady = stats.status === 'ready';
+  const blockError = rosterError || statsError;
+  const blocksPending =
+    (needs.roster && !rosterReady) || (needs.stats && !statsReady);
+
+  const rows = participants.data ?? [];
+  const proposals = attachments.data ?? [];
+  const progress = stats.data ? votingProgress(stats.data) : null;
+  const votingStatus = stats.data?.participant_voting_status;
+
+  const deadline = currentDeadline({
+    stage: event.stage,
+    participation_estimated_end_date: event.participation_estimated_end_date ?? null,
+    voting_estimated_end_date: event.voting_estimated_end_date ?? null,
+  });
+  const deadlineText = deadline ? fmt.date(deadline) : null;
+  const capacity = capacityOf(event);
+
+  // Pendientes del recordatorio (D-9).
+  const reminder = cancelled ? null : reminderType(event.stage);
+  const pending =
+    reminder === 'file' && rosterReady
+      ? pendingFiles(rows, proposals)
+      : reminder === 'vote' && rosterReady && statsReady
+        ? pendingVotes(rows, votingStatus)
+        : [];
+
+  // ---------- Encabezado ----------
+  const pill = managePill(event);
+  const showEdit = !cancelled && canEditEvent(event.stage);
+  const shareAction = ((): React.ReactNode => {
+    if (cancelled || event.stage === 'creation') return null;
+    if (event.stage === 'participation') {
+      return (
+        <Button variant="onBand" iconStart={<LinkIcon />} onClick={handleCopy}>
+          {copied ? t('manage.copied') : t('manage.copyInvite')}
+        </Button>
+      );
+    }
+    return (
+      <Button variant="onBand" iconStart={<ShareIcon />} onClick={() => setOpenDialog('share')}>
+        {t('manage.share')}
+      </Button>
+    );
+  })();
+  const heroActions =
+    showEdit || shareAction ? (
+      <>
+        {showEdit && (
+          <Button variant="onBand" iconStart={<EditIcon />} onClick={() => setOpenDialog('edit')}>
+            {t('manage.editData')}
+          </Button>
+        )}
+        {shareAction}
+      </>
+    ) : undefined;
+
+  // ---------- Línea de etapas ----------
+  const stageLabels = Object.fromEntries(STAGE_ORDER.map((s) => [s, t(stageNameKey(s))])) as Record<
+    EventStage,
+    string
+  >;
+  const closesText = deadlineText
+    ? t('manage.timeline.closes', { date: deadlineText })
+    : t('manage.timeline.noDeadline');
+  const subtitleFor = (stage: EventStage): string | undefined => {
+    const status = stageStatus(stage, event.stage);
+    switch (stage) {
+      case 'creation':
+        if (status === 'current') return t('manage.timeline.creationNow');
+        return event.created_at ? fmt.date(event.created_at.slice(0, 10)) : undefined;
+      case 'participation':
+        if (status === 'current') return closesText;
+        if (status === 'pending') return t('manage.timeline.noDeadline');
+        return attachments.status === 'ready'
+          ? t('manage.timeline.files', { count: proposals.length })
+          : undefined;
+      case 'voting':
+        if (status === 'current') return closesText;
+        return status === 'pending' ? EMPTY_VALUE : undefined;
+      default:
+        return status === 'current' ? t('manage.timeline.published') : EMPTY_VALUE;
+    }
+  };
+  const subtitles = Object.fromEntries(STAGE_ORDER.map((s) => [s, subtitleFor(s)])) as Partial<
+    Record<EventStage, string>
+  >;
+  const deadlineEditable =
+    !cancelled && !paused && Boolean(deadline) && (event.stage === 'participation' || event.stage === 'voting');
+
+  // ---------- Métricas ----------
+  const registeredCount =
+    state === 'results' ? event.participant_ids?.length ?? 0 : rosterReady ? rows.length : null;
+  const deadlineDays = deadline ? daysUntilClose(deadline) : null;
+  const deadlineValue =
+    deadlineDays === null
+      ? t('manage.metrics.noDeadline')
+      : deadlineDays <= 0
+        ? t('manage.metrics.closesToday')
+        : t('manage.metrics.days', { count: deadlineDays });
+
+  const metrics: React.ReactNode[] = [];
+  if (state === 'participation' || state === 'voting' || state === 'results') {
+    metrics.push(
+      <StatTile
+        key="registered"
+        label={t('manage.metrics.registered')}
+        value={registeredCount ?? EMPTY_VALUE}
+        total={registeredCount === null ? undefined : capacity}
+        progress={registeredCount !== null}
+        loading={state !== 'results' && rosterLoading}
+        accessibleText={
+          registeredCount === null
+            ? undefined
+            : t('manage.metrics.registeredA11y', { count: registeredCount, max: capacity })
+        }
+      />
+    );
+  }
+  if (state === 'participation') {
+    metrics.push(
+      <StatTile
+        key="files"
+        label={t('manage.metrics.files')}
+        value={rosterReady ? proposals.length : EMPTY_VALUE}
+        total={rosterReady ? rows.length : undefined}
+        loading={rosterLoading}
+        accessibleText={
+          rosterReady ? t('manage.metrics.filesA11y', { count: proposals.length, total: rows.length }) : undefined
+        }
+      />
+    );
+  }
+  if (state === 'voting') {
+    metrics.push(
+      statsError ? (
+        <div key="rankings" className="mep-metric-error">
+          <Callout tone="error" action={{ label: t('common.retry'), onClick: retryStats }}>
+            {t('manage.participants.statsError')}
+          </Callout>
+        </div>
+      ) : (
+        <div key="rankings" className="mep-metric">
+          <StatTile
+            label={t('manage.metrics.rankings')}
+            value={progress ? t('manage.metrics.rankingsValue', { sent: progress.sent, total: progress.total }) : ''}
+            loading={!progress}
+            accessibleText={
+              progress ? t('manage.metrics.rankingsA11y', { sent: progress.sent, total: progress.total }) : undefined
+            }
+          />
+          {progress && (
+            <ProgressBar
+              value={progress.sent}
+              max={progress.total}
+              size="sm"
+              valueText={t('manage.metrics.rankingsA11y', { sent: progress.sent, total: progress.total })}
+            />
+          )}
+        </div>
+      )
+    );
+  }
+  if (state === 'participation' || state === 'voting') {
+    metrics.push(<StatTile key="deadline" label={t('manage.metrics.deadline')} value={deadlineValue} />);
+  }
+
+  // ---------- Próximo paso ----------
+  const dialog = transitionDialog(event.stage);
+  const nextStepDisabled = paused || blockError || blocksPending;
+  const nextStep = ((): React.ReactNode => {
+    if (cancelled || !dialog) return null;
+    const action = (label: string) => ({
+      label,
+      onClick: () => setOpenDialog(dialog),
+      disabled: nextStepDisabled,
+    });
+    const common = { eyebrow: t('manage.nextStep.eyebrow') };
+    switch (event.stage) {
+      case 'creation':
+        return (
+          <NextStepCard
+            {...common}
+            title={t('manage.nextStep.creation.title')}
+            description={t('manage.nextStep.creation.text')}
+            checklist={[
+              { label: t('manage.nextStep.checklist.details'), done: true },
+              { label: t('manage.nextStep.checklist.capacity', { count: capacity }), done: true },
+              { label: t('manage.nextStep.checklist.deadline'), done: false },
+            ]}
+            doneLabel={t('events.timeline.completed')}
+            pendingLabel={t('events.timeline.pending')}
+            primaryAction={action(t('manage.nextStep.creation.action'))}
+          />
+        );
+      case 'participation': {
+        let consequence: string | undefined;
+        if (rosterReady) {
+          const missing = pendingFiles(rows, proposals).length;
+          if (proposals.length < MIN_PROPOSALS_TO_VOTE) {
+            consequence = t('manage.consequence.minimum', { count: proposals.length });
+          } else if (missing > 0) {
+            consequence = t('manage.consequence.missingFiles', { count: missing });
+          }
+        }
+        return (
+          <NextStepCard
+            {...common}
+            title={t('manage.nextStep.participation.title')}
+            description={t('manage.nextStep.participation.text')}
+            consequence={consequence}
+            primaryAction={action(t('manage.nextStep.participation.action'))}
+          />
+        );
+      }
+      default: {
+        const votingDate = event.voting_estimated_end_date;
+        return (
+          <NextStepCard
+            {...common}
+            title={t('manage.nextStep.voting.title')}
+            description={
+              votingDate
+                ? t('manage.nextStep.voting.text', { date: fmt.date(votingDate) })
+                : t('manage.nextStep.voting.textNoDate')
+            }
+            consequence={
+              progress && progress.missing > 0
+                ? t('manage.consequence.missingRankings', { missing: progress.missing, total: progress.total })
+                : undefined
+            }
+            primaryAction={action(t('manage.nextStep.voting.action'))}
+            primaryVariant={progress?.complete ? 'primary' : 'secondary'}
+          />
+        );
+      }
+    }
+  })();
+
+  // ---------- Configuración aplicada ----------
+  const configBlock = ((): React.ReactNode => {
+    if (!needs.config) return null;
+    if (config.status === 'error') {
+      return (
+        <Callout tone="error" action={{ label: t('common.retry'), onClick: retryConfig }}>
+          {t('manage.config.error')}
+        </Callout>
+      );
+    }
+    if (config.status !== 'ready' || !config.data) return null;
+    const applied = config.data;
+    return (
+      <Callout tone="info" title={t('manage.config.title')}>
+        {t('manage.config.text', {
+          count: applied.attachments_per_evaluator,
+          min: applied.min_evaluations_per_file,
+          quality: isRecommendedConfig(applied) ? t('manage.config.recommended') : t('manage.config.custom'),
+        })}
+      </Callout>
+    );
+  })();
+
+  // ---------- Participantes ----------
+  const showReminder = reminder !== null && pending.length > 0 && !blockError;
+  const reminderButton = showReminder ? (
+    <Button
+      variant="secondary"
+      iconStart={<BellIcon />}
+      disabled={paused || reminderSent}
+      onClick={() => setOpenDialog('reminder')}
+    >
+      {reminderSent
+        ? t('manage.reminder.sent')
+        : t(reminder === 'file' ? 'manage.reminder.file' : 'manage.reminder.vote', { count: pending.length })}
+    </Button>
+  ) : null;
+
+  const participantsContent = ((): React.ReactNode => {
+    if (state === 'creation') {
+      return <EmptyState title={t('manage.empty.title')} headingLevel={3} description={t('manage.empty.creation')} />;
+    }
+    if (!needs.roster) return null;
+    if (rosterError) {
+      return (
+        <Callout tone="error" action={{ label: t('common.retry'), onClick: retryRoster }}>
+          {t('manage.participants.error')}
+        </Callout>
+      );
+    }
+    if (rosterReady && rows.length === 0) {
+      return (
+        <EmptyState
+          title={t('manage.empty.title')}
+          headingLevel={3}
+          description={state === 'participation' ? t('manage.empty.participation') : undefined}
+          action={
+            state === 'participation' ? { label: t('manage.copyInvite'), onClick: handleCopy } : undefined
+          }
+        />
+      );
+    }
+    return (
+      <>
+        {downloadError && (
+          <Callout tone="error">{t('manage.participants.downloadError', { name: downloadError })}</Callout>
+        )}
+        <ParticipantsTable
+          variant="organizer"
+          rows={rows}
+          caption={t('manage.participants.caption')}
+          loading={!rosterReady}
+          stage={event.stage}
+          attachments={proposals}
+          votingStatus={votingStatus}
+          voteUnavailable={statsError}
+          onDownload={handleDownload}
+        />
+      </>
+    );
+  })();
+
+  const showParticipants = state === 'creation' || needs.roster;
+  const showPause = canPause(event);
+
+  return (
+    <div className="mep-page" ref={pageRef}>
+      <EventHero
+        back={{ label: t('manage.back'), to: '/my-events' }}
+        pills={
+          <>
+            <StatusPill tone="onBand">{t(pill.key, pill.params)}</StatusPill>
+            <StatusPill tone="onBand">{t('manage.role')}</StatusPill>
+          </>
+        }
+        title={event.title}
+        meta={t('manage.meta', {
+          organizer: event.organizer ?? '',
+          date: event.created_at ? fmt.date(event.created_at.slice(0, 10)) : EMPTY_VALUE,
+        })}
+        actions={heroActions}
+      />
+
+      <div className="mep-container">
+        <div role="status" aria-live="polite" className="mep-notice">
+          {notice && <Callout tone="success">{t(notice.key, notice.params)}</Callout>}
+        </div>
+
+        <StageTimeline
+          current={event.stage}
+          stageLabels={stageLabels}
+          subtitles={subtitles}
+          nowLabel={t('events.timeline.now')}
+          completedLabel={t('events.timeline.completed')}
+          pendingLabel={t('events.timeline.pending')}
+          stepOfLabel={t('events.timeline.stepOf', { number: STAGE_ORDER.indexOf(event.stage) + 1 })}
+          variant="full"
+          onEditDeadline={deadlineEditable ? () => setOpenDialog('deadline') : undefined}
+          editLabel={t('manage.timeline.edit')}
+          summaryDetail={deadlineText ? t('manage.timeline.closes', { date: deadlineText }) : undefined}
+        />
+
+        {paused && <Callout tone="warning">{t('manage.pausedNotice')}</Callout>}
+
+        <div className="mep-body">
+          <aside className="mep-aside" aria-label={t('manage.nextStep.eyebrow')}>
+            {nextStep && (
+              <div className="mep-item mep-item--next" ref={nextStepRef}>
+                {nextStep}
+              </div>
+            )}
+            {configBlock && <div className="mep-item mep-item--config">{configBlock}</div>}
+            {state === 'creation' && (
+              <>
+                <div className="mep-item mep-item--summary">
+                  <Card variant="subtle" title={t('manage.summary.title')}>
+                    <dl className="mep-summary">
+                      <div className="mep-summary__row">
+                        <dt className="mep-summary__label">{t('manage.summary.participants')}</dt>
+                        <dd className="mep-summary__value">{t('manage.summary.participantsValue', { max: capacity })}</dd>
+                      </div>
+                      <div className="mep-summary__row">
+                        <dt className="mep-summary__label">{t('manage.summary.files')}</dt>
+                        <dd className="mep-summary__value">{fmt.number(0)}</dd>
+                      </div>
+                      <div className="mep-summary__row">
+                        <dt className="mep-summary__label">{t('manage.summary.deadline')}</dt>
+                        <dd className="mep-summary__value">{t('manage.summary.notSet')}</dd>
+                      </div>
+                    </dl>
+                  </Card>
+                </div>
+                <div className="mep-item mep-item--after">
+                  <Callout tone="info" title={t('manage.after.title')}>
+                    {t('manage.after.text')}
+                  </Callout>
+                </div>
+              </>
+            )}
+            {showPause && (
+              <div className="mep-item mep-item--pause">
+                {resumeError && <Callout tone="error">{t(resumeError)}</Callout>}
+                <Button
+                  variant="tertiary"
+                  fullWidth
+                  loading={paused && pausing}
+                  onClick={paused ? handleResume : openPauseDialog}
+                >
+                  {paused ? t('manage.pause.resume') : t('manage.pause.action')}
+                </Button>
+              </div>
+            )}
+          </aside>
+
+          {metrics.length > 0 && <div className="mep-metrics mep-item mep-item--metrics">{metrics}</div>}
+
+          <div className="mep-main mep-item mep-item--main">
+            {showParticipants && (
+              <section className="mep-participants" aria-labelledby="mep-participants-title">
+                <div className="mep-participants__header">
+                  <h2 id="mep-participants-title" className="mep-participants__title">
+                    {t('manage.participants.title')}
+                  </h2>
+                  {reminderButton}
+                </div>
+                {participantsContent}
+              </section>
+            )}
+            {state === 'results' && (
+              <EventResults eventId={event.id} currentUserId={null} recalculateIfMissing />
+            )}
+          </div>
+        </div>
+      </div>
+
+      <EditEventDialog
+        open={openDialog === 'edit'}
+        event={event}
+        onClose={closeDialog}
+        onSaved={() => finishDialog('manageEvent.updated')}
+      />
+      <ShareDialog
+        open={openDialog === 'share'}
+        eventId={event.id}
+        eventName={event.title}
+        stage={event.stage}
+        onClose={closeDialog}
+      />
+      <OpenRegistrationDialog
+        open={openDialog === 'openRegistration'}
+        eventId={event.id}
+        onClose={closeDialog}
+        onDone={() => finishDialog('manage.success.registrationOpened', undefined, true)}
+      />
+      <OpenVotingDialog
+        open={openDialog === 'openVoting'}
+        eventId={event.id}
+        onClose={closeDialog}
+        onDone={() => finishDialog('manage.success.votingOpened', undefined, true)}
+      />
+      {progress && (
+        <PublishResultsDialog
+          open={openDialog === 'publishResults'}
+          eventId={event.id}
+          progress={progress}
+          onClose={closeDialog}
+          onDone={() => finishDialog('manage.success.resultsPublished', undefined, true)}
+        />
+      )}
+      {reminder && (
+        <ReminderDialog
+          open={openDialog === 'reminder'}
+          eventId={event.id}
+          type={reminder}
+          recipients={pending}
+          onClose={closeDialog}
+          onDone={handleReminderDone}
+        />
+      )}
+      {deadline && (event.stage === 'participation' || event.stage === 'voting') && (
+        <EditDeadlineDialog
+          open={openDialog === 'deadline'}
+          eventId={event.id}
+          stage={event.stage}
+          currentDate={deadline}
+          onClose={closeDialog}
+          onDone={() => finishDialog('manage.success.deadlineUpdated')}
+        />
+      )}
+      <Dialog
+        open={openDialog === 'pause'}
+        onClose={closeDialog}
+        variant="alert"
+        title={t('manage.pause.confirmTitle')}
+        busy={pausing}
+        closeLabel={t('manage.dialog.close')}
+        describedBy="mep-pause-text"
+        initialFocusRef={pauseCancelRef}
+        actions={
+          <>
+            <Button ref={pauseCancelRef} variant="secondary" disabled={pausing} onClick={closeDialog}>
+              {t('manage.pause.cancel')}
+            </Button>
+            <Button loading={pausing} onClick={handlePauseConfirm}>
+              {t('manage.pause.action')}
+            </Button>
+          </>
+        }
+      >
+        <p id="mep-pause-text" className="mep-dialog-text">
+          {t('manage.pause.confirmText')}
+        </p>
+        {pauseError && <Callout tone="error">{t(pauseError)}</Callout>}
+      </Dialog>
     </div>
   );
 };

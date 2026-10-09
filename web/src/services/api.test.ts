@@ -9,7 +9,9 @@ import {
   neutralFilename,
   extensionForMime,
 } from "./api";
-import { User } from "../types";
+import { VotingConfiguration } from "../types";
+import { VotingConfigPreview } from "../domain/voting";
+import { API_CONFIG } from "../config/api";
 
 jest.mock("../config/api", () => ({
   ...jest.requireActual("../config/api"),
@@ -146,52 +148,6 @@ describe("UserService.getUserEvents", () => {
     const result = await UserService.getUserEvents("user-1");
 
     expect(result).toEqual([]);
-  });
-});
-
-describe("EventService.getEventParticipants", () => {
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it("relanza el error de red en vez de devolver [] silencioso (TS-1)", async () => {
-    mockedApiRequest.mockRejectedValueOnce(new Error("Failed to fetch"));
-
-    await expect(EventService.getEventParticipants("ev-1")).rejects.toThrow("Failed to fetch");
-  });
-
-  it("sigue devolviendo [] en lista vacía real (TS-2)", async () => {
-    mockedApiRequest.mockResolvedValueOnce({
-      count: 0,
-      data: { event: { id: "ev-1", name: "E", stage: "participation" }, participants: [] },
-    });
-
-    const result = await EventService.getEventParticipants("ev-1");
-
-    expect(result).toEqual([]);
-  });
-
-  it("mapea el camino feliz sin cambios (TS-3)", async () => {
-    mockedApiRequest.mockResolvedValueOnce({
-      count: 1,
-      data: {
-        participants: [{ id: "u1", name: "Test User", email: "t@t.com", role: "participant" }],
-      },
-    });
-
-    const result = await EventService.getEventParticipants("ev-1");
-
-    const expected: User[] = [
-      {
-        id: "u1",
-        name: "Test User",
-        email: "t@t.com",
-        role: "participant",
-        joinedEventIDs: [],
-        createdEventIDs: [],
-      },
-    ];
-    expect(result).toEqual(expected);
   });
 });
 
@@ -430,5 +386,165 @@ describe("S-015 · servicios del detalle", () => {
   it("TS-19 no quedan metadatos de compartir en el servicio", () => {
     const source = fs.readFileSync(path.join(__dirname, "api.ts"), "utf8");
     expect(source).not.toContain("getShareable" + "EventInfo");
+  });
+});
+
+
+describe("S-016 · servicios de gestión (Task 2)", () => {
+  const config: VotingConfiguration = {
+    id: "c-1",
+    event_id: "e-1",
+    attachments_per_evaluator: 2,
+    quality_good_threshold: 0.6,
+    quality_bad_threshold: 0.3,
+    adjustment_magnitude: 3,
+    min_evaluations_per_file: 2,
+  };
+
+  beforeEach(() => {
+    jest.spyOn(console, "log").mockImplementation(() => undefined);
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.clearAllMocks();
+  });
+
+  it("TS-15 abrir inscripción manda solo stage y fecha", async () => {
+    mockedApiRequest.mockResolvedValueOnce({
+      data: { id: "e-1", stage: "participation", participation_estimated_end_date: "2026-10-12" },
+      code: "STAGE_UPDATED",
+      transition: { from: "creation", to: "participation" },
+    });
+
+    const result = await EventService.updateEventStage("e-1", "participation", "2026-10-12");
+
+    const [url, options] = mockedApiRequest.mock.calls[0];
+    expect(url).toBe("/api/v1/events/e-1/stage");
+    expect(options?.method).toBe("PATCH");
+    expect(options?.body).toBe('{"stage":"participation","estimated_end_date":"2026-10-12"}');
+    expect(result).toEqual({ stage: "participation" });
+  });
+
+  it("TS-16 abrir votación en una sola llamada con voting_config", async () => {
+    const input = {
+      attachments_per_evaluator: 2,
+      min_evaluations_per_file: 2,
+      adjustment_magnitude: 3,
+      quality_good_threshold: 0.6,
+      quality_bad_threshold: 0.3,
+    };
+    mockedApiRequest.mockResolvedValueOnce({
+      data: { stage: "voting" },
+      voting: { configuration: config, assignments_count: 3, total_attachments: 3 },
+    });
+
+    const result = await EventService.updateEventStage("e-1", "voting", "2026-10-12", input);
+
+    expect(mockedApiRequest).toHaveBeenCalledTimes(1);
+    const [url, options] = mockedApiRequest.mock.calls[0];
+    expect(url).toBe("/api/v1/events/e-1/stage");
+    expect(options?.method).toBe("PATCH");
+    expect(JSON.parse(options?.body as string)).toEqual({
+      stage: "voting",
+      estimated_end_date: "2026-10-12",
+      voting_config: input,
+    });
+    expect(result).toEqual({
+      stage: "voting",
+      voting: { configuration: config, assignments_count: 3, total_attachments: 3 },
+    });
+  });
+
+  it("TS-17 publicar manda solo stage", async () => {
+    mockedApiRequest.mockResolvedValueOnce({ data: { stage: "results" } });
+
+    await EventService.updateEventStage("e-1", "results");
+
+    expect(mockedApiRequest.mock.calls[0][1]?.body).toBe('{"stage":"results"}');
+  });
+
+  it("TS-18 propaga el ApiError con code", async () => {
+    mockedApiRequest.mockRejectedValueOnce(
+      new ApiError({ status: 500, body: { error: "x", code: "VOTING_SETUP_ERROR" } })
+    );
+
+    await expect(
+      EventService.updateEventStage("e-1", "voting", "2026-10-12", { attachments_per_evaluator: 2 })
+    ).rejects.toMatchObject({ status: 500, code: "VOTING_SETUP_ERROR" });
+  });
+
+  it("updateEstimatedEndDate no escribe en consola", async () => {
+    mockedApiRequest.mockResolvedValueOnce({
+      data: { event_id: "e-1", stage: "voting", estimated_end_date: "2026-10-20", previous_date: "" },
+      code: "ESTIMATED_DATE_UPDATED",
+    });
+
+    await EventService.updateEstimatedEndDate("e-1", "voting", "2026-10-20");
+
+    expect(console.log).not.toHaveBeenCalled();
+  });
+
+  it("TS-19 vista previa del reparto", async () => {
+    const preview: VotingConfigPreview = {
+      participants_count: 4,
+      participants_with_proposal: 3,
+      can_open_voting: true,
+      min_m: 1,
+      max_m: 2,
+      recommended_m: 2,
+      defaults: { quality_good_threshold: 0.6, quality_bad_threshold: 0.3, adjustment_magnitude: 3 },
+    };
+    mockedApiRequest.mockResolvedValueOnce({ data: preview });
+
+    const result = await DistributedVotingService.getVotingConfigPreview("e-1");
+
+    expect(mockedApiRequest).toHaveBeenCalledWith("/api/v1/events/e-1/voting-config/preview");
+    expect(result).toEqual(preview);
+  });
+
+  it("TS-20 configuración aplicada: datos, null en CONFIG_NOT_FOUND, relanza el resto", async () => {
+    mockedApiRequest.mockResolvedValueOnce({ data: config });
+    await expect(DistributedVotingService.getVotingConfig("e-1")).resolves.toEqual(config);
+    expect(mockedApiRequest).toHaveBeenCalledWith("/api/v1/events/e-1/voting-config");
+
+    mockedApiRequest.mockRejectedValueOnce(
+      new ApiError({ status: 404, body: { error: "x", code: "CONFIG_NOT_FOUND" } })
+    );
+    await expect(DistributedVotingService.getVotingConfig("e-1")).resolves.toBeNull();
+
+    mockedApiRequest.mockRejectedValueOnce(
+      new ApiError({ status: 500, body: { error: "x", code: "CONFIG_LOOKUP_ERROR" } })
+    );
+    await expect(DistributedVotingService.getVotingConfig("e-1")).rejects.toMatchObject({
+      status: 500,
+      code: "CONFIG_LOOKUP_ERROR",
+    });
+  });
+
+  it("TS-21 recordatorio", async () => {
+    mockedApiRequest.mockResolvedValueOnce({
+      data: { type: "file", recipients_count: 1 },
+      message: "x",
+      code: "REMINDER_SENT",
+    });
+
+    const result = await EventService.sendReminder("e-1", "file");
+
+    const [url, options] = mockedApiRequest.mock.calls[0];
+    expect(url).toBe("/api/v1/events/e-1/reminders");
+    expect(options?.method).toBe("POST");
+    expect(options?.body).toBe('{"type":"file"}');
+    expect(result).toEqual({ type: "file", recipients_count: 1 });
+  });
+
+  it("TS-22 deprecados fuera y endpoints nuevos", () => {
+    expect("getEventParticipants" in EventService).toBe(false);
+    expect("createVotingConfig" in DistributedVotingService).toBe(false);
+    expect("generateAssignments" in DistributedVotingService).toBe(false);
+    expect("GENERATE_ASSIGNMENTS" in API_CONFIG.ENDPOINTS).toBe(false);
+    expect(API_CONFIG.ENDPOINTS.EVENT_REMINDERS("e-1")).toBe("/api/v1/events/e-1/reminders");
+    expect(API_CONFIG.ENDPOINTS.VOTING_CONFIG_PREVIEW("e-1")).toBe("/api/v1/events/e-1/voting-config/preview");
   });
 });

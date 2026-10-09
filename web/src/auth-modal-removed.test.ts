@@ -43,8 +43,8 @@ describe('fin de los modales de autenticación (S-012)', () => {
     expect(offenders.map((f) => path.relative(SRC, f))).toEqual([]);
   });
 
-  it('TS-59: Modal se eliminó (lo reemplaza Dialog) y LinkButton sigue (lo usa ManageEventPage)', () => {
+  it('TS-59: Modal (lo reemplaza Dialog) y LinkButton (S-016) se eliminaron', () => {
     expect(exists('components/modal/Modal.tsx')).toBe(false);
-    expect(exists('components/link-button/LinkButton.tsx')).toBe(true);
+    expect(exists('components/link-button/LinkButton.tsx')).toBe(false);
   });
 });

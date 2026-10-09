@@ -69,4 +69,42 @@ describe('NumberStepper', () => {
     expect(screen.getByRole('button', { name: 'Disminuir' })).toHaveAttribute('aria-controls', input.id);
     expect(screen.getByRole('button', { name: 'Aumentar' })).toHaveAttribute('aria-controls', input.id);
   });
+
+  it('TS-27: decimales con paso 0.05 (redondeo a centésimos)', () => {
+    const fn = jest.fn();
+    render(
+      <NumberStepper
+        {...base({ value: 0.6, min: 0, max: 1, step: 0.05, recommended: 0.6, rangeError: 'Entre 0 y 1.', onChange: fn })}
+      />
+    );
+    userEvent.click(screen.getByRole('button', { name: 'Aumentar' }));
+    expect(fn).toHaveBeenLastCalledWith(0.65);
+
+    fn.mockClear();
+    const input = screen.getByRole('spinbutton');
+    fireEvent.change(input, { target: { value: '0.75' } });
+    expect(fn).toHaveBeenCalledWith(0.75);
+    expect(screen.queryByText('Entre 0 y 1.')).toBeNull();
+
+    fn.mockClear();
+    fireEvent.change(input, { target: { value: '1.2' } });
+    expect(fn).not.toHaveBeenCalled();
+    expect(screen.getByText('Entre 0 y 1.')).toBeInTheDocument();
+  });
+
+  it('TS-27b: bajar desde 0.3 con paso 0.05 da 0.25', () => {
+    const fn = jest.fn();
+    render(<NumberStepper {...base({ value: 0.3, min: 0, max: 1, step: 0.05, onChange: fn })} />);
+    userEvent.click(screen.getByRole('button', { name: 'Disminuir' }));
+    expect(fn).toHaveBeenCalledWith(0.25);
+  });
+
+  it('TS-28: con paso entero sigue rechazando decimales', () => {
+    const fn = jest.fn();
+    render(<NumberStepper {...base({ value: 2, onChange: fn })} />);
+    expect(screen.getByRole('button', { name: 'Aumentar' })).toBeDisabled();
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '1.5' } });
+    expect(fn).not.toHaveBeenCalled();
+    expect(screen.getByText('Elegí un valor entre 1 y 2.')).toBeInTheDocument();
+  });
 });

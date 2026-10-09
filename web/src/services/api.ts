@@ -10,6 +10,10 @@ import {
   User,
   EventParticipant,
   VotingConfiguration,
+  VotingConfigInput,
+  StageUpdateResult,
+  ReminderType,
+  ReminderResult,
   AnonymousAssignment,
   RankingVote,
   VotingResults,
@@ -17,6 +21,7 @@ import {
   Attachment
 } from "../types";
 import { automaticEventDates } from "../domain/eventForm";
+import { VotingConfigPreview } from "../domain/voting";
 
 // Mantener en sync con `neutralExtensions` de api/internal/handlers/attachment_handler.go
 export const NEUTRAL_EXTENSIONS: Record<string, string> = {
@@ -167,46 +172,34 @@ export const EventService = {
 
   async updateEventStage(
     eventId: string,
-    newStage: string,
-    estimatedEndDate?: string
-  ): Promise<Event> {
-    try {
-      const body: { stage: string; estimated_end_date?: string } = {
-        stage: newStage
-      };
+    newStage: EventStage,
+    estimatedEndDate?: string,
+    votingConfig?: VotingConfigInput
+  ): Promise<StageUpdateResult> {
+    const response = await apiRequest<{
+      data: { stage: EventStage };
+      voting?: StageUpdateResult["voting"];
+    }>(API_CONFIG.ENDPOINTS.EVENT_STAGE(eventId), {
+      method: "PATCH",
+      body: JSON.stringify({
+        stage: newStage,
+        ...(estimatedEndDate && { estimated_end_date: estimatedEndDate }),
+        ...(votingConfig && { voting_config: votingConfig }),
+      }),
+    });
+    return {
+      stage: response.data.stage,
+      ...(response.voting && { voting: response.voting }),
+    };
+  },
 
-      if (estimatedEndDate) {
-        body.estimated_end_date = estimatedEndDate;
-      }
-
-      const response = await apiRequest<{ data: any }>(
-        API_CONFIG.ENDPOINTS.EVENT_STAGE(eventId),
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        }
-      );
-
-      // Map response to Event type
-      const event = response.data;
-      return {
-        id: event.id,
-        title: event.name || event.title,
-        description: event.description,
-        date: event.start_date || event.date,
-        stage: event.stage,
-        participation_estimated_end_date: event.participation_estimated_end_date,
-        voting_estimated_end_date: event.voting_estimated_end_date,
-        creator_id: event.author_id,
-        updated_at: event.updated_at
-      } as Event;
-    } catch (error) {
-      console.error("Failed to update event stage:", error);
-      throw error;
-    }
+  /** Envía un recordatorio a los destinatarios pendientes (S-016). */
+  async sendReminder(eventId: string, type: ReminderType): Promise<ReminderResult> {
+    const response = await apiRequest<{ data: ReminderResult }>(
+      API_CONFIG.ENDPOINTS.EVENT_REMINDERS(eventId),
+      { method: "POST", body: JSON.stringify({ type }) }
+    );
+    return { type: response.data.type, recipients_count: response.data.recipients_count };
   },
 
   /**
@@ -221,12 +214,6 @@ export const EventService = {
     estimatedEndDate: string
   ): Promise<{ previousDate: string | null; newDate: string }> {
     try {
-      console.log('📅 Updating estimated end date:', {
-        eventId,
-        stage,
-        estimatedEndDate
-      });
-
       const response = await apiRequest<{
         data: {
           event_id: string;
@@ -249,8 +236,6 @@ export const EventService = {
           }),
         }
       );
-
-      console.log('✅ Estimated end date updated:', response.data);
 
       return {
         previousDate: response.data.previous_date || null,
@@ -292,29 +277,6 @@ export const EventService = {
       );
     } catch (error) {
       console.error("❌ Failed to register for event:", error);
-      throw error;
-    }
-  },
-
-  async getEventParticipants(eventId: string): Promise<User[]> {
-    try {
-      const response = await apiRequest<{ count: number; data: { participants: any[] } }>(
-        API_CONFIG.ENDPOINTS.EVENT_PARTICIPANTS(eventId)
-      );
-
-      // El backend devuelve { count, data: { event, participants } }
-      const participants = response.data?.participants || [];
-
-      return participants.map(participant => ({
-        id: participant.id,
-        name: participant.name,
-        email: participant.email,
-        role: participant.role || "participant",
-        joinedEventIDs: participant.joined_event_ids || [],
-        createdEventIDs: participant.created_event_ids || []
-      }));
-    } catch (error) {
-      console.error("❌ Failed to fetch event participants:", error);
       throw error;
     }
   },
@@ -576,54 +538,24 @@ export const AttachmentService = {
 // ========================================
 
 export const DistributedVotingService = {
-  /**
-   * Crear configuración de votación para un evento
-   */
-  async createVotingConfig(
-    eventId: string,
-    config: Partial<VotingConfiguration>
-  ): Promise<VotingConfiguration> {
-    try {
-      const response = await apiRequest<{ data: VotingConfiguration }>(
-        API_CONFIG.ENDPOINTS.VOTING_CONFIG(eventId),
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config)
-        }
-      );
-      console.log('✅ Voting configuration created:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('Failed to create voting configuration:', error);
-      throw error;
-    }
+  /** Vista previa del reparto para el organizador (S-016). */
+  async getVotingConfigPreview(eventId: string): Promise<VotingConfigPreview> {
+    const response = await apiRequest<{ data: VotingConfigPreview }>(
+      API_CONFIG.ENDPOINTS.VOTING_CONFIG_PREVIEW(eventId)
+    );
+    return response.data;
   },
 
-  /**
-   * Generar asignaciones distribuidas para todos los participantes
-   */
-  async generateAssignments(eventId: string): Promise<void> {
+  /** Configuración aplicada; `null` si el evento aún no abrió la votación. */
+  async getVotingConfig(eventId: string): Promise<VotingConfiguration | null> {
     try {
-      const response = await apiRequest<{ 
-        data: { 
-          assignments_count: number;
-          total_participants: number;
-          total_attachments: number;
-          total_evaluations: number;
-        };
-        message: string;
-      }>(
-        API_CONFIG.ENDPOINTS.GENERATE_ASSIGNMENTS(eventId),
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        }
+      const response = await apiRequest<{ data: VotingConfiguration }>(
+        API_CONFIG.ENDPOINTS.VOTING_CONFIG(eventId)
       );
-      console.log('✅ Assignments generated:', response.data.assignments_count, 'assignments for', response.data.total_participants, 'participants');
-    } catch (error) {
-      console.error('Failed to generate assignments:', error);
-      throw error;
+      return response.data;
+    } catch (err) {
+      if (getErrorCode(err) === 'CONFIG_NOT_FOUND') return null;
+      throw err;
     }
   },
 

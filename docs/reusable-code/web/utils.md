@@ -12,14 +12,20 @@ try { await apiRequest(url); } catch (err) { const code = getErrorCode(err); }
 
 ---
 
-## validateStageAdvance
+## domain/stages (transitionDialog)
 
 **Location:** `src/domain/stages.ts`
-**Description:** Replicates the backend rules for `PATCH /stage` and returns the same codes (`INVALID_TRANSITION`, `MISSING_ESTIMATED_DATE`, `INVALID_ESTIMATED_DATE`, `INSUFFICIENT_ATTACHMENTS`). Today is a valid deadline.
+**Description:** Stage order and helpers (`STAGE_ORDER`, `stageIndex`, `getNextStage`, `stageNameKey`, `stageStatus`, `MIN_PROPOSALS_TO_VOTE = 3`). `transitionDialog` says which dialog runs the next step of each stage (`null` in Results). The client-side advance validation (`validateStageAdvance`, `requiresEstimatedEndDate`) was removed in S-016: each transition dialog validates its own fields and the backend codes are shown on failure.
 
 **Signature:**
 ```ts
-validateStageAdvance(input: { current: EventStage; target: EventStage; estimatedEndDate?: string | null; participantsWithProposal?: number; today?: Date }): StageAdvanceIssue[]
+type TransitionDialog = 'openRegistration' | 'openVoting' | 'publishResults'
+transitionDialog(stage: EventStage): TransitionDialog | null
+```
+
+**Usage:**
+```ts
+const dialog = transitionDialog(event.stage); // creation -> 'openRegistration'
 ```
 
 ---
@@ -48,14 +54,40 @@ daysUntilClose(date: string, now?: Date): number
 formatDate(date: string, locale: string): string
 formatRelative(when: Date | string, locale: string, now?: Date): string
 addDays(date: string, days: number): string
+todayISO(now?: Date): string
+DURATION_PRESETS = [3, 7, 14] as const   // days, shared by the deadline dialogs
+DEFAULT_DURATION_DAYS = 7
+type DeadlineIssue = 'not_after_today' | 'not_postponed'
+validateNewDeadline(date: string, today: string): DeadlineIssue | null   // date must be > today
+validatePostpone(date: string, current: string): DeadlineIssue | null    // date must be > current close
 ```
+
+`validateNewDeadline` / `validatePostpone` compare `YYYY-MM-DD` strings (local calendar).
 
 ---
 
 ## validateThresholds / formatScore
 
 **Location:** `src/domain/voting.ts`, `src/domain/score.ts`
-**Description:** `validateThresholds` compares in hundredths (avoids `0.7 - 0.6` float error). `formatScore` shows `mbc_score × 10` with one decimal.
+**Description:** `validateThresholds` compares in hundredths (avoids `0.7 - 0.6` float error). `formatScore` shows `mbc_score × 10` with one decimal. The voting-config draft of the "Abrir votación" dialog starts from the preview (`recommended_m`, `min(3, m)` and the preview defaults); `validateVotingDraft` checks thresholds first, then the adjustment range; `isRecommendedConfig` tells whether an applied configuration matches the recommended one (thresholds in hundredths).
+
+**Signature:**
+```ts
+validateThresholds(good: number, bad: number): 'not_greater' | 'gap_too_small' | null
+recommendedMinEvaluations(m: number): number            // min(3, m)
+initialVotingDraft(p: VotingConfigPreview): VotingConfigDraft
+validateVotingDraft(d: VotingConfigDraft): ThresholdIssue | 'adjustment_out_of_range' | null
+isRecommendedConfig(c: Pick<VotingConfiguration, 'attachments_per_evaluator' | 'min_evaluations_per_file'
+  | 'adjustment_magnitude' | 'quality_good_threshold' | 'quality_bad_threshold'>): boolean
+// VotingConfigDraft: attachments_per_evaluator, min_evaluations_per_file, adjustment_magnitude, quality_good_threshold, quality_bad_threshold
+// constants: ADJUSTMENT_MIN = 1, ADJUSTMENT_MAX = 10, MIN_EVALUATIONS_MAX = 20, THRESHOLD_STEP = 0.05, MIN_THRESHOLD_GAP, DEFAULT_THRESHOLDS
+```
+
+**Usage:**
+```ts
+const draft = initialVotingDraft(preview);
+const issue = validateVotingDraft(draft); // null -> can submit
+```
 
 ---
 
@@ -167,4 +199,71 @@ capacityOf(e) / isRegistered(e, userId) / isFull(e)
 ```ts
 const state = nextStepState(event, user?.id ?? null, myAttachment, assignmentStatus);
 const { podium, rest } = splitResults(results.adjusted_ranking);
+```
+
+---
+
+## domain/manage
+
+**Location:** `src/domain/manage.ts`
+**Description:** Pure rules for the organizer management page (S-016). Cancelled wins over the stage; pause is allowed unless cancelled or in Results. Pending files are participants without an attachment; pending votes are only those with `false` in `participant_voting_status` (absent = not participating). `managePill` priority is cancelled > paused > stage, adding the days to close when the stage deadline has not passed ("closes today" when 0). `reminderType` maps participation -> `file`, voting -> `vote`, otherwise `null`.
+
+**Signature:**
+```ts
+type ManageStage = 'creation' | 'participation' | 'voting' | 'results' | 'cancelled'
+manageStage(e: Pick<Event, 'stage' | 'is_cancelled'>): ManageStage
+canPause(e: Pick<Event, 'stage' | 'is_cancelled'>): boolean
+pendingFiles(participants: EventParticipant[], attachments: Pick<Attachment, 'participant_id'>[]): EventParticipant[]
+pendingVotes(participants: EventParticipant[], status: Record<string, boolean> | undefined): EventParticipant[]
+voteCell(participantId: string, status: Record<string, boolean> | undefined): 'sent' | 'pending' | 'notParticipating'
+votingProgress(s: Pick<VotingStatistics, 'completed_assignments' | 'total_assignments'>): VotingProgress // { sent, total, missing, complete }
+managePill(e: Event, now?: Date): ManagePill   // { key: ManagePillKey ('manage.pill.*'); params?: { count } }
+reminderType(stage: EventStage): ReminderType | null
+REMINDER_PREVIEW_LIMIT = 5
+```
+
+**Usage:**
+```ts
+const pill = managePill(event);           // t(pill.key, pill.params)
+const type = reminderType(event.stage);   // null -> no reminder button
+const recipients = type === 'file' ? pendingFiles(participants, attachments) : pendingVotes(participants, stats?.participant_voting_status);
+```
+
+---
+
+## API services (S-016 changes)
+
+**Location:** `src/services/api.ts`
+**Description:** `EventService.updateEventStage` now accepts the voting configuration (sent in the same `PATCH /events/{id}/stage` when opening the voting) and returns `StageUpdateResult` (`voting` only when moving to voting). `EventService.sendReminder` calls `POST /events/{id}/reminders`. `DistributedVotingService.getVotingConfigPreview` reads `GET …/voting-config/preview` (`recommended_m` / `max_m` are never recomputed on the client); `getVotingConfig` reads the applied configuration and returns `null` on `CONFIG_NOT_FOUND`. Removed in S-016: `getEventParticipants`, `createVotingConfig`, `generateAssignments` (use `getParticipants` and the stage PATCH with `votingConfig`).
+
+**Signature:**
+```ts
+EventService.updateEventStage(eventId: string, newStage: EventStage, estimatedEndDate?: string,
+  votingConfig?: VotingConfigInput): Promise<StageUpdateResult>
+EventService.sendReminder(eventId: string, type: ReminderType): Promise<ReminderResult>
+DistributedVotingService.getVotingConfigPreview(eventId: string): Promise<VotingConfigPreview>
+DistributedVotingService.getVotingConfig(eventId: string): Promise<VotingConfiguration | null>
+```
+
+**Usage:**
+```ts
+await EventService.updateEventStage(id, 'voting', date, { attachments_per_evaluator: m, min_evaluations_per_file: k });
+const { recipients_count } = await EventService.sendReminder(id, 'vote');
+```
+
+---
+
+## Stage and reminder types
+
+**Location:** `src/types/index.ts`
+**Description:** Types for the S-016 stage and reminder endpoints.
+
+**Signature:**
+```ts
+type ReminderType = 'file' | 'vote'
+interface ReminderResult { type: ReminderType; recipients_count: number }
+interface VotingConfigInput { attachments_per_evaluator: number; quality_good_threshold?: number;
+  quality_bad_threshold?: number; adjustment_magnitude?: number; min_evaluations_per_file?: number }
+interface StageUpdateResult { stage: EventStage;
+  voting?: { configuration: VotingConfiguration; assignments_count: number; total_attachments: number } }
 ```

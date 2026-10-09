@@ -56,7 +56,25 @@ All text reaches the components through props (no embedded copy); CSS uses only 
 ## DateQuickPicker / NumberStepper / TextField / Menu / FilterTabs
 
 **Location:** `src/components/ui/{date-quick-picker,number-stepper,text-field,menu,filter-tabs}/`
-**Description:** Accessible form and navigation controls. `DateQuickPicker` is controlled with ISO dates and takes `presets: { days, label }[]`; `NumberStepper` never propagates an out-of-range value; `TextField` forwards its `ref`.
+**Description:** Accessible form and navigation controls. `DateQuickPicker` is controlled with ISO dates and takes `presets: { days, label }[]`; the optional `base` (ISO) is the date the presets are added to and takes priority over the variant default (today for `fromToday`, initial value for `postpone`). `NumberStepper` never propagates an out-of-range value; with a decimal `step` (e.g. `THRESHOLD_STEP = 0.05`) − / + snap to the step grid rounded to hundredths (no `0.6500000001`), typed decimals are accepted and the input uses `inputMode="decimal"`. `TextField` forwards its `ref`.
+
+**Usage:**
+```tsx
+<DateQuickPicker variant="postpone" base={current} value={value} presets={presets} locale={locale} label={...} changeLabel={...} onChange={setValue} />
+<NumberStepper value={good} min={0} max={1} step={THRESHOLD_STEP} label={...} decrementLabel={...} incrementLabel={...} onChange={setGood} />
+```
+
+---
+
+## Icons
+
+**Location:** `src/components/ui/icons/Icons.tsx`
+**Description:** Inline SVG icons (`IconProps` = SVG props) built on `BaseIcon` (stroke) or `BrandIcon` (filled path). S-016 adds `EditIcon` (pencil, "edit deadline") and `BellIcon` (reminders).
+
+**Usage:**
+```tsx
+<Button variant="tertiary" iconStart={<BellIcon width={16} height={16} />}>{t('manage.remind')}</Button>
+```
 
 ---
 
@@ -200,16 +218,25 @@ ShareDialog({ open: boolean; eventId: string; eventName: string; stage: EventSta
 ## ParticipantsTable
 
 **Location:** `src/components/events/participants-table/ParticipantsTable.tsx`
-**Description:** Public variant of the participants table: columns name and registration date (`created_at` formatted with the locale), on `DataTable` with a visually hidden caption and 4 skeleton rows while loading. Never renders the email.
+**Description:** Participants table on `DataTable` with a visually hidden caption and 4 skeleton rows while loading. Discriminated by `variant`:
+- `public` (default): name and registration date (`created_at` formatted with the locale). Never renders the email.
+- `organizer`: name, email, file (tertiary button with the file name calling `onDownload(attachment)`, or a warning "missing" pill) and, depending on `stage`, the registration date or (in `voting`) a vote pill from `voteCell` (sent / pending / not participating). `voteUnavailable` shows "—" when the statistics failed.
 
 **Signature:**
 ```ts
-ParticipantsTable({ rows: EventParticipant[]; caption: string; loading?: boolean })
+ParticipantsTable(
+  | { variant?: 'public'; rows: EventParticipant[]; caption: string; loading?: boolean }
+  | { variant: 'organizer'; rows: EventParticipant[]; caption: string; loading?: boolean; stage: EventStage;
+      attachments: Attachment[]; votingStatus?: Record<string, boolean>; voteUnavailable?: boolean;
+      onDownload?: (attachment: Attachment) => void }
+)
 ```
 
 **Usage:**
 ```tsx
 <ParticipantsTable rows={participants} caption={t('participants.title', { count, max })} />
+<ParticipantsTable variant="organizer" rows={participants} caption={...} stage={event.stage} attachments={attachments}
+  votingStatus={stats?.participant_voting_status} voteUnavailable={statsFailed} onDownload={download} />
 ```
 
 ---
@@ -268,14 +295,47 @@ RankingList({ entries: AttachmentResult[]; currentUserId: string | null })
 ## EventResults
 
 **Location:** `src/components/voting/event-results/EventResults.tsx`
-**Description:** Public results block. Loads `GET /distributed-results`; renders `Podium`, `RankingList` (only if there is a 4th place) and the score note. `RESULTS_NOT_CALCULATED` or an empty `adjusted_ranking` show "Los resultados todavía no están disponibles." (not an error); other failures show an error callout with "Reintentar". It never calls the recalculate endpoint. Used by the event detail and, until S-016, by the management page.
+**Description:** Public results block. Loads `GET /distributed-results`; renders `Podium`, `RankingList` (only if there is a 4th place) and the score note. `RESULTS_NOT_CALCULATED` or an empty `adjusted_ranking` show "Los resultados todavía no están disponibles." (not an error); other failures show an error callout with "Reintentar". By default it never calls the recalculate endpoint; with `recalculateIfMissing` (management page, S-016) a `RESULTS_NOT_CALCULATED` triggers one `POST …/distributed-results/recalculate` per load (eventId + retry attempt; a re-run effect reuses the same promise). Used by the event detail and the management page.
 
 **Signature:**
 ```ts
-EventResults({ eventId: string; currentUserId: string | null; onLoaded?: (results: VotingResults) => void })
+EventResults({ eventId: string; currentUserId: string | null; onLoaded?: (results: VotingResults) => void;
+  recalculateIfMissing?: boolean })
 ```
 
 **Usage:**
 ```tsx
 <EventResults eventId={event.id} currentUserId={user?.id ?? null} onLoaded={setResults} />
+```
+
+---
+
+## Stage transition and management dialogs (S-016)
+
+**Location:** `src/components/events/{open-registration-dialog,edit-deadline-dialog,open-voting-dialog,publish-results-dialog,reminder-dialog}/`
+**Description:** Organizer dialogs on `Dialog`, each calling the API itself and reporting success with `onDone`. Errors go through `scopedMessageKeyForError` with each dialog's allowed codes and show an error `Callout`; while saving, `Dialog` is `busy` and Cancel is disabled. `OpenRegistrationDialog`, `EditDeadlineDialog` and `OpenVotingDialog` mount their content only when `open`, so every opening starts from the initial values without errors. Which dialog runs the next step of a stage comes from `transitionDialog(stage)`.
+
+- **OpenRegistrationDialog** - Creation → Participation. `DateQuickPicker` `fromToday` with `DURATION_PRESETS` (default today + `DEFAULT_DURATION_DAYS`), initial focus on the selected preset, blocks dates not after today (`validateNewDeadline`). Calls `EventService.updateEventStage(eventId, 'participation', date)`.
+- **EditDeadlineDialog** - Postpones the current deadline of `participation` or `voting`. Presets counted from the current close (`base={currentDate}`), default current + 7, rejects dates not after the current close (`validatePostpone`). Calls `EventService.updateEstimatedEndDate(eventId, stage, date)`.
+- **OpenVotingDialog** - Participation → Voting. On open loads `DistributedVotingService.getVotingConfigPreview` (skeleton / error + retry), shows proposals / reviewers / files per reviewer, a "left out" warning and the minimum-proposals error when `can_open_voting` is false. Fields: voting deadline, files per reviewer (`min_m..max_m`, min evaluations follow `recommendedMinEvaluations` until touched) and a collapsible advanced section (min evaluations, adjustment, good / bad thresholds with `THRESHOLD_STEP`) validated with `validateVotingDraft`. Calls `EventService.updateEventStage(eventId, 'voting', date, votingConfig)`.
+- **PublishResultsDialog** - Voting → Results, `variant="alert"`. With `progress.missing > 0` shows a warning ("{missing} of {total}") and the confirm label changes to "publish anyway"; initial focus on "Wait". Calls `EventService.updateEventStage(eventId, 'results')`.
+- **ReminderDialog** - Manual `file` / `vote` reminder. Lists the first `REMINDER_PREVIEW_LIMIT` recipients plus "and {n} more"; with no recipients shows a notice and disables Send. `EVENT_PAUSED_OR_CANCELLED` has its own message. Calls `EventService.sendReminder(eventId, type)` and `onDone(result)`.
+
+**Signature:**
+```ts
+OpenRegistrationDialog({ open: boolean; eventId: string; today?: string; onClose: () => void; onDone: () => void })
+EditDeadlineDialog({ open: boolean; eventId: string; stage: 'participation' | 'voting'; currentDate: string;
+  onClose: () => void; onDone: () => void })
+OpenVotingDialog({ open: boolean; eventId: string; today?: string; onClose: () => void; onDone: () => void })
+PublishResultsDialog({ open: boolean; eventId: string; progress: VotingProgress; onClose: () => void; onDone: () => void })
+ReminderDialog({ open: boolean; eventId: string; type: ReminderType; recipients: EventParticipant[];
+  onClose: () => void; onDone: (result: ReminderResult) => void })
+```
+
+**Usage:**
+```tsx
+<PublishResultsDialog open={dialog === 'publishResults'} eventId={event.id} progress={votingProgress(stats)}
+  onClose={close} onDone={reload} />
+<ReminderDialog open={reminderOpen} eventId={event.id} type={reminderType(event.stage)!}
+  recipients={pendingFiles(participants, attachments)} onClose={close} onDone={(r) => toast(r.recipients_count)} />
 ```

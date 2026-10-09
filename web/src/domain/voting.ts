@@ -1,3 +1,5 @@
+import type { VotingConfiguration } from '../types';
+
 /** Diferencia mínima entre el umbral bueno y el malo (igual al backend). */
 export const MIN_THRESHOLD_GAP = 0.1;
 
@@ -23,6 +25,57 @@ export const validateThresholds = (good: number, bad: number): ThresholdIssue | 
 
 /** `min_evaluations_per_file` recomendado: min(3, m). */
 export const recommendedMinEvaluations = (m: number): number => Math.min(3, m);
+
+export const ADJUSTMENT_MIN = 1;
+export const ADJUSTMENT_MAX = 10;
+export const MIN_EVALUATIONS_MAX = 20;
+export const THRESHOLD_STEP = 0.05;
+
+export interface VotingConfigDraft {
+  attachments_per_evaluator: number;
+  min_evaluations_per_file: number;
+  adjustment_magnitude: number;
+  quality_good_threshold: number;
+  quality_bad_threshold: number;
+}
+
+/** Borrador inicial: m recomendado, mínimo recomendado y defaults del preview. */
+export const initialVotingDraft = (p: VotingConfigPreview): VotingConfigDraft => ({
+  attachments_per_evaluator: p.recommended_m,
+  min_evaluations_per_file: recommendedMinEvaluations(p.recommended_m),
+  adjustment_magnitude: p.defaults.adjustment_magnitude,
+  quality_good_threshold: p.defaults.quality_good_threshold,
+  quality_bad_threshold: p.defaults.quality_bad_threshold,
+});
+
+export type VotingDraftIssue = ThresholdIssue | 'adjustment_out_of_range';
+
+export const validateVotingDraft = (d: VotingConfigDraft): VotingDraftIssue | null => {
+  const thresholds = validateThresholds(d.quality_good_threshold, d.quality_bad_threshold);
+  if (thresholds) return thresholds;
+  if (d.adjustment_magnitude < ADJUSTMENT_MIN || d.adjustment_magnitude > ADJUSTMENT_MAX) {
+    return 'adjustment_out_of_range';
+  }
+  return null;
+};
+
+const cents = (n: number): number => Math.round(n * 100);
+
+/** true si la configuración coincide con la recomendada (umbrales comparados en centésimos). */
+export const isRecommendedConfig = (
+  c: Pick<
+    VotingConfiguration,
+    | 'attachments_per_evaluator'
+    | 'min_evaluations_per_file'
+    | 'adjustment_magnitude'
+    | 'quality_good_threshold'
+    | 'quality_bad_threshold'
+  >
+): boolean =>
+  cents(c.quality_good_threshold) === cents(DEFAULT_THRESHOLDS.quality_good_threshold) &&
+  cents(c.quality_bad_threshold) === cents(DEFAULT_THRESHOLDS.quality_bad_threshold) &&
+  c.adjustment_magnitude === DEFAULT_THRESHOLDS.adjustment_magnitude &&
+  c.min_evaluations_per_file === recommendedMinEvaluations(c.attachments_per_evaluator);
 
 /**
  * Respuesta de `GET /api/v1/events/{event_id}/voting-config/preview`.

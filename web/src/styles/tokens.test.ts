@@ -71,10 +71,4 @@ describe('tokens.css', () => {
       .filter((f) => /^\s*--[a-z0-9-]+\s*:/m.test(fs.readFileSync(f, 'utf8')));
     expect(offenders).toEqual([]);
   });
-
-  it('TS-6: fallbacks de StageAdvanceModal.css neutralizados', () => {
-    const css = read('components', 'stage-advance-modal', 'StageAdvanceModal.css');
-    expect(css).not.toContain('var(--text-primary');
-    expect(css).not.toContain('var(--text-secondary');
-  });
 });

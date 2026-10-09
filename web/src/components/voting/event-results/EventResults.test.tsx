@@ -93,4 +93,36 @@ describe('EventResults', () => {
     expect(await screen.findByRole('list', { name: 'Podio' })).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
   });
+
+  it('TS-29: con recalculateIfMissing recalcula una vez y muestra el podio', async () => {
+    getResults.mockRejectedValue(
+      new ApiError({ status: 404, body: { error: 'RESULTS_NOT_CALCULATED', message: 'x' } })
+    );
+    recalculate.mockResolvedValue({ ...results, adjusted_ranking: results.adjusted_ranking.slice(0, 3) });
+    renderWithProviders(<EventResults eventId="e-1" currentUserId={null} recalculateIfMissing />);
+    expect(await screen.findByRole('list', { name: 'Podio' })).toBeInTheDocument();
+    expect(recalculate).toHaveBeenCalledTimes(1);
+    expect(recalculate).toHaveBeenCalledWith('e-1');
+    expect(screen.queryByText('Los resultados todavía no están disponibles.')).toBeNull();
+  });
+
+  it('TS-29b: sin la prop no recalcula', async () => {
+    getResults.mockRejectedValue(
+      new ApiError({ status: 404, body: { error: 'RESULTS_NOT_CALCULATED', message: 'x' } })
+    );
+    renderWithProviders(<EventResults eventId="e-1" currentUserId={null} />);
+    expect(await screen.findByText('Los resultados todavía no están disponibles.')).toBeInTheDocument();
+    expect(recalculate).not.toHaveBeenCalled();
+  });
+
+  it('TS-29c: si el recálculo falla muestra error con Reintentar', async () => {
+    getResults.mockRejectedValue(
+      new ApiError({ status: 404, body: { error: 'RESULTS_NOT_CALCULATED', message: 'x' } })
+    );
+    recalculate.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    renderWithProviders(<EventResults eventId="e-1" currentUserId={null} recalculateIfMissing />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cargar los resultados.');
+    expect(recalculate).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
+  });
 });

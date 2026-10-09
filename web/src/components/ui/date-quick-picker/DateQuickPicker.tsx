@@ -15,6 +15,8 @@ export interface DateQuickPickerProps {
   min?: string;
   /** Hoy en ISO; inyectable para tests. */
   today?: string;
+  /** ISO desde el que se suman los atajos; tiene prioridad sobre el default de la variante. */
+  base?: string;
   presets?: DatePreset[];
   locale: string;
   label: string;
@@ -30,6 +32,7 @@ const DateQuickPicker: React.FC<DateQuickPickerProps> = ({
   value,
   min,
   today,
+  base: baseProp,
   presets = [],
   locale,
   label,
@@ -47,7 +50,7 @@ const DateQuickPicker: React.FC<DateQuickPickerProps> = ({
   const refs = React.useRef<Array<HTMLButtonElement | null>>([]);
 
   // postpone: la base es el cierre actual al montar, para que el atajo no se acumule.
-  const base = variant === 'postpone' ? initialValue : today ?? todayISO();
+  const base = baseProp ?? (variant === 'postpone' ? initialValue : today ?? todayISO());
   const targets = presets.map((p) => addDays(base, p.days));
   const isBlocked = (iso: string): boolean => min !== undefined && iso < min;
   const selectedIndex = targets.findIndex((t) => t === value);

@@ -87,6 +87,28 @@ describe('DateQuickPicker', () => {
     expect(fn).toHaveBeenCalledWith('2026-10-13');
   });
 
+  it('base explícita: los atajos se suman a `base` aunque el valor inicial sea otro', () => {
+    const fn = jest.fn();
+    render(
+      <DateQuickPicker
+        {...base({
+          variant: 'postpone',
+          base: '2026-10-10',
+          value: '2026-10-17',
+          min: undefined,
+          presets: [
+            { days: 3, label: '+3 días' },
+            { days: 7, label: '+1 semana' },
+          ],
+          onChange: fn,
+        })}
+      />
+    );
+    expect(screen.getByRole('radio', { name: '+1 semana' })).toHaveAttribute('aria-checked', 'true');
+    userEvent.click(screen.getByRole('radio', { name: '+3 días' }));
+    expect(fn).toHaveBeenCalledWith('2026-10-13');
+  });
+
   it('TS-43: las flechas mueven la selección', () => {
     const fn = jest.fn();
     render(<DateQuickPicker {...base({ value: '2026-10-11', onChange: fn })} />);
