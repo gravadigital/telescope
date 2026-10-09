@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	"github.com/gravadigital/telescopio-api/internal/domain/participant"
 	"github.com/gravadigital/telescopio-api/internal/domain/vote"
 	"github.com/gravadigital/telescopio-api/internal/middleware/auth"
+	"github.com/gravadigital/telescopio-api/internal/storage/postgres"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -787,13 +789,139 @@ func TestGetVotingStatistics_ReportsCompletionRateAndNonVoters(t *testing.T) {
 // GetVotingConfiguration / UpdateVotingConfiguration / DeleteVotingConfiguration
 // ---------------------------------------------------------------------------
 
+func getConfigRequest(t *testing.T, s *testHandlerSet, eventID string) *httptest.ResponseRecorder {
+	t.Helper()
+	return performRequest(t, http.MethodGet, s.handler.GetVotingConfiguration,
+		gin.Params{{Key: "event_id", Value: eventID}}, "", nil)
+}
+
+func TestGetVotingConfiguration_ReturnsAppliedConfiguration(t *testing.T) {
+	for name, stage := range map[string]event.Stage{"voting": event.StageVoting, "results": event.StageResult} {
+		t.Run(name, func(t *testing.T) {
+			s := newTestHandlerSet()
+			e := newVotingEvent()
+			e.Stage = stage
+			s.eventRepo.addEvent(e)
+			cfg := vote.NewVotingConfiguration(e.ID, 2)
+			s.configRepo.byEvent[e.ID.String()] = cfg
+
+			w := getConfigRequest(t, s, e.ID.String())
+
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+			data := jsonBody(t, w)["data"].(map[string]interface{})
+			assert.Equal(t, cfg.ID.String(), data["id"])
+			assert.Equal(t, e.ID.String(), data["event_id"])
+			assert.EqualValues(t, 2, data["attachments_per_evaluator"])
+			assert.EqualValues(t, 0.6, data["quality_good_threshold"])
+			assert.EqualValues(t, 0.3, data["quality_bad_threshold"])
+			assert.EqualValues(t, 3, data["adjustment_magnitude"])
+			assert.EqualValues(t, 3, data["min_evaluations_per_file"])
+			createdAt, ok := data["created_at"].(string)
+			assert.True(t, ok && createdAt != "")
+		})
+	}
+}
+
+func TestGetVotingConfiguration_OmitsUpdatedAt(t *testing.T) {
+	s := newTestHandlerSet()
+	e := newVotingEvent()
+	s.eventRepo.addEvent(e)
+	s.configRepo.byEvent[e.ID.String()] = vote.NewVotingConfiguration(e.ID, 2)
+
+	w := getConfigRequest(t, s, e.ID.String())
+
+	require.Equal(t, http.StatusOK, w.Code)
+	data := jsonBody(t, w)["data"].(map[string]interface{})
+	assert.Len(t, data, 8)
+	assert.NotContains(t, data, "updated_at")
+}
+
+func TestGetVotingConfiguration_InvalidEventID(t *testing.T) {
+	s := newTestHandlerSet()
+
+	w := getConfigRequest(t, s, "")
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, "MISSING_EVENT_ID", jsonBody(t, w)["code"])
+
+	w = getConfigRequest(t, s, "not-a-uuid")
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, "INVALID_EVENT_ID", jsonBody(t, w)["code"])
+}
+
 func TestGetVotingConfiguration_NotFound(t *testing.T) {
 	s := newTestHandlerSet()
-	w := performRequest(t, http.MethodGet, s.handler.GetVotingConfiguration,
-		gin.Params{{Key: "event_id", Value: uuid.New().String()}}, "", nil)
+	e := newParticipationEvent()
+	s.eventRepo.addEvent(e)
 
+	w := getConfigRequest(t, s, e.ID.String())
 	assert.Equal(t, http.StatusNotFound, w.Code)
 	assert.Equal(t, "CONFIG_NOT_FOUND", jsonBody(t, w)["code"])
+
+	s.configRepo.getErr = fmt.Errorf("lookup: %w", postgres.ErrVotingConfigurationNotFound)
+	w = getConfigRequest(t, s, e.ID.String())
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Equal(t, "CONFIG_NOT_FOUND", jsonBody(t, w)["code"])
+}
+
+func TestGetVotingConfiguration_DatabaseFailure(t *testing.T) {
+	s := newTestHandlerSet()
+	e := newVotingEvent()
+	s.eventRepo.addEvent(e)
+	s.configRepo.getErr = errors.New("simulated db failure")
+
+	w := getConfigRequest(t, s, e.ID.String())
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Equal(t, "CONFIG_LOOKUP_ERROR", jsonBody(t, w)["code"])
+	assert.NotContains(t, w.Body.String(), "simulated db failure")
+}
+
+func TestGetVotingConfiguration_OnlyTheAuthorOrAdmin(t *testing.T) {
+	s := newTestHandlerSet()
+	e := newVotingEvent()
+	s.eventRepo.addEvent(e)
+	s.configRepo.byEvent[e.ID.String()] = vote.NewVotingConfiguration(e.ID, 2)
+
+	serve := func(eventID string, userID uuid.UUID, role participant.Role) *httptest.ResponseRecorder {
+		router := gin.New()
+		router.GET("/events/:event_id/voting-config",
+			func(c *gin.Context) {
+				c.Set("user_id", userID.String())
+				c.Set("user_role", role)
+			},
+			auth.RequireEventOwner(s.eventRepo),
+			s.handler.GetVotingConfiguration)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/events/"+eventID+"/voting-config", nil))
+		return w
+	}
+
+	t.Run("author", func(t *testing.T) {
+		w := serve(e.ID.String(), e.AuthorID, participant.RoleOrganizer)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		assert.Equal(t, e.ID.String(), jsonBody(t, w)["data"].(map[string]interface{})["event_id"])
+	})
+	t.Run("non-author is forbidden", func(t *testing.T) {
+		w := serve(e.ID.String(), uuid.New(), participant.RoleParticipant)
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		assert.Equal(t, "FORBIDDEN", jsonBody(t, w)["error"])
+	})
+	t.Run("admin who is not the author", func(t *testing.T) {
+		w := serve(e.ID.String(), uuid.New(), participant.RoleAdmin)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		assert.Equal(t, e.ID.String(), jsonBody(t, w)["data"].(map[string]interface{})["event_id"])
+	})
+	t.Run("admin with unknown event gets CONFIG_NOT_FOUND", func(t *testing.T) {
+		// Intentional: RequireEventOwner does not look the event up for admins.
+		w := serve(uuid.NewString(), uuid.New(), participant.RoleAdmin)
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.Equal(t, "CONFIG_NOT_FOUND", jsonBody(t, w)["code"])
+	})
+	t.Run("non-admin with unknown event gets NOT_FOUND from middleware", func(t *testing.T) {
+		w := serve(uuid.NewString(), uuid.New(), participant.RoleParticipant)
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.Equal(t, "NOT_FOUND", jsonBody(t, w)["error"])
+	})
 }
 
 func TestUpdateVotingConfiguration_RejectsWhenAssignmentsExist(t *testing.T) {

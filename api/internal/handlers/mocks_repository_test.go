@@ -732,7 +732,7 @@ func (m *mockVotingConfigurationRepository) GetByEventID(eventID string) (*vote.
 	}
 	c, ok := m.byEvent[eventID]
 	if !ok {
-		return nil, fmt.Errorf("config not found for event: %s", eventID)
+		return nil, fmt.Errorf("config for event %s: %w", eventID, postgres.ErrVotingConfigurationNotFound)
 	}
 	return c, nil
 }

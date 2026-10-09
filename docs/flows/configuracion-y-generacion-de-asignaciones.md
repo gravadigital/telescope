@@ -4,7 +4,7 @@ title: Configuración de la votación y generación de asignaciones
 type: feature
 status: Active
 created: 2026-09-18
-last_updated: 2026-10-02
+last_updated: 2026-10-09
 stories: [S-006, S-016]
 ---
 
@@ -13,8 +13,8 @@ stories: [S-006, S-016]
 **Tipo:** Feature
 **Status:** Active (implementado en el código existente)
 **Creado:** 2026-09-18
-**Última actualización:** 2026-10-02
-**Stories:** S-006, S-016 (S-016 pendiente)
+**Última actualización:** 2026-10-09
+**Stories:** S-006, S-016 (S-016: `api` implementado, `web` pendiente)
 
 ## Descripción
 
@@ -36,12 +36,13 @@ subieron una propuesta.
 | Paso | Cambio | Story |
 |---|---|---|
 | 1 | El `web` deja de calcular el `m` recomendado y usa `GET /api/v1/events/{event_id}/voting-config/preview` (la api ya lo expone). Se elimina la fórmula del front (cierra D-09) | S-016 |
+| 4 | Nuevo paso: la gestión lee la configuración aplicada con `GET /api/v1/events/{event_id}/voting-config`. La api registra la ruta del handler existente, valida el UUID (`INVALID_EVENT_ID`) y distingue "no encontrada" (`404 CONFIG_NOT_FOUND`) de un error de base (`500 CONFIG_LOOKUP_ERROR`) | S-016 |
 
 ## Servicios Involucrados
 
 | Servicio | Rol | Tipo de Participación |
 |----------|-----|-----------------------|
-| `web` | Sugiere `m` (hoy con su propia fórmula, ver Paso 1) y presenta la configuración | Iniciador |
+| `web` | Sugiere `m` (hoy con su propia fórmula, ver Paso 1), presenta la configuración y, desde la gestión, muestra la configuración aplicada (Paso 4) | Iniciador |
 | `api` | Calcula los límites de `m`, valida las restricciones matemáticas, ejecuta el algoritmo de asignación y escribe todo en una transacción | Procesador |
 | PostgreSQL | Persiste la configuración y las asignaciones; **valida las invariantes vía triggers** | Almacenamiento + Validador |
 
@@ -191,6 +192,49 @@ Si cualquier paso falla, rollback completo y `500 VOTING_SETUP_ERROR`.
 
 ---
 
+### Paso 4: Consultar la configuración aplicada desde la gestión
+
+**Origen:** `web` · **Destino:** `api` · **Tipo:** REST
+
+Una vez abierta la votación, la gestión del organizador muestra la "Configuración aplicada" en
+las etapas Votación y Resultados leyendo lo que guardó el Paso 3. Es la única fuente en Votación:
+`GET /distributed-results?include_metrics=true` solo trae `configuration` cuando el ranking ya
+está calculado.
+
+- **Método:** GET
+- **Endpoint:** `/api/v1/events/{event_id}/voting-config`
+- **Auth:** JWT Bearer — solo el autor del evento o un admin (`RequireEventOwner`, como el preview)
+
+**Response — 200:**
+```json
+{
+  "data": {
+    "id":                        "uuid",
+    "event_id":                  "uuid",
+    "attachments_per_evaluator": "integer — m",
+    "quality_good_threshold":    "number",
+    "quality_bad_threshold":     "number",
+    "adjustment_magnitude":      "integer — n",
+    "min_evaluations_per_file":  "integer",
+    "created_at":                "date-time"
+  }
+}
+```
+
+No incluye `updated_at`. Es solo lectura: la configuración sigue sin poder modificarse.
+
+| Condición | Respuesta |
+|---|---|
+| `event_id` no es un UUID | 400 `INVALID_EVENT_ID` |
+| Sin token / no es el autor ni admin | 401 / 403 del middleware |
+| El evento todavía no abrió la votación | 404 `CONFIG_NOT_FOUND` |
+| Falla la lectura de la base | 500 `CONFIG_LOOKUP_ERROR` |
+
+**Ref:** `docs/apis/api.yaml` → `get /api/v1/events/{event_id}/voting-config`;
+`api/internal/handlers/distributed_vote_handler.go` (`GetVotingConfiguration`)
+
+---
+
 ### Endpoints deprecados
 
 `POST /api/v1/events/{event_id}/voting-config` y `POST /api/v1/events/{event_id}/generate-assignments`
@@ -227,6 +271,7 @@ asignaciones. Aplican la misma regla que la apertura:
 - `assignments` — una fila por participante **con propuesta**, con exactamente `m` propuestas, ninguna propia,
   `is_completed = false` y `quality_score` NULL.
 - Los participantes pueden consultar su asignación y empezar a rankear.
+- El organizador puede leer la configuración aplicada (Paso 4), pero no modificarla.
 
 **Este estado es efectivamente irreversible desde la interfaz**: no hay endpoint para regenerar
 asignaciones ni para modificar la configuración una vez creada.

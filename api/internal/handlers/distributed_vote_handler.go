@@ -1056,7 +1056,7 @@ func participantVotingStatus(assignments []*vote.Assignment) map[string]bool {
 	return status
 }
 
-// GetVotingConfiguration handles GET /api/events/{event_id}/voting-config
+// GetVotingConfiguration handles GET /api/v1/events/{event_id}/voting-config
 func (h *DistributedVoteHandler) GetVotingConfiguration(c *gin.Context) {
 	eventID := c.Param("event_id")
 
@@ -1070,13 +1070,30 @@ func (h *DistributedVoteHandler) GetVotingConfiguration(c *gin.Context) {
 		return
 	}
 
+	if _, err := uuid.Parse(eventID); err != nil {
+		h.log.Warn("invalid event_id format", "event_id", eventID, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid event_id format",
+			"code":  "INVALID_EVENT_ID",
+		})
+		return
+	}
+
 	// Get voting configuration
 	config, err := h.configRepo.GetByEventID(eventID)
 	if err != nil {
-		h.log.Error("voting configuration not found", "event_id", eventID, "error", err)
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Voting configuration not found for this event",
-			"code":  "CONFIG_NOT_FOUND",
+		if errors.Is(err, postgres.ErrVotingConfigurationNotFound) {
+			h.log.Debug("voting configuration not found", "event_id", eventID)
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "Voting configuration not found for this event",
+				"code":  "CONFIG_NOT_FOUND",
+			})
+			return
+		}
+		h.log.Error("failed to retrieve voting configuration", "event_id", eventID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to retrieve voting configuration",
+			"code":  "CONFIG_LOOKUP_ERROR",
 		})
 		return
 	}
