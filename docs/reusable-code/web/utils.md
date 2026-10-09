@@ -267,3 +267,49 @@ interface VotingConfigInput { attachments_per_evaluator: number; quality_good_th
 interface StageUpdateResult { stage: EventStage;
   voting?: { configuration: VotingConfiguration; assignments_count: number; total_attachments: number } }
 ```
+
+---
+
+## domain/ranking
+
+**Location:** `src/domain/ranking.ts`
+**Description:** Pure rules behind the ranking list (S-017). Positions stay unique because `move` only swaps neighbours. `hasChanged(order, null)` is `true`; `initialOrder` puts the draft's known ids first (by `rank`) and appends the rest in assignment order; `isValidOrder` validates what was read from `localStorage`; `submittedRankingKey(assignmentId)` is the key of the submitted-order reference (the api has no endpoint to read the submitted votes).
+
+**Signature:**
+```ts
+move(order: readonly string[], index: number, direction: 'up' | 'down'): string[]
+positionLabel(position: number, total: number): 'best' | 'middle' | 'worst'
+hasChanged(order: readonly string[], submitted: readonly string[] | null): boolean
+initialOrder(attachments: readonly { id: string }[], draft: readonly { attachment_id: string; rank: number }[] | null): string[]
+toRankings(order: readonly string[]): { attachment_id: string; rank: number }[]
+isValidOrder(order: unknown, attachments: readonly { id: string }[]): order is string[]
+submittedRankingKey(assignmentId: string): string   // 'telescopio_submitted_ranking:{id}'
+DRAFT_DEBOUNCE_MS = 500
+```
+
+**Usage:**
+```ts
+const next = move(order, index, 'down');
+await DistributedVotingService.submitRankingVotes(eventId, userId, assignment.id, toRankings(order));
+```
+
+---
+
+## fetchFile / saveBlob / openAssignedAttachment (S-017)
+
+**Location:** `src/config/api.ts`, `src/services/api.ts`
+**Description:** `fetchFile(endpoint)` requests a protected file with the JWT and returns the `Blob` (`ApiError` when not OK); `downloadFile` is `saveBlob(await fetchFile(...), filename)`. `AttachmentService.openAssignedAttachment` navigates a tab opened by the caller (synchronously in the click, so it is not blocked) to the blob URL; without a tab it saves the file with the neutral name `propuesta-{n}.{ext}`; on failure it closes the tab and rethrows. `DistributedVotingService.submitRankingVotes` now resolves `{ replaced: boolean }`.
+
+**Signature:**
+```ts
+fetchFile(endpoint: string): Promise<Blob>
+saveBlob(blob: Blob, filename: string): void
+AttachmentService.openAssignedAttachment(attachmentId: string, position: number, mimeType: string, target: Window | null): Promise<void>
+```
+
+**Usage:**
+```ts
+const target = window.open('', '_blank');
+await AttachmentService.openAssignedAttachment(a.id, number, a.mime_type, target);
+```
+

@@ -1,7 +1,6 @@
 import React, { JSX } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import './App.css';
 import AppLayout from './components/layout/app-layout/AppLayout';
 import RequireAuth from './components/layout/require-auth/RequireAuth';
 import RedirectIfAuthenticated from './components/layout/redirect-if-authenticated/RedirectIfAuthenticated';

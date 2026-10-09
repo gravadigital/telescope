@@ -40,7 +40,7 @@ La organización es **por tipo técnico** (`components/`, `pages/`, `hooks/`, `s
 | `auth` | `components/auth/*`, `components/auth-form/`, `context/AuthContext.tsx` |
 | `events` | `components/events/`, `pages/create-event/`, `pages/event-detail/` |
 | `event-management` | `pages/manage-event/`, `components/event-timeline/`, `components/stage-advance-modal/`, `components/participants/` |
-| `voting` | `components/ranking-vote-panel/`, `components/voting-configuration-panel/`, `components/voting-results-panel/` |
+| `voting` | `components/voting/` (`SortableRankList`, `Podium`, `RankingList`, `EventResults`), `pages/event-detail/` (`useRankingVote`) |
 
 ## Rutas
 
@@ -80,8 +80,8 @@ Relevada del código:
 2. **No hay ruta 404.** Una URL desconocida renderiza el navbar sobre contenido vacío.
 3. **Interfaz en dos idiomas.** Landing y navbar en inglés, pantallas de eventos y votación
    en español. No hay i18n: los textos están embebidos en el JSX.
-4. **Tokens de diseño duplicados.** Las 57 variables CSS de `index.css` están repetidas con
-   los mismos valores en `styles/global.css`, que además define 22 propias.
+4. *(resuelto en S-017)* Los tokens viven solo en `styles/tokens.css`; se borró el bloque
+   legacy v1.0 de `global.css`.
 5. **Un tercio de los colores hardcodeado**: 350 hex literales contra 753 usos de `var()`.
 6. **Código muerto**: `components/api-status-auth/ApiStatusAuth.tsx` y
    `components/voting/Voting.tsx` no tienen ninguna referencia.

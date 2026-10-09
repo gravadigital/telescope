@@ -69,7 +69,7 @@ All text reaches the components through props (no embedded copy); CSS uses only 
 ## Icons
 
 **Location:** `src/components/ui/icons/Icons.tsx`
-**Description:** Inline SVG icons (`IconProps` = SVG props) built on `BaseIcon` (stroke) or `BrandIcon` (filled path). S-016 adds `EditIcon` (pencil, "edit deadline") and `BellIcon` (reminders).
+**Description:** Inline SVG icons (`IconProps` = SVG props) built on `BaseIcon` (stroke) or `BrandIcon` (filled path). S-016 adds `EditIcon` (pencil, "edit deadline") and `BellIcon` (reminders). S-017 adds `ArrowUpIcon` and `ArrowDownIcon` (move a ranking row).
 
 **Usage:**
 ```tsx
@@ -288,6 +288,26 @@ RankingList({ entries: AttachmentResult[]; currentUserId: string | null })
 **Usage:**
 ```tsx
 <RankingList entries={splitResults(results.adjusted_ranking).rest} currentUserId={user?.id ?? null} />
+```
+
+---
+
+## SortableRankList
+
+**Location:** `src/components/voting/sortable-rank-list/SortableRankList.tsx`
+**Description:** Ordered list of the proposals assigned to the evaluator. Each row shows the position, "Propuesta N" (N = index in `attachments`, never the api `label` and never the author or original file name), `TYPE · size`, the optional description, "Ver archivo" and a position label (best / middle / least). In `editable` mode it has ↑ ↓ icon buttons (disabled at the edges or with `disabled`); moving swaps with the neighbour, announces the new position in an `aria-live="polite"` region and keeps focus on the same row's button (or the other one if it became disabled). The component is controlled: the page owns the order, the draft debounce and the submission. Mobile-first; ↑ ↓ are 44 px; one row per line, in one line from 768 px.
+
+**Signature:**
+```ts
+SortableRankList({ attachments: AssignedAttachment[]; order: string[]; mode: 'editable' | 'readonly';
+  onChange?: (order: string[]) => void; onOpenFile: (a: AssignedAttachment, number: number) => void;
+  disabled?: boolean })
+```
+
+**Usage:**
+```tsx
+<SortableRankList mode="editable" attachments={assignment.attachments} order={order}
+  onChange={setOrder} onOpenFile={openFile} disabled={submitting} />
 ```
 
 ---

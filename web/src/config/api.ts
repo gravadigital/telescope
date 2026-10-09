@@ -207,9 +207,9 @@ export const uploadFile = async (endpoint: string, formData: FormData): Promise<
   }
 };
 
-// Descarga un archivo protegido por JWT y dispara el guardado en el navegador.
+// Pide un archivo protegido por JWT y devuelve su contenido.
 // No puede ser un <a href> directo: el backend exige Authorization: Bearer.
-export const downloadFile = async (endpoint: string, filename: string): Promise<void> => {
+export const fetchFile = async (endpoint: string): Promise<Blob> => {
   const url = `${API_CONFIG.BASE_URL}${endpoint}`;
   const token = localStorage.getItem('telescopio_token');
 
@@ -222,7 +222,11 @@ export const downloadFile = async (endpoint: string, filename: string): Promise<
     throw new ApiError({ status: response.status, body: errorData });
   }
 
-  const blob = await response.blob();
+  return response.blob();
+};
+
+// Dispara el guardado de un blob en el navegador con el nombre dado.
+export const saveBlob = (blob: Blob, filename: string): void => {
   const blobUrl = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = blobUrl;
@@ -231,6 +235,11 @@ export const downloadFile = async (endpoint: string, filename: string): Promise<
   link.click();
   link.remove();
   window.URL.revokeObjectURL(blobUrl);
+};
+
+// Descarga un archivo protegido por JWT y dispara el guardado en el navegador.
+export const downloadFile = async (endpoint: string, filename: string): Promise<void> => {
+  saveBlob(await fetchFile(endpoint), filename);
 };
 
 // Helper para verificar conectividad con la API

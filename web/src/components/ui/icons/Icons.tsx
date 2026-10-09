@@ -24,6 +24,18 @@ const BaseIcon: React.FC<IconProps & { children: React.ReactNode }> = ({ childre
   </svg>
 );
 
+export const ArrowUpIcon: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M12 19V5M5 12l7-7 7 7" />
+  </BaseIcon>
+);
+
+export const ArrowDownIcon: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M12 5v14M19 12l-7 7-7-7" />
+  </BaseIcon>
+);
+
 export const CloseIcon: React.FC<IconProps> = (props) => (
   <BaseIcon {...props}>
     <path d="M6 6l12 12M18 6L6 18" />

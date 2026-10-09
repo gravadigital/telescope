@@ -1,4 +1,4 @@
-import { apiRequest, downloadFile, ApiError } from "../config/api";
+import { apiRequest, downloadFile, fetchFile, ApiError } from "../config/api";
 import * as fs from "fs";
 import * as path from "path";
 import {
@@ -6,6 +6,7 @@ import {
   UserService,
   DistributedVotingService,
   AttachmentService,
+  VoteDraftService,
   neutralFilename,
   extensionForMime,
 } from "./api";
@@ -17,10 +18,12 @@ jest.mock("../config/api", () => ({
   ...jest.requireActual("../config/api"),
   apiRequest: jest.fn(),
   downloadFile: jest.fn(),
+  fetchFile: jest.fn(),
 }));
 
 const mockedApiRequest = apiRequest as jest.MockedFunction<typeof apiRequest>;
 const mockedDownloadFile = downloadFile as jest.MockedFunction<typeof downloadFile>;
+const mockedFetchFile = fetchFile as jest.MockedFunction<typeof fetchFile>;
 
 describe("EventService.listEvents", () => {
   afterEach(() => {
@@ -215,13 +218,89 @@ describe("neutralFilename", () => {
   });
 });
 
-describe("AttachmentService.downloadAssignedAttachment", () => {
-  it("descarga con nombre neutro (TS-10)", async () => {
-    mockedDownloadFile.mockResolvedValueOnce(undefined);
+describe("AttachmentService.openAssignedAttachment (S-017)", () => {
+  const originalCreate = window.URL.createObjectURL;
+  const originalRevoke = window.URL.revokeObjectURL;
 
-    await AttachmentService.downloadAssignedAttachment("f2", 2, "image/png");
+  beforeEach(() => {
+    jest.useFakeTimers();
+    window.URL.createObjectURL = jest.fn(() => "blob:neutral");
+    window.URL.revokeObjectURL = jest.fn();
+    mockedFetchFile.mockReset();
+  });
 
-    expect(mockedDownloadFile).toHaveBeenCalledWith("/api/v1/attachments/f2/download", "propuesta-2.png");
+  afterEach(() => {
+    jest.useRealTimers();
+    window.URL.createObjectURL = originalCreate;
+    window.URL.revokeObjectURL = originalRevoke;
+  });
+
+  it("TS-19 navega la pestaña abierta al blob", async () => {
+    mockedFetchFile.mockResolvedValueOnce(new Blob(["x"], { type: "application/pdf" }));
+    const target = { location: { href: "" }, close: jest.fn() } as unknown as Window;
+
+    await AttachmentService.openAssignedAttachment("f1", 1, "application/pdf", target);
+
+    expect(mockedFetchFile).toHaveBeenCalledWith("/api/v1/attachments/f1/download");
+    expect(target.location.href).toBe("blob:neutral");
+    expect(target.close).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(60_000);
+    expect(window.URL.revokeObjectURL).toHaveBeenCalledWith("blob:neutral");
+  });
+
+  it("TS-20 sin pestaña descarga con nombre neutro", async () => {
+    mockedFetchFile.mockResolvedValueOnce(new Blob(["x"], { type: "application/pdf" }));
+    const clicked: string[] = [];
+    const click = jest
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        clicked.push(this.download);
+      });
+
+    await AttachmentService.openAssignedAttachment("f1", 1, "application/pdf", null);
+
+    expect(clicked).toEqual(["propuesta-1.pdf"]);
+    click.mockRestore();
+  });
+
+  it("TS-21 si falla cierra la pestaña y relanza", async () => {
+    const error = new ApiError({ status: 404, body: { error: "nf" } });
+    mockedFetchFile.mockRejectedValueOnce(error);
+    const target = { location: { href: "" }, close: jest.fn() } as unknown as Window;
+
+    await expect(
+      AttachmentService.openAssignedAttachment("f1", 1, "application/pdf", target)
+    ).rejects.toBe(error);
+    expect(target.close).toHaveBeenCalled();
+  });
+});
+
+describe("DistributedVotingService.submitRankingVotes (S-017)", () => {
+  it("devuelve replaced de la api", async () => {
+    mockedApiRequest.mockResolvedValueOnce({ message: "ok", replaced: true });
+    const result = await DistributedVotingService.submitRankingVotes("e1", "p1", "a1", [
+      { attachment_id: "f1", rank: 1 },
+    ]);
+    expect(result).toEqual({ replaced: true });
+  });
+
+  it("replaced es false si la api no lo trae", async () => {
+    mockedApiRequest.mockResolvedValueOnce({ message: "ok" });
+    const result = await DistributedVotingService.submitRankingVotes("e1", "p1", "a1", []);
+    expect(result).toEqual({ replaced: false });
+  });
+});
+
+describe("VoteDraftService.getDraft (S-017)", () => {
+  it.each(["DRAFT_NOT_FOUND", "ASSIGNMENT_NOT_FOUND"])("devuelve null ante %s", async (code) => {
+    mockedApiRequest.mockRejectedValueOnce(new ApiError({ status: 404, body: { error: "x", code } }));
+    await expect(VoteDraftService.getDraft("e1", "p1")).resolves.toBeNull();
+  });
+
+  it("relanza DRAFT_GET_ERROR", async () => {
+    const error = new ApiError({ status: 500, body: { error: "x", code: "DRAFT_GET_ERROR" } });
+    mockedApiRequest.mockRejectedValueOnce(error);
+    await expect(VoteDraftService.getDraft("e1", "p1")).rejects.toBe(error);
   });
 });
 

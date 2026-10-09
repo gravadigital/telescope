@@ -73,7 +73,7 @@ describe('reglas estáticas de componentes nuevos', () => {
       const selectors = css.replace(/\{[^}]*\}/g, '{}').replace(/@media[^{]*\{/g, '');
       let m: RegExpExecArray | null;
       while ((m = re.exec(selectors)) !== null) {
-        if (!/^(ui|ev|ly|au|vt|mep)-/.test(m[1])) offenders.push(`${rel(f)}: .${m[1]}`);
+        if (!/^(ui|ev|ly|au|vt|mep|srl)-/.test(m[1])) offenders.push(`${rel(f)}: .${m[1]}`);
       }
     });
     expect(offenders).toEqual([]);

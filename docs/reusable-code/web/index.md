@@ -4,7 +4,7 @@ This document lists the reusable code documented so far for this service (increm
 
 ## Components
 
-**Total: 42**
+**Total: 43**
 
 - **Button** (`src/components/ui/button/Button.tsx`) - Variants primary / secondary / tertiary / onBand / icon, sizes sm / md / lg, loading state; `icon` requires `aria-label`
 - **TextField** (`src/components/ui/text-field/TextField.tsx`) - Text, multiline with counter and search variants; label, help, error, password toggle
@@ -21,7 +21,7 @@ This document lists the reusable code documented so far for this service (increm
 - **DateQuickPicker** (`src/components/ui/date-quick-picker/DateQuickPicker.tsx`) - Date with duration presets (from today or postpone) and native calendar; `base` overrides the date the presets are added to
 - **FileDropzone** (`src/components/ui/file-dropzone/FileDropzone.tsx`) - File picker / drop zone validated with `domain/files`, includes the FileChip; `onReplace` tells the page a replacement started and `submitted` resets it
 - **Menu** (`src/components/ui/menu/Menu.tsx`) - Dropdown menu (actions / select) with roving focus
-- **Icons** (`src/components/ui/icons/Icons.tsx`) - Inline SVG icons on `BaseIcon` / `BrandIcon`; S-016 adds `EditIcon` (pencil) and `BellIcon` (reminder)
+- **Icons** (`src/components/ui/icons/Icons.tsx`) - Inline SVG icons on `BaseIcon` / `BrandIcon`; S-016 adds `EditIcon` (pencil) and `BellIcon` (reminder); S-017 adds `ArrowUpIcon` / `ArrowDownIcon`
 - **AppHeader / AppLayout** (`src/components/layout/app-header/AppHeader.tsx`, `src/components/layout/app-layout/AppLayout.tsx`) - Global band (logo, links, notifications slot, language and user menus) and layout route with header, `<main>` and footer
 - **UserMenu / LanguageSelect** (`src/components/layout/user-menu/UserMenu.tsx`, `src/components/layout/language-select/LanguageSelect.tsx`) - User menu with avatar initials and language radio items; ES / EN selector for visitors
 - **RequireAuth** (`src/components/layout/require-auth/RequireAuth.tsx`) - Route guard: waits for `loading`, then redirects to `/login?next=<route>`
@@ -45,6 +45,7 @@ This document lists the reusable code documented so far for this service (increm
 - **ReminderDialog** (`src/components/events/reminder-dialog/ReminderDialog.tsx`) - Manual file / vote reminder: lists up to `REMINDER_PREVIEW_LIMIT` recipients + "y {n} más", `EventService.sendReminder`, `onDone(result)`
 - **Podium** (`src/components/voting/podium/Podium.tsx`) - Top-3 results as cards with score on a 0-10 scale and the current user marked "Tú"
 - **RankingList** (`src/components/voting/ranking-list/RankingList.tsx`) - Results table from 4th place on `DataTable` with the current user's row highlighted
+- **SortableRankList** (`src/components/voting/sortable-rank-list/SortableRankList.tsx`) - Controlled, anonymous ranking list: rows "Propuesta N · TYPE · size" with ↑ ↓ (`editable`) or read-only (`readonly`); focus follows the moved row and a live region announces the new position
 - **EventResults** (`src/components/voting/event-results/EventResults.tsx`) - Public results block: loads `distributed-results`, handles loading / not calculated / error + retry; recalculates once only with `recalculateIfMissing` (management); `onLoaded(results)`
 
 See full details in [components.md](./components.md)
@@ -59,7 +60,7 @@ See full details in [hooks.md](./hooks.md)
 
 ## Utils
 
-**Total: 16**
+**Total: 17**
 
 - **ApiError / getErrorCode** (`src/config/api.ts`) - Error thrown by `apiRequest`, `uploadFile` and `downloadFile` with `status`, `code` and `details`
 - **domain/stages** (`src/domain/stages.ts`) - Stage order, next stage, status, i18n key, `MIN_PROPOSALS_TO_VOTE` and `transitionDialog` (which dialog runs the next step of each stage)
@@ -74,7 +75,8 @@ See full details in [hooks.md](./hooks.md)
 - **domain/voting** (`src/domain/voting.ts`) - `validateThresholds` (in hundredths), `recommendedMinEvaluations`, `VotingConfigPreview`, voting-config draft (`initialVotingDraft`, `validateVotingDraft`, `isRecommendedConfig`) and range constants (`ADJUSTMENT_MIN/MAX`, `MIN_EVALUATIONS_MAX`, `THRESHOLD_STEP`)
 - **domain/eventDetail** (`src/domain/eventDetail.ts`) - Event detail rules: `nextStepState` (11 states with priority cancelled > results > paused), `detailPill`, `progressSteps`, `splitResults` (podium + rest), `shareUrl` / `shareLinks`, `shareAudienceKey`, `afterKey`, `capacityOf` / `isRegistered` / `isFull` and constants
 - **domain/manage** (`src/domain/manage.ts`) - Organizer management rules: `manageStage`, `canPause`, `pendingFiles`, `pendingVotes`, `voteCell`, `votingProgress`, `managePill`, `reminderType`, `REMINDER_PREVIEW_LIMIT`
-- **API services** (`src/services/api.ts`) - `EventService.updateEventStage` (optional `votingConfig`, returns `StageUpdateResult`), `EventService.sendReminder`, `DistributedVotingService.getVotingConfigPreview` / `getVotingConfig` (`null` on `CONFIG_NOT_FOUND`)
+- **domain/ranking** (`src/domain/ranking.ts`) - Pure ranking rules: `move`, `positionLabel`, `hasChanged`, `initialOrder`, `toRankings`, `isValidOrder`, `submittedRankingKey`, `DRAFT_DEBOUNCE_MS`
+- **API services** (`src/services/api.ts`) - S-017: `AttachmentService.openAssignedAttachment` (open in another tab with a neutral fallback name), `DistributedVotingService.submitRankingVotes` returns `{ replaced }`; `fetchFile` / `saveBlob` in `src/config/api.ts`; `EventService.updateEventStage` (optional `votingConfig`, returns `StageUpdateResult`), `EventService.sendReminder`, `DistributedVotingService.getVotingConfigPreview` / `getVotingConfig` (`null` on `CONFIG_NOT_FOUND`)
 - **Stage / reminder types** (`src/types/index.ts`) - `ReminderType`, `ReminderResult`, `VotingConfigInput`, `StageUpdateResult`
 
 See full details in [utils.md](./utils.md)

@@ -1,4 +1,4 @@
-import { apiRequest, checkApiHealth, downloadFile, getErrorCode, API_CONFIG } from "../config/api";
+import { apiRequest, checkApiHealth, downloadFile, fetchFile, saveBlob, getErrorCode, API_CONFIG } from "../config/api";
 import {
   Event,
   EventCreateInput,
@@ -513,17 +513,30 @@ export const AttachmentService = {
   },
 
   /**
-   * Descarga de una propuesta asignada al evaluador, con nombre neutro (anonimato).
+   * Abre una propuesta asignada al evaluador (S-017). La pestaña (`target`) la abre el
+   * componente en el click, de forma sincrónica, para que el navegador no la bloquee.
+   * Sin pestaña se descarga con nombre neutro (anonimato).
    */
-  async downloadAssignedAttachment(
+  async openAssignedAttachment(
     attachmentId: string,
     position: number,
-    mimeType: string
+    mimeType: string,
+    target: Window | null
   ): Promise<void> {
-    await downloadFile(
-      API_CONFIG.ENDPOINTS.DOWNLOAD_ATTACHMENT(attachmentId),
-      neutralFilename(position, mimeType)
-    );
+    try {
+      const blob = await fetchFile(API_CONFIG.ENDPOINTS.DOWNLOAD_ATTACHMENT(attachmentId));
+      if (!target) {
+        saveBlob(blob, neutralFilename(position, mimeType));
+        return;
+      }
+      const url = window.URL.createObjectURL(blob);
+      target.location.href = url;
+      // Se revoca más tarde para que la pestaña llegue a cargarlo.
+      setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      target?.close();
+      throw error;
+    }
   },
 
   async deleteAttachment(attachmentId: string): Promise<void> {
@@ -572,14 +585,12 @@ export const DistributedVotingService = {
         event_name: string;
         participant_id: string;
       }>(API_CONFIG.ENDPOINTS.GET_ASSIGNMENT(eventId, participantId));
-      console.log('✅ Assignment loaded for participant:', participantId);
       return response.assignment;
     } catch (error) {
       // Inscripto sin propuesta: no es un error, simplemente no evalúa
       if (getErrorCode(error) === 'NO_ASSIGNMENT') {
         return null;
       }
-      console.error('Failed to get participant assignment:', error);
       throw error;
     }
   },
@@ -592,24 +603,19 @@ export const DistributedVotingService = {
     participantId: string,
     assignmentId: string,
     rankings: RankingVote[]
-  ): Promise<void> {
-    try {
-      await apiRequest<{ message: string }>(
-        API_CONFIG.ENDPOINTS.SUBMIT_RANKING_VOTES(eventId, participantId),
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            assignment_id: assignmentId,
-            rankings 
-          })
-        }
-      );
-      console.log('✅ Ranking votes submitted successfully');
-    } catch (error) {
-      console.error('Failed to submit ranking votes:', error);
-      throw error;
-    }
+  ): Promise<{ replaced: boolean }> {
+    const response = await apiRequest<{ message: string; replaced?: boolean }>(
+      API_CONFIG.ENDPOINTS.SUBMIT_RANKING_VOTES(eventId, participantId),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assignment_id: assignmentId,
+          rankings
+        })
+      }
+    );
+    return { replaced: response.replaced === true };
   },
 
   /**
@@ -687,8 +693,9 @@ export const VoteDraftService = {
         API_CONFIG.ENDPOINTS.VOTE_DRAFT(eventId, participantId)
       );
       return response.data;
-    } catch (err: any) {
-      if (err?.message?.includes('404') || err?.message?.includes('DRAFT_NOT_FOUND')) {
+    } catch (err) {
+      const code = getErrorCode(err);
+      if (code === 'DRAFT_NOT_FOUND' || code === 'ASSIGNMENT_NOT_FOUND') {
         return null;
       }
       throw err;

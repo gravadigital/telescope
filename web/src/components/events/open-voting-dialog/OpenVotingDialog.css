@@ -53,7 +53,7 @@
   flex-direction: column;
   gap: var(--space-stack-sm);
   cursor: pointer;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-field);
 }
 
 .ev-open-voting__summary-toggle:focus-visible {

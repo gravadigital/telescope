@@ -30,9 +30,7 @@ describe('código muerto', () => {
     expect(app).not.toContain('function ' + 'HomePage');
     expect(app).not.toContain('function ' + 'EventsPage');
     expect(app).not.toContain('WHY' + '?');
-    const css = read('App.css');
-    expect(css).not.toContain('.main-' + 'content');
-    expect(css).not.toMatch(/\.section\b/);
+    expect(fs.existsSync(path.join(SRC, 'App.css'))).toBe(false);
     const api = read('services', 'api.ts');
     expect(api).not.toContain('getAll' + 'Events');
   });

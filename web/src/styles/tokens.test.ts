@@ -39,33 +39,35 @@ describe('tokens.css', () => {
     expect((css.match(/:root\s*\{/g) || []).length).toBe(1);
   });
 
-  it('TS-2: index.css ya no define tokens', () => {
+  it('TS-2: index.css ya no define tokens ni importa estilos legacy', () => {
     const css = read('index.css');
     expect(css).not.toMatch(/^\s*--[a-z0-9-]+\s*:/m);
-    expect(css.trimStart().startsWith("@import './styles/global.css';")).toBe(true);
+    expect(css).not.toContain('global.css');
   });
 
-  it('TS-3: bloque legacy único en global.css', () => {
-    const css = read('styles', 'global.css');
-    expect((css.match(/:root\s*\{/g) || []).length).toBe(1);
-    const start = css.indexOf(':root {');
-    const end = css.indexOf('\n}', start);
-    const before = css.slice(0, start);
-    expect(before).toContain('LEGACY');
-    // Única excepción: el override responsive de variables legacy, dentro de @media y con :is(:root).
-    const outside = (css.slice(0, start) + css.slice(end)).replace(/:is\(:root\)\s*\{[^}]*\}/g, '');
-    expect(outside).not.toMatch(/^\s*--[a-z0-9-]+\s*:/m);
+  it('TS-3: el bloque legacy v1.0 ya no existe', () => {
+    expect(fs.existsSync(path.join(SRC, 'styles', 'global.css'))).toBe(false);
+    expect(fs.existsSync(path.join(SRC, 'App.css'))).toBe(false);
   });
 
-  it('TS-4: sin colisión entre tokens nuevos y legacy', () => {
-    const a = definedNames(read('styles', 'tokens.css'));
-    const b = definedNames(read('styles', 'global.css'));
-    const common = Array.from(a).filter((n) => b.has(n));
-    expect(common).toEqual([]);
+  it('TS-4: ningún var(--x) sin definición en los CSS', () => {
+    const files = listCss(SRC);
+    const defined = new Set<string>();
+    files.forEach((f) => definedNames(fs.readFileSync(f, 'utf8')).forEach((n) => defined.add(n)));
+    const orphans: string[] = [];
+    files.forEach((f) => {
+      const css = fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+      const re = /var\(\s*(--[a-z0-9-]+)\s*(,[^)]*)?\)/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(css)) !== null) {
+        if (!m[2] && !defined.has(m[1])) orphans.push(`${path.relative(SRC, f)}: ${m[1]}`);
+      }
+    });
+    expect(orphans).toEqual([]);
   });
 
   it('TS-5: ningún otro CSS define tokens', () => {
-    const skip = [path.join(SRC, 'styles', 'tokens.css'), path.join(SRC, 'styles', 'global.css')];
+    const skip = [path.join(SRC, 'styles', 'tokens.css')];
     const offenders = listCss(SRC)
       .filter((f) => !skip.includes(f))
       .filter((f) => /^\s*--[a-z0-9-]+\s*:/m.test(fs.readFileSync(f, 'utf8')));
