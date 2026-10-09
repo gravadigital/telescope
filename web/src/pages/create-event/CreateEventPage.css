@@ -42,6 +42,30 @@
   color: var(--text-primary);
 }
 
+.cev-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-inline-sm) var(--space-inline-md);
+}
+
+.cev-draft-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-inline-sm);
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--color-success);
+  white-space: nowrap;
+}
+
+.cev-draft-state__icon {
+  width: var(--space-inline-md);
+  height: var(--space-inline-md);
+  flex: none;
+}
+
 /* Indicador de pasos: mobile = barra compacta + "Paso N de 3"; desde 768px, etiquetas. */
 .cev-steps__list {
   position: absolute;
@@ -172,13 +196,19 @@
   gap: var(--space-stack-md);
   min-width: 0;
 }
+.cev-main {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-surface);
+  padding: var(--space-padding-default);
+}
 .cev-eyebrow {
   display: none;
   margin: 0;
   font: var(--type-eyebrow);
   letter-spacing: var(--type-tracking-wide);
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--text-action);
 }
 .cev-question {
   margin: 0;
@@ -203,6 +233,21 @@
   margin: 0;
   font: var(--type-ui);
   color: var(--text-secondary);
+}
+
+/* Cards: el contenido principal. La vista previa ya trae su propia Card. */
+
+/* Consejo en card oscura, como el diseño de referencia. */
+.cev-tip .ui-callout--info {
+  background: #101014;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #f1f1f6;
+}
+.cev-tip .ui-callout--info .ui-callout__title {
+  color: #67e8f9;
+}
+.cev-tip .ui-callout--info .ui-callout__text {
+  color: rgba(241, 241, 246, 0.75);
 }
 
 /* Resumen */
@@ -238,17 +283,24 @@
   min-width: 0;
 }
 
-/* Acciones: mobile = barra fija abajo (Atrás 4/12 + Siguiente 8/12, Cancelar debajo). */
+/* La barra de cupo del preview no va en esta pantalla (diseño de referencia). */
+.cev-aside .ui-progress-bar {
+  display: none;
+}
+
+/* Acciones: mobile = barra fija abajo (Atrás 4/12 + Siguiente 8/12, Borrador y Cancelar debajo). */
 .cev-actions {
   position: sticky;
   bottom: 0;
+  margin: 0 calc(-1 * var(--space-padding-compact));
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-default);
+}
+.cev-actions__inner {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: var(--space-stack-sm) var(--space-inline-md);
   padding: var(--space-padding-compact);
-  margin: 0 calc(-1 * var(--space-padding-compact));
-  background: var(--bg-surface);
-  border-top: 1px solid var(--border-default);
 }
 .cev-actions__back {
   grid-row: 1;
@@ -261,8 +313,12 @@
 .cev-actions__next--alone {
   grid-column: 1 / -1;
 }
-.cev-actions__cancel {
+.cev-actions__draft {
   grid-row: 2;
+  grid-column: 1 / -1;
+}
+.cev-actions__cancel {
+  grid-row: 3;
   grid-column: 1 / -1;
   display: flex;
   justify-content: center;
@@ -272,6 +328,13 @@
   .cev-page {
     padding: var(--space-padding-spacious) var(--space-padding-default);
   }
+  /* Pasos en columna lateral, como el diseño de referencia. */
+  .cev-body {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: var(--space-stack-lg);
+    align-items: start;
+  }
   .cev-steps__list {
     position: static;
     width: auto;
@@ -280,16 +343,39 @@
     overflow: visible;
     clip: auto;
     display: flex;
-    align-items: center;
-    gap: var(--space-inline-md);
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-inline-sm);
     white-space: normal;
   }
   .cev-steps__item + .cev-steps__item::before {
-    content: '';
-    flex: none;
-    width: var(--space-stack-lg);
-    border-top: 1px solid var(--border-strong);
-    margin-right: var(--space-inline-sm);
+    content: none;
+  }
+  .cev-steps__item {
+    padding: var(--space-padding-compact);
+    border-radius: var(--radius-surface);
+  }
+  .cev-steps__item--current {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+  }
+  .cev-steps__text {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+  /* "En curso" visible bajo el paso actual. */
+  .cev-steps__state {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+    font: var(--type-caption);
+    font-weight: 400;
+    color: var(--text-secondary);
   }
   .cev-steps__compact {
     display: none;
@@ -309,23 +395,33 @@
   .cev-aside {
     grid-column: span 5;
   }
+  /* Barra de acciones como caja dentro del contenedor. */
   .cev-actions {
     position: static;
     margin: 0;
+    padding: var(--space-padding-compact) var(--space-padding-default);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-surface);
+  }
+  .cev-actions__inner {
+    margin: 0;
     padding: 0;
-    background: none;
-    border-top: 0;
   }
   .cev-actions__cancel {
     grid-row: 1;
-    grid-column: 1 / span 6;
+    grid-column: 1 / span 3;
     justify-content: flex-start;
   }
   .cev-actions__back {
-    grid-column: 7 / span 3;
+    grid-column: 4 / span 2;
+  }
+  .cev-actions__draft {
+    grid-row: 1;
+    grid-column: 6 / span 3;
   }
   .cev-actions__next,
   .cev-actions__next--alone {
-    grid-column: 10 / span 3;
+    grid-column: 9 / span 4;
   }
 }

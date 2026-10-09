@@ -6,7 +6,7 @@ import { Event, User, Attachment } from '../../types';
 import EventResults from '../../components/voting/event-results/EventResults';
 import VotingConfigurationPanel from '../../components/voting-configuration-panel/VotingConfigurationPanel';
 import StageAdvanceModal from '../../components/stage-advance-modal/StageAdvanceModal';
-import EventTimeline from '../../components/event-timeline/EventTimeline';
+import { CheckIcon } from '../../components/ui/icons/Icons';
 import EditEventDialog from '../../components/events/edit-event-dialog/EditEventDialog';
 import { Button, Callout } from '../../components/ui';
 import { canEditEvent } from '../../domain';
@@ -50,7 +50,7 @@ const ManageEventPage: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useT();
+  const { t, locale } = useT();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
 
   const [event, setEvent] = useState<Event | null>(null);
@@ -377,7 +377,7 @@ const getStageName = (stage: Event['stage']): string => {
 };
 
   const handleBack = (): void => {
-    navigate(`/events/${eventId}`);
+    navigate('/events');
   };
 
   if (loading) {
@@ -420,18 +420,70 @@ const getStageName = (stage: Event['stage']): string => {
 
   const nextStage = getNextStage(event.stage);
 
+  const STAGE_ORDER = ['creation', 'participation', 'voting', 'results'] as const;
+  const currentStageIndex = STAGE_ORDER.indexOf(event.stage);
+  const stepperSub = (stage: (typeof STAGE_ORDER)[number]): string => {
+    if (stage === 'creation') return t('manageEvent.stepper.configure');
+    if (stage === 'participation') {
+      return event.participation_estimated_end_date
+        ? formatEstimatedDate(event.participation_estimated_end_date)
+        : t('manageEvent.stepper.noDeadline');
+    }
+    if (stage === 'voting') {
+      return event.voting_estimated_end_date
+        ? formatEstimatedDate(event.voting_estimated_end_date)
+        : t('manageEvent.stepper.none');
+    }
+    return t('manageEvent.stepper.none');
+  };
+
+  const isOwner = !!user && !!event.creator_id && event.creator_id === user.id;
+  const organizerName = event.organizer || user?.name || '';
+  const createdDate = new Date(event.created_at || event.date).toLocaleDateString(
+    locale === 'es' ? 'es' : 'en-US',
+    { day: 'numeric', month: 'short', year: 'numeric' }
+  );
+
   return (
     <div className="manage-event-page">
+      <div className="manage-hero">
       <div className="manage-event-container">
         {/* Header */}
         <div className="manage-header">
-          <button onClick={handleBack} className="btn btn-secondary btn-sm back-button">
-            ← Back to Event Details
+          <button type="button" onClick={handleBack} className="manage-crumbs">
+            {t('manageEvent.headerBack')}
           </button>
-          <h1>Manage Event</h1>
-          <p className="subtitle">Control event stages and view participants</p>
+          <div className="manage-head">
+            <div className="manage-head__main">
+              <div className="manage-badges">
+                {event.stage === 'creation' && (
+                  <span className="badge badge-draft">{t('manageEvent.draftBadge')}</span>
+                )}
+                {isOwner && (
+                  <span className="badge badge-organizer">{t('manageEvent.organizerBadge')}</span>
+                )}
+              </div>
+              <h1>{event.title}</h1>
+              <p className="subtitle">
+                {t('manageEvent.createdBy', { organizer: organizerName, date: createdDate })}
+              </p>
+            </div>
+            <div className="manage-head__actions">
+              {canEditEvent(event.stage) && (
+                <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
+                  {t('manageEvent.editData')}
+                </Button>
+              )}
+              <Button variant="secondary" size="sm" onClick={() => navigate(`/events/${eventId}`)}>
+                {t('manageEvent.publicView')}
+              </Button>
+            </div>
+          </div>
         </div>
+      </div>
+      </div>
 
+      <div className="manage-event-container">
         {notice && (
           <div className="manage-notice">
             <Callout tone="success">
@@ -447,16 +499,107 @@ const getStageName = (stage: Event['stage']): string => {
           </div>
         )}
 
-        {/* Event Info Card */}
-        <div className="event-info-card">
-          <div className="manage-title-row">
-            <h2>{event.title}</h2>
-            {canEditEvent(event.stage) && (
-              <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
-                {t('manageEvent.editData')}
-              </Button>
-            )}
+        {/* Stepper de etapas */}
+        <div className="stepper-card">
+          <nav className="stepper" aria-label={t('manageEvent.stepper.label')}>
+            <ol className="stepper__list">
+              {STAGE_ORDER.map((stage, index) => (
+                <li
+                  key={stage}
+                  className={
+                    `stepper__item` +
+                    (index < currentStageIndex ? ' is-done' : '') +
+                    (index === currentStageIndex ? ' is-current' : '')
+                  }
+                  aria-current={index === currentStageIndex ? 'step' : undefined}
+                >
+                  <div className="stepper__track" aria-hidden="true">
+                    <div className="stepper__line" />
+                    <span className="stepper__marker">
+                      {index < currentStageIndex && <CheckIcon className="stepper__check" />}
+                      {index === currentStageIndex && <span className="stepper__dot" />}
+                    </span>
+                  </div>
+                  <span className="stepper__label">
+                    {t(`manageEvent.stepper.${stage}` as 'manageEvent.stepper.creation')}
+                    {index === currentStageIndex && ` - ${t('manageEvent.stepper.now')}`}
+                  </span>
+                  <span className="stepper__sub">{stepperSub(stage)}</span>
+                </li>
+              ))}
+            </ol>
+          </nav>
+        </div>
+
+        {/* Tu próximo paso + Resumen (solo creación): el avance vive acá, no junto a Pausar */}
+        {event.stage === 'creation' && (
+          <div className="manage-cols">
+          <div className="next-step-card">
+            <p className="next-step-card__eyebrow">{t('manageEvent.nextStep.eyebrow')}</p>
+            <h2>{t('manageEvent.nextStep.openTitle')}</h2>
+            <p className="next-step-card__text">{t('manageEvent.nextStep.openText')}</p>
+            <ul className="next-step-card__checklist">
+              <li className={event.title.trim() && event.description.trim() ? 'is-done' : ''}>
+                {t('manageEvent.nextStep.checkName')}
+              </li>
+              <li className="is-done">
+                {t('manageEvent.nextStep.checkCapacity', { count: event.max_participants || 20 })}
+              </li>
+              <li className={event.participation_estimated_end_date ? 'is-done' : ''}>
+                {t('manageEvent.nextStep.checkDeadline')}
+                {!event.participation_estimated_end_date && (
+                  <span className="next-step-card__hint">
+                    {t('manageEvent.nextStep.checkDeadlineHint')}
+                  </span>
+                )}
+              </li>
+            </ul>
+            <Button
+              onClick={handleAdvanceStageClick}
+              disabled={updatingStage || !!participantsError}
+            >
+              {t('manageEvent.nextStep.openCta')}
+            </Button>
           </div>
+          <div className="manage-side">
+            <div className="resumen-card">
+              <h3>{t('manageEvent.side.summary')}</h3>
+              <div className="resumen-row">
+                <span>{t('manageEvent.side.participants')}</span>
+                <strong>{participantsError ? '—' : `${participants.length} / ${event.max_participants || 20}`}</strong>
+              </div>
+              <div className="resumen-row">
+                <span>{t('manageEvent.side.files')}</span>
+                <strong>{attachmentsError ? '—' : attachments.length}</strong>
+              </div>
+              <div className="resumen-row">
+                <span>{t('manageEvent.side.closing')}</span>
+                <strong>
+                  {event.participation_estimated_end_date
+                    ? formatEstimatedDate(event.participation_estimated_end_date)
+                    : t('manageEvent.side.undefined')}
+                </strong>
+              </div>
+            </div>
+            <div className="after-card">
+              <p className="after-card__title">{t('manageEvent.side.afterTitle')}</p>
+              <p>{t('manageEvent.side.afterText')}</p>
+            </div>
+            <button
+              type="button"
+              className="link-quiet"
+              onClick={handlePauseToggle}
+              disabled={updatingStage}
+            >
+              {t(event.is_paused ? 'manageEvent.side.resume' : 'manageEvent.side.pause')}
+            </button>
+          </div>
+          </div>
+        )}
+
+        {/* Event Info Card (desde participación: en creación vive en Resumen) */}
+        {event.stage !== 'creation' && (
+        <div className="event-info-card">
           <p className="event-description">{event.description}</p>
 
           <div className="event-meta">
@@ -552,20 +695,12 @@ const getStageName = (stage: Event['stage']): string => {
             )}
           </div>
         </div>
+        )}
 
-        {/* Stage Control Section */}
+        {/* Stage Control Section (desde participación: en creación lo reemplazan el próximo paso y el lateral) */}
+        {event.stage !== 'creation' && (
         <div className="stage-control-section">
           <h3>Event Stage Control</h3>
-
-          <EventTimeline
-            currentStage={event.stage}
-            participantCount={participants.length}
-            maxParticipants={event.max_participants || 20}
-            deadlines={{
-              participation: event.participation_estimated_end_date,
-              voting: event.voting_estimated_end_date,
-            }}
-          />
 
           <div className="stage-actions">
             {nextStage && (
@@ -608,6 +743,7 @@ const getStageName = (stage: Event['stage']): string => {
             )}
           </div>
         </div>
+        )}
 
         {/* Voting Statistics Error (replaces configuration panel / underway message) */}
         {event.stage === 'voting' && votingStatsError && (
@@ -661,16 +797,26 @@ const getStageName = (stage: Event['stage']): string => {
           <div className="participants-section">
             <h3>
               {participantsError
-                ? 'Registered Participants'
-                : `Registered Participants (${participants.filter(p => p.id !== event.creator_id).length})`}
+                ? t('manageEvent.participants.titleError')
+                : t('manageEvent.participants.title', {
+                    count: participants.filter(p => p.id !== event.creator_id).length,
+                    max: event.max_participants || 20,
+                  })}
             </h3>
 
             {!participantsError && (
               participants.filter(p => p.id !== event.creator_id).length === 0 ? (
-                <div className="empty-state">
-                  <p>No participants have registered yet.</p>
-                  <p>Share the event link to invite participants!</p>
-                </div>
+                event.stage === 'creation' ? (
+                  <div className="empty-box">
+                    <p className="empty-box__title">{t('manageEvent.participants.emptyTitle')}</p>
+                    <p className="empty-box__text">{t('manageEvent.participants.emptyText')}</p>
+                  </div>
+                ) : (
+                  <div className="empty-state">
+                    <p>No participants have registered yet.</p>
+                    <p>Share the event link to invite participants!</p>
+                  </div>
+                )
               ) : (
                 <div className="participants-table">
                   <div className="table-header">

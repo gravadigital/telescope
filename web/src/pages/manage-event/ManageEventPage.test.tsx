@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import ManageEventPage from './ManageEventPage';
@@ -471,7 +471,7 @@ describe('ManageEventPage', () => {
     ])('TS-57: botón "Editar datos" en %s → %s', async (stage, visible) => {
       arrange({ ...baseEvent, stage });
       renderManage();
-      await screen.findByRole('heading', { name: 'Test Event' });
+      await screen.findByRole('heading', { level: 1, name: 'Test Event' });
       const button = screen.queryByRole('button', { name: 'Editar datos' });
       if (visible) expect(button).toBeInTheDocument();
       else expect(button).toBeNull();
@@ -495,7 +495,7 @@ describe('ManageEventPage', () => {
       userEvent.clear(name);
       userEvent.type(name, 'Afiches 2026');
       userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
-      expect(await screen.findByRole('heading', { name: 'Afiches 2026' })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { level: 1, name: 'Afiches 2026' })).toBeInTheDocument();
       expect(screen.queryByRole('dialog')).toBeNull();
       expect(screen.getByText('Datos actualizados.')).toBeInTheDocument();
     });
@@ -508,5 +508,155 @@ describe('ManageEventPage', () => {
       ).toBeInTheDocument();
       await waitFor(() => expect(screen.getByTestId('location-state')).toHaveTextContent('null'));
     });
+  });
+});
+
+describe('ManageEventPage — cabecera (T1)', () => {
+  const renderManage = () =>
+    renderWithProviders(
+      <Routes>
+        <Route path="/events/:eventId/manage" element={<ManageEventPage />} />
+      </Routes>,
+      {
+        auth: { user: organizer, isAuthenticated: true, loading: false },
+        initialEntry: { pathname: '/events/ev-1/manage' },
+      } as any
+    );
+
+  const arrange = (event: object) => {
+    mockedGetEventById.mockResolvedValue(event as any);
+    mockedGetEventParticipants.mockResolvedValue([]);
+    mockedGetEventAttachments.mockResolvedValue([]);
+    mockedGetVotingStatistics.mockResolvedValue(votingStatsBase as any);
+  };
+
+  it('T1: título con nombre del evento, etiqueta de organizador y acciones', async () => {
+    arrange(baseEvent);
+    renderManage();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Test Event' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Manage Event' })).toBeNull();
+    expect(screen.getByText('Gestionas este evento')).toBeInTheDocument();
+    expect(screen.getByText(/Org · creado el/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Editar datos' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ver página pública' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '← Mis eventos' })).toBeInTheDocument();
+  });
+
+  it('T1: insignia de borrador solo en creación', async () => {
+    arrange({ ...baseEvent, stage: 'creation' });
+    renderManage();
+    await screen.findByRole('heading', { level: 1, name: 'Test Event' });
+    expect(screen.getByText('Borrador · no visible')).toBeInTheDocument();
+  });
+});
+
+describe('ManageEventPage — próximo paso (T2)', () => {
+  const renderManage = () =>
+    renderWithProviders(
+      <Routes>
+        <Route path="/events/:eventId/manage" element={<ManageEventPage />} />
+      </Routes>,
+      {
+        auth: { user: organizer, isAuthenticated: true, loading: false },
+        initialEntry: { pathname: '/events/ev-1/manage' },
+      } as any
+    );
+
+  const arrange = (event: object) => {
+    mockedGetEventById.mockResolvedValue(event as any);
+    mockedGetEventParticipants.mockResolvedValue([]);
+    mockedGetEventAttachments.mockResolvedValue([]);
+    mockedGetVotingStatistics.mockResolvedValue(votingStatsBase as any);
+  };
+
+  it('T2: tarjeta de próximo paso en creación con checklist y CTA', async () => {
+    arrange({ ...baseEvent, stage: 'creation', max_participants: 20 });
+    renderManage();
+    expect(await screen.findByText('Tu próximo paso')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Abre la inscripción' })).toBeInTheDocument();
+    expect(screen.getByText('Nombre y descripción')).toBeInTheDocument();
+    expect(screen.getByText('Cupo: 20 participantes')).toBeInTheDocument();
+    expect(screen.getByText('Fecha de cierre de inscripción')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Advance to Participation' })).toBeNull();
+    userEvent.click(screen.getByRole('button', { name: 'Abrir inscripción →' }));
+    expect(await screen.findByRole('heading', { name: /Advance to Participation\?/ })).toBeInTheDocument();
+  });
+
+  it('T2: sin tarjeta de próximo paso fuera de creación', async () => {
+    arrange(baseEvent);
+    renderManage();
+    await screen.findByRole('heading', { level: 1, name: 'Test Event' });
+    expect(screen.queryByText('Tu próximo paso')).toBeNull();
+  });
+});
+
+describe('ManageEventPage — lateral resumen (T3)', () => {
+  const renderManage = () =>
+    renderWithProviders(
+      <Routes>
+        <Route path="/events/:eventId/manage" element={<ManageEventPage />} />
+      </Routes>,
+      {
+        auth: { user: organizer, isAuthenticated: true, loading: false },
+        initialEntry: { pathname: '/events/ev-1/manage' },
+      } as any
+    );
+
+  const arrange = (event: object) => {
+    mockedGetEventById.mockResolvedValue(event as any);
+    mockedGetEventParticipants.mockResolvedValue([]);
+    mockedGetEventAttachments.mockResolvedValue([]);
+    mockedGetVotingStatistics.mockResolvedValue(votingStatsBase as any);
+  };
+
+  it('T3: resumen, después y pausar discreto en creación', async () => {
+    arrange({ ...baseEvent, stage: 'creation', max_participants: 20 });
+    renderManage();
+    await screen.findByText('Tu próximo paso');
+    expect(screen.getByRole('heading', { name: 'Resumen' })).toBeInTheDocument();
+    expect(screen.getByText('Participantes')).toBeInTheDocument();
+    expect(screen.getByText('Archivos')).toBeInTheDocument();
+    expect(screen.getByText('Sin definir')).toBeInTheDocument();
+    expect(screen.getByText('Después')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pausar evento' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Pause Event/ })).toBeNull();
+  });
+
+  it('T3: sin lateral fuera de creación', async () => {
+    arrange(baseEvent);
+    renderManage();
+    await screen.findByRole('heading', { level: 1, name: 'Test Event' });
+    expect(screen.queryByText('Tu próximo paso')).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Resumen' })).toBeNull();
+  });
+});
+
+describe('ManageEventPage — participantes (T4)', () => {
+  const renderManage = () =>
+    renderWithProviders(
+      <Routes>
+        <Route path="/events/:eventId/manage" element={<ManageEventPage />} />
+      </Routes>,
+      {
+        auth: { user: organizer, isAuthenticated: true, loading: false },
+        initialEntry: { pathname: '/events/ev-1/manage' },
+      } as any
+    );
+
+  const arrange = (event: object, participants: object[] = []) => {
+    mockedGetEventById.mockResolvedValue(event as any);
+    mockedGetEventParticipants.mockResolvedValue(participants as any);
+    mockedGetEventAttachments.mockResolvedValue([]);
+    mockedGetVotingStatistics.mockResolvedValue(votingStatsBase as any);
+  };
+
+  it('T4: título con conteo y estado vacío en creación', async () => {
+    arrange({ ...baseEvent, stage: 'creation', max_participants: 20 });
+    renderManage();
+    expect(await screen.findByRole('heading', { name: 'Participantes · 0 / 20' })).toBeInTheDocument();
+    expect(screen.getByText('Todavía no hay inscriptos')).toBeInTheDocument();
+    expect(
+      screen.getByText('Cuando abras la inscripción vas a poder compartir el enlace.')
+    ).toBeInTheDocument();
   });
 });

@@ -38,6 +38,31 @@ const CREATE_EVENT_ERROR_CODES = [
   'MAX_PARTICIPANTS_LIMIT_EXCEEDED',
 ] as const;
 
+const DRAFT_KEY = 'telescopio_event_draft';
+const DRAFT_DEBOUNCE_MS = 500;
+const DRAFT_AGE_TICK_MS = 15000;
+
+interface EventDraft {
+  values: EventFormValues;
+  step: Step;
+  savedAt?: number;
+}
+
+const isValidDraft = (raw: unknown): raw is EventDraft => {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const draft = raw as { values?: unknown; step?: unknown };
+  if (typeof draft.values !== 'object' || draft.values === null) return false;
+  return draft.step === 1 || draft.step === 2 || draft.step === 3;
+};
+
+const draftAge = (savedAt: number, now: number): { key: TranslationKey; count: number } => {
+  const seconds = Math.max(0, Math.floor((now - savedAt) / 1000));
+  if (seconds < 60) return { key: 'createEvent.draftAgeSeconds', count: seconds };
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return { key: 'createEvent.draftAgeMinutes', count: minutes };
+  return { key: 'createEvent.draftAgeHours', count: Math.floor(minutes / 60) };
+};
+
 const STEP_NAME_KEY: Record<Step, TranslationKey> = {
   1: 'createEvent.steps.identification',
   2: 'createEvent.steps.capacity',
@@ -66,6 +91,11 @@ const CreateEventPage: React.FC = () => {
   const [submitError, setSubmitError] = useState<TranslationKey | null>(null);
   const [creating, setCreating] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [draftSaving, setDraftSaving] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
+  const [, setDraftTick] = useState(0);
+  const lastSavedRef = useRef<string | null>(null);
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const discardTextId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -92,6 +122,55 @@ const CreateEventPage: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
+
+  // Restaura el borrador guardado en este navegador (solo front).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw);
+        if (isValidDraft(parsed)) {
+          setValues({ ...EMPTY_EVENT_FORM, ...parsed.values });
+          setStep(parsed.step);
+          lastSavedRef.current = JSON.stringify({ values: parsed.values, step: parsed.step });
+          if (typeof parsed.savedAt === 'number') setDraftSavedAt(parsed.savedAt);
+        }
+      }
+    } catch {
+      // Borrador corrupto: se ignora y se empieza de cero.
+    }
+    const tick = setInterval(() => setDraftTick((n) => n + 1), DRAFT_AGE_TICK_MS);
+    return () => {
+      clearInterval(tick);
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Autoguardado con debounce: solo si hay algo cargado y cambió desde el último guardado.
+  useEffect(() => {
+    if (!hasEventFormData(values)) return;
+    const snapshot = JSON.stringify({ values, step });
+    if (snapshot === lastSavedRef.current) return;
+    setDraftSaving(true);
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      const savedAt = Date.now();
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ values, step, savedAt }));
+      } catch {
+        setDraftSaving(false);
+        return;
+      }
+      lastSavedRef.current = snapshot;
+      setDraftSavedAt(savedAt);
+      setDraftSaving(false);
+    }, DRAFT_DEBOUNCE_MS);
+    return () => {
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values, step]);
 
   const stepErrors: FieldErrors<EventFormField> =
     step === 3 ? {} : validateEventForm(values, { fields: STEP_FIELDS[step] });
@@ -122,6 +201,7 @@ const CreateEventPage: React.FC = () => {
     setSubmitError(null);
     try {
       const { id } = await EventService.createEvent(toEventInput(values));
+      localStorage.removeItem(DRAFT_KEY);
       navigate(`/events/${id}/manage`, { state: { notice: 'eventCreated' } });
     } catch (err) {
       if (err instanceof ApiError && err.code === 'DUPLICATE_EVENT_NAME') {
@@ -156,6 +236,26 @@ const CreateEventPage: React.FC = () => {
   const handleCancel = (): void => {
     if (hasEventFormData(values)) setConfirmDiscard(true);
     else navigate('/events');
+  };
+
+  const handleConfirmDiscard = (): void => {
+    localStorage.removeItem(DRAFT_KEY);
+    setConfirmDiscard(false);
+    navigate('/events');
+  };
+
+  const handleSaveDraft = (): void => {
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    const savedAt = Date.now();
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ values, step, savedAt }));
+    } catch {
+      // Sin almacenamiento (modo privado): no se puede guardar.
+      return;
+    }
+    lastSavedRef.current = JSON.stringify({ values, step });
+    setDraftSavedAt(savedAt);
+    setDraftSaving(false);
   };
 
   const capacityHelp = t('eventForm.capacityRange');
@@ -197,8 +297,29 @@ const CreateEventPage: React.FC = () => {
         </ol>
       </nav>
 
-      <h1 className="cev-title">{t('createEvent.title')}</h1>
+      <div className="cev-head">
+        <h1 className="cev-title">{t('createEvent.title')}</h1>
+        {(draftSaving || draftSavedAt !== null) && (
+          <p className="cev-draft-state">
+            {draftSaving ? (
+              t('createEvent.draftSaving')
+            ) : (
+              <>
+                <CheckIcon className="cev-draft-state__icon" aria-hidden="true" />
+                {draftSavedAt !== null &&
+                  t('createEvent.draftAutosaved', {
+                    age: (() => {
+                      const age = draftAge(draftSavedAt, Date.now());
+                      return t(age.key, { count: age.count });
+                    })(),
+                  })}
+              </>
+            )}
+          </p>
+        )}
+      </div>
 
+      <div className="cev-body">
       <nav className="cev-steps" aria-label={t('createEvent.stepsLabel')}>
         <ol className="cev-steps__list">
           {STEPS.map((n) => {
@@ -360,43 +481,53 @@ const CreateEventPage: React.FC = () => {
               fallbackOrganizer={user?.name ?? ''}
             />
             {step === 1 && (
-              <Callout tone="info" title={t('createEvent.tipTitle')}>
-                {t('createEvent.tip')}
-              </Callout>
+              <div className="cev-tip">
+                <Callout tone="info" title={t('createEvent.tipTitle')}>
+                  {t('createEvent.tip')}
+                </Callout>
+              </div>
             )}
           </aside>
         </div>
 
         <div className="cev-actions">
-          <div className="cev-actions__cancel">
-            <Button variant="tertiary" disabled={creating} onClick={handleCancel}>
-              {t('createEvent.cancel')}
-            </Button>
-          </div>
-          {step > 1 && (
-            <div className="cev-actions__back">
-              <Button
-                variant="secondary"
-                fullWidth
-                disabled={creating}
-                onClick={() => goTo((step - 1) as Step)}
-              >
-                {t('createEvent.back')}
+          <div className="cev-actions__inner">
+            <div className="cev-actions__cancel">
+              <Button variant="tertiary" disabled={creating} onClick={handleCancel}>
+                {t('createEvent.cancel')}
               </Button>
             </div>
-          )}
-          <div className={`cev-actions__next${step === 1 ? ' cev-actions__next--alone' : ''}`}>
-            <Button
-              type="submit"
-              fullWidth
-              loading={creating}
-              loadingLabel={t('createEvent.submitting')}
-            >
-              {t(NEXT_LABEL_KEY[step])}
-            </Button>
+            {step > 1 && (
+              <div className="cev-actions__back">
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  disabled={creating}
+                  onClick={() => goTo((step - 1) as Step)}
+                >
+                  {t('createEvent.back')}
+                </Button>
+              </div>
+            )}
+            <div className="cev-actions__draft">
+              <Button variant="secondary" fullWidth disabled={creating} onClick={handleSaveDraft}>
+                {t('createEvent.saveDraft')}
+              </Button>
+            </div>
+            <div className={`cev-actions__next${step === 1 ? ' cev-actions__next--alone' : ''}`}>
+              <Button
+                type="submit"
+                fullWidth
+                loading={creating}
+                loadingLabel={t('createEvent.submitting')}
+              >
+                {t(NEXT_LABEL_KEY[step])}
+              </Button>
+            </div>
           </div>
         </div>
       </form>
+      </div>
 
       <Dialog
         open={confirmDiscard}
@@ -412,7 +543,7 @@ const CreateEventPage: React.FC = () => {
             <Button ref={keepEditingRef} variant="secondary" onClick={() => setConfirmDiscard(false)}>
               {t('createEvent.discard.keep')}
             </Button>
-            <Button onClick={() => navigate('/events')}>{t('createEvent.discard.confirm')}</Button>
+            <Button onClick={handleConfirmDiscard}>{t('createEvent.discard.confirm')}</Button>
           </>
         }
       >
