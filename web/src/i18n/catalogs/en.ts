@@ -19,7 +19,101 @@ export const en: Catalog = {
     languageMenu: 'Language: {code}',
     userMenu: 'User menu for {name}',
     myEvents: 'My events',
+    notifications: 'Notifications',
     logout: 'Log out',
+  },
+  notifications: {
+    title: 'Notifications',
+    bell: 'Notifications',
+    bellWithCount: plural({ one: 'Notifications, {count} unread', other: 'Notifications, {count} unread' }),
+    announce: plural({ one: '{count} unread notification', other: '{count} unread notifications' }),
+    newCount: plural({ one: '{count} new', other: '{count} new' }),
+    unreadEyebrow: '{count} UNREAD',
+    upToDateEyebrow: "YOU'RE ALL CAUGHT UP",
+    intro: 'Everything that happens in the events you take part in or organize. They are kept for 90 days.',
+    markAll: 'Mark all as read',
+    markAllError: "We couldn't mark the notifications. Please try again.",
+    viewAll: 'View all notifications',
+    loadMore: 'Load more',
+    loadingMore: 'Loading…',
+    loading: 'Loading notifications…',
+    loadingPanel: 'Loading…',
+    loadError: "We couldn't load your notifications.",
+    empty: "You're all caught up. We'll let you know here when something happens in your events.",
+    unread: 'Unread',
+    back: '← Back',
+    tags: {
+      registration: 'Registration',
+      voting: 'Voting',
+      results: 'Results',
+      myEvents: 'My events',
+    },
+    actions: {
+      viewEvent: 'View event',
+      vote: 'Go vote',
+      viewRanking: 'View ranking',
+      viewRegistrations: 'View registrations',
+      uploadFile: 'Upload file',
+      viewMyRanking: 'View my ranking',
+    },
+    types: {
+      participationOpened: {
+        title: 'Registration is open for «{event}»',
+        body: 'You can now register and upload your proposal.',
+      },
+      votingAssigned: {
+        title: 'Voting is open in «{event}»',
+        body: plural({
+          one: 'We assigned you {count} proposal to rank. You have until {date}.',
+          other: 'We assigned you {count} proposals to rank. You have until {date}.',
+        }),
+      },
+      votingNoProposal: {
+        title: 'Voting started in «{event}»',
+        body: "You can't take part because you didn't upload a proposal.",
+      },
+      results: {
+        title: 'The results of «{event}» are out',
+        bodyPosition: 'You placed {position} of {total}.',
+        bodyNoPosition: 'Take a look at the final ranking.',
+      },
+      cancelled: {
+        title: '«{event}» was cancelled',
+        body: 'The organizer cancelled the event.',
+      },
+      paused: {
+        title: '«{event}» was paused',
+        body: 'The organizer paused the event for now.',
+      },
+      deadlineChanged: {
+        title: 'The deadline of «{event}» changed',
+        bodyParticipation: 'Registration now closes on {date}.',
+        bodyVoting: 'Voting now closes on {date}.',
+      },
+      registered: {
+        title: plural({
+          one: '{count} person registered for «{event}»',
+          other: '{count} people registered for «{event}»',
+        }),
+      },
+      registrationConfirmed: {
+        title: 'You registered for «{event}»',
+        body: 'You can now upload your proposal.',
+      },
+      rankingSubmitted: {
+        title: 'You submitted your ranking in «{event}»',
+        titleReplaced: 'You updated your ranking in «{event}»',
+        body: 'You can change it until voting closes.',
+      },
+      fileReminder: {
+        title: 'Your file is missing in «{event}»',
+        body: 'Registration closes on {date}.',
+      },
+      voteReminder: {
+        title: 'Your ranking is missing in «{event}»',
+        body: 'Voting closes on {date}.',
+      },
+    },
   },
   language: {
     es: 'Español',

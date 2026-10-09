@@ -16,6 +16,7 @@ import ManageEventPage from './pages/manage-event/ManageEventPage';
 import HomePage from './pages/home/HomePage';
 import EventsListPage from './pages/events-list/EventsListPage';
 import MyEventsPage from './pages/my-events/MyEventsPage';
+import NotificationsPage from './pages/notifications/NotificationsPage';
 import ResetPasswordPage from './pages/reset-password/ResetPasswordPage';
 import { AuthProvider } from './context/AuthContext';
 import { RUNTIME_CONFIG } from './config/runtime';
@@ -33,6 +34,7 @@ export function AppRoutes(): JSX.Element {
         <Route path="/" element={<HomePage />} />
         <Route path="/events" element={<EventsListPage />} />
         <Route path="/my-events" element={<RequireAuth><MyEventsPage /></RequireAuth>} />
+        <Route path="/notifications" element={<RequireAuth><NotificationsPage /></RequireAuth>} />
         <Route path="/events/create" element={<RequireAuth><CreateEventPage /></RequireAuth>} />
         <Route path="/events/:eventId/manage" element={<RequireAuth><ManageEventPage /></RequireAuth>} />
         <Route path="/events/:eventId" element={<EventDetailPage />} />

@@ -1,8 +1,9 @@
 import React from 'react';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { AppRoutes } from './App';
 import { renderWithProviders, sampleUser } from './test-utils/renderWithProviders';
-import { EventService, UserService, ApiHealthService } from './services/api';
+import { EventService, UserService, ApiHealthService, NotificationService } from './services/api';
 import { page } from './test-utils/eventFixtures';
 
 jest.mock('./context/AuthContext');
@@ -24,12 +25,42 @@ describe('rutas', () => {
     (EventService.listEvents as jest.Mock).mockResolvedValue(page([]));
     (UserService.getMyEvents as jest.Mock).mockResolvedValue([]);
     (EventService.getEventById as jest.Mock).mockResolvedValue(null);
+    (NotificationService.unreadCount as jest.Mock).mockResolvedValue(0);
+    (NotificationService.unreadCount as jest.Mock).mockClear();
   });
 
   it('TS-46: crear evento sin sesión', () => {
     renderWithProviders(<AppRoutes />, { route: '/events/create', auth: guest });
     expect(screen.getByTestId('location')).toHaveTextContent('/login?next=%2Fevents%2Fcreate');
     expect(screen.queryByText('crear-evento')).toBeNull();
+  });
+
+  it('TS-46 (S-018): notificaciones sin sesión', () => {
+    renderWithProviders(<AppRoutes />, { route: '/notifications', auth: guest });
+    expect(screen.getByTestId('location')).toHaveTextContent('/login?next=%2Fnotifications');
+  });
+
+  it('TS-27 (S-018): sin sesión no se consulta el contador', () => {
+    renderWithProviders(<AppRoutes />, { route: '/events', auth: guest });
+    expect(NotificationService.unreadCount).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /^Notificaciones/ })).toBeNull();
+  });
+
+  it('TS-25 (S-018): con sesión monta el contador una vez y muestra la campana', async () => {
+    (NotificationService.unreadCount as jest.Mock).mockResolvedValue(2);
+    renderWithProviders(<AppRoutes />, { route: '/events', auth: { user: sampleUser } });
+    expect(await screen.findByRole('button', { name: 'Notificaciones, 2 sin leer' })).toHaveTextContent('2');
+    expect(NotificationService.unreadCount).toHaveBeenCalledTimes(1);
+  });
+
+  it('TS-30 (S-018): después de navegar vuelve a consultar el contador', async () => {
+    (NotificationService.unreadCount as jest.Mock).mockResolvedValue(2);
+    renderWithProviders(<AppRoutes />, { route: '/events', auth: { user: sampleUser } });
+    await screen.findByRole('button', { name: 'Notificaciones, 2 sin leer' });
+    expect(NotificationService.unreadCount).toHaveBeenCalledTimes(1);
+    userEvent.click(screen.getByRole('button', { name: 'Menú de usuario de Ana Pérez' }));
+    userEvent.click(screen.getByRole('menuitem', { name: 'Mis eventos' }));
+    await waitFor(() => expect(NotificationService.unreadCount).toHaveBeenCalledTimes(2));
   });
 
   it('TS-47: gestión sin sesión', () => {

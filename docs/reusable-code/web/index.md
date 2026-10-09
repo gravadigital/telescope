@@ -4,7 +4,7 @@ This document lists the reusable code documented so far for this service (increm
 
 ## Components
 
-**Total: 43**
+**Total: 46**
 
 - **Button** (`src/components/ui/button/Button.tsx`) - Variants primary / secondary / tertiary / onBand / icon, sizes sm / md / lg, loading state; `icon` requires `aria-label`
 - **TextField** (`src/components/ui/text-field/TextField.tsx`) - Text, multiline with counter and search variants; label, help, error, password toggle
@@ -21,7 +21,7 @@ This document lists the reusable code documented so far for this service (increm
 - **DateQuickPicker** (`src/components/ui/date-quick-picker/DateQuickPicker.tsx`) - Date with duration presets (from today or postpone) and native calendar; `base` overrides the date the presets are added to
 - **FileDropzone** (`src/components/ui/file-dropzone/FileDropzone.tsx`) - File picker / drop zone validated with `domain/files`, includes the FileChip; `onReplace` tells the page a replacement started and `submitted` resets it
 - **Menu** (`src/components/ui/menu/Menu.tsx`) - Dropdown menu (actions / select) with roving focus
-- **Icons** (`src/components/ui/icons/Icons.tsx`) - Inline SVG icons on `BaseIcon` / `BrandIcon`; S-016 adds `EditIcon` (pencil) and `BellIcon` (reminder); S-017 adds `ArrowUpIcon` / `ArrowDownIcon`
+- **Icons** (`src/components/ui/icons/Icons.tsx`) - Inline SVG icons on `BaseIcon` / `BrandIcon`; S-016 adds `EditIcon` (pencil) and `BellIcon` (reminder); S-017 adds `ArrowUpIcon` / `ArrowDownIcon`; S-018 adds `UsersIcon`, `TrophyIcon`, `ArrowRightIcon`
 - **AppHeader / AppLayout** (`src/components/layout/app-header/AppHeader.tsx`, `src/components/layout/app-layout/AppLayout.tsx`) - Global band (logo, links, notifications slot, language and user menus) and layout route with header, `<main>` and footer
 - **UserMenu / LanguageSelect** (`src/components/layout/user-menu/UserMenu.tsx`, `src/components/layout/language-select/LanguageSelect.tsx`) - User menu with avatar initials and language radio items; ES / EN selector for visitors
 - **RequireAuth** (`src/components/layout/require-auth/RequireAuth.tsx`) - Route guard: waits for `loading`, then redirects to `/login?next=<route>`
@@ -47,10 +47,15 @@ This document lists the reusable code documented so far for this service (increm
 - **RankingList** (`src/components/voting/ranking-list/RankingList.tsx`) - Results table from 4th place on `DataTable` with the current user's row highlighted
 - **SortableRankList** (`src/components/voting/sortable-rank-list/SortableRankList.tsx`) - Controlled, anonymous ranking list: rows "Propuesta N · TYPE · size" with ↑ ↓ (`editable`) or read-only (`readonly`); focus follows the moved row and a live region announces the new position
 - **EventResults** (`src/components/voting/event-results/EventResults.tsx`) - Public results block: loads `distributed-results`, handles loading / not calculated / error + retry; recalculates once only with `recalculateIfMissing` (management); `onLoaded(results)`
+- **NotificationItem** (`src/components/notifications/notification-item/NotificationItem.tsx`) - One notification composed with `domain/notifications.describe`: icon by tag, title, body, relative time and action; `panel` variant (whole item is a button) or `page` variant (action `Button`, primary only when still actionable)
+- **NotificationBell** (`src/components/notifications/notification-bell/NotificationBell.tsx`) - Header bell with unread counter; desktop opens `NotificationPanel`, mobile navigates to `/notifications` (decided at click with `matchMedia`)
+- **NotificationPanel** (`src/components/notifications/notification-panel/NotificationPanel.tsx`) - Non-modal popover (O-13) with the 10 latest notifications, mark-all, loading / error / empty states; closes on Escape, outside click or focus leaving; the only popover (not in the DS)
 
 See full details in [components.md](./components.md)
 
 ## Hooks
+
+- **useNotifications / NotificationsProvider** (`src/context/NotificationsContext.tsx`) - Shared unread counter with ADR-009 polling (mount, 60 s while visible, tab focus, navigation); `refresh`, optimistic `markRead`, `markAllRead`, `syncUnreadCount`; mounted by `AppLayout` only with a session
 
 - **useT / I18nProvider** (`src/i18n/I18nProvider.tsx`) - Own i18n over `Intl` (ADR-010): `t(key, params)`, `locale`, `setLocale`, `fmt` formatters; typed `es` / `en` catalogs, `messageKeyForError(err)` for API errors
 

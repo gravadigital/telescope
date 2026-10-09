@@ -18,7 +18,8 @@ import {
   RankingVote,
   VotingResults,
   VotingStatistics,
-  Attachment
+  Attachment,
+  NotificationPage
 } from "../types";
 import { automaticEventDates } from "../domain/eventForm";
 import { VotingConfigPreview } from "../domain/voting";
@@ -786,5 +787,46 @@ export const GoogleAuthService = {
       },
       token: response.token,
     };
+  },
+};
+
+export const NotificationService = {
+  /** Lista las notificaciones del usuario; `before` es el `next_cursor` recibido, tal cual. */
+  async list({ limit, before }: { limit: number; before?: string | null }): Promise<NotificationPage> {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (before) params.set("before", before);
+    const response = await apiRequest<{
+      data: NotificationPage["notifications"];
+      unread_count: number;
+      next_cursor: string | null;
+    }>(`${API_CONFIG.ENDPOINTS.NOTIFICATIONS}?${params.toString()}`);
+    return {
+      notifications: response.data,
+      unread_count: response.unread_count,
+      next_cursor: response.next_cursor,
+    };
+  },
+
+  async unreadCount(): Promise<number> {
+    const response = await apiRequest<{ data: { unread_count: number } }>(
+      API_CONFIG.ENDPOINTS.NOTIFICATIONS_UNREAD_COUNT
+    );
+    return response.data.unread_count;
+  },
+
+  async markRead(id: string): Promise<{ id: string; read_at: string }> {
+    const response = await apiRequest<{ data: { id: string; read_at: string } }>(
+      API_CONFIG.ENDPOINTS.NOTIFICATION_READ(id),
+      { method: "PATCH" }
+    );
+    return { id: response.data.id, read_at: response.data.read_at };
+  },
+
+  async markAllRead(): Promise<{ updated: number }> {
+    const response = await apiRequest<{ data: { updated: number } }>(
+      API_CONFIG.ENDPOINTS.NOTIFICATIONS_READ_ALL,
+      { method: "POST" }
+    );
+    return { updated: response.data.updated };
   },
 };

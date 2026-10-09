@@ -313,3 +313,25 @@ const target = window.open('', '_blank');
 await AttachmentService.openAssignedAttachment(a.id, number, a.mime_type, target);
 ```
 
+
+
+## domain/notifications and NotificationService
+
+**Location:** `src/domain/notifications.ts`, `src/services/api.ts`
+
+**Description:** `describe(n, locale)` turns an `AppNotification` (`type` + `data` + current event) into catalog keys, params, route, tag and `isActionable`, so the panel and the page show the same text. A missing datum yields `bodyKey: null`; an unknown type yields `null`. `NotificationService` wraps the four `/api/v1/notifications` endpoints and never swallows errors (`ApiError` propagates). Constants: `NOTIFICATIONS_POLL_MS = 60_000`, `PANEL_LIMIT = 10`, `PAGE_LIMIT = 20`.
+
+**Signature:**
+```ts
+describe(n: AppNotification, locale: Locale): NotificationDescription | null
+NotificationService.list({ limit, before? }): Promise<NotificationPage>   // before = next_cursor, as received
+NotificationService.unreadCount(): Promise<number>
+NotificationService.markRead(id: string): Promise<{ id: string; read_at: string }>
+NotificationService.markAllRead(): Promise<{ updated: number }>
+```
+
+**Usage:**
+```ts
+const d = describe(n, locale);
+if (d) t(d.titleKey, d.params); // and t(d.actionKey), navigate(d.route)
+```

@@ -1,0 +1,102 @@
+.nt-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-lg);
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-padding-default) var(--space-padding-compact);
+}
+.nt-page__header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-stack-md);
+}
+.nt-page__back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--text-action);
+  font: var(--type-ui);
+  text-decoration: none;
+}
+.nt-page__back:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-control);
+}
+.nt-page__intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-sm);
+}
+.nt-page__eyebrow {
+  margin: 0;
+  color: var(--text-muted);
+  font: var(--type-eyebrow);
+  letter-spacing: var(--type-tracking-wide);
+}
+.nt-page__title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--type-heading-l);
+}
+.nt-page__lead {
+  margin: 0;
+  color: var(--text-secondary);
+  font: var(--type-body);
+}
+.nt-page__mark.ui-button {
+  white-space: normal;
+}
+.nt-page__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-md);
+  min-width: 0;
+}
+.nt-page__list {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-field);
+  list-style: none;
+}
+.nt-page__skeleton {
+  height: 96px;
+  background: var(--bg-surface-subtle);
+  border-bottom: 1px solid var(--border-default);
+}
+.nt-page__more {
+  align-self: center;
+}
+
+/* Desktop: grilla de 12 columnas; cabecera 2 · 6 · 2 · 2 y lista 8/12 centrada. */
+@media (min-width: 768px) {
+  .nt-page__header {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    align-items: start;
+    column-gap: var(--space-padding-default);
+  }
+  .nt-page__back {
+    grid-column: 1 / span 2;
+  }
+  .nt-page__intro {
+    grid-column: 3 / span 6;
+  }
+  .nt-page__mark.ui-button {
+    grid-column: 9 / span 2;
+  }
+  .nt-page__body {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: var(--space-padding-default);
+    row-gap: var(--space-stack-md);
+  }
+  .nt-page__body > * {
+    grid-column: 3 / span 8;
+  }
+}

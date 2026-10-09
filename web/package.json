@@ -21,7 +21,7 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint --max-warnings=0 --ext .ts,.tsx --ignore-pattern '*.test.*' --ignore-pattern '__tests__' src/i18n src/domain src/components/ui src/components/layout src/pages/home src/pages/events-list src/pages/my-events src/pages/create-event src/components/events/event-preview src/components/events/edit-event-dialog src/components/events/share-dialog src/components/events/participants-table src/components/events/participants-dialog src/components/voting src/pages/event-detail src/components/events/pending-card src/components/events/events-table src/pages/not-found src/pages/login src/pages/register src/pages/forgot-password src/pages/reset-password src/pages/complete-profile src/components/auth src/hooks/useGoogleSignIn.ts src/pages/manage-event src/components/events/open-registration-dialog src/components/events/open-voting-dialog src/components/events/publish-results-dialog src/components/events/reminder-dialog src/components/events/edit-deadline-dialog"
+    "lint": "eslint --max-warnings=0 --ext .ts,.tsx --ignore-pattern '*.test.*' --ignore-pattern '__tests__' src/i18n src/domain src/components/ui src/components/layout src/pages/home src/pages/events-list src/pages/my-events src/pages/create-event src/components/events/event-preview src/components/events/edit-event-dialog src/components/events/share-dialog src/components/events/participants-table src/components/events/participants-dialog src/components/voting src/pages/event-detail src/components/events/pending-card src/components/events/events-table src/pages/not-found src/pages/login src/pages/register src/pages/forgot-password src/pages/reset-password src/pages/complete-profile src/components/auth src/hooks/useGoogleSignIn.ts src/pages/manage-event src/components/notifications src/pages/notifications src/context/NotificationsContext.tsx src/components/events/open-registration-dialog src/components/events/open-voting-dialog src/components/events/publish-results-dialog src/components/events/reminder-dialog src/components/events/edit-deadline-dialog"
   },
   "eslintConfig": {
     "extends": [
@@ -54,6 +54,9 @@
           "src/pages/complete-profile/**/*.tsx",
           "src/components/auth/**/*.tsx",
           "src/pages/manage-event/**/*.tsx",
+          "src/components/notifications/**/*.tsx",
+          "src/pages/notifications/**/*.tsx",
+          "src/context/NotificationsContext.tsx",
           "src/components/events/open-registration-dialog/**/*.tsx",
           "src/components/events/open-voting-dialog/**/*.tsx",
           "src/components/events/publish-results-dialog/**/*.tsx",

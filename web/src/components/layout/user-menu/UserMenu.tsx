@@ -7,7 +7,7 @@ import { useT } from '../../../i18n';
 import { initials } from './initials';
 import './UserMenu.css';
 
-/** Menú de usuario: Mis eventos, idioma (elección con ✓) y Cerrar sesión. */
+/** Menú de usuario: Mis eventos, notificaciones, idioma (elección con ✓) y Cerrar sesión. */
 const UserMenu: React.FC = () => {
   const { user, logout } = useAuth();
   const { t, locale, setLocale } = useT();
@@ -29,6 +29,7 @@ const UserMenu: React.FC = () => {
       }
       items={[
         { id: 'my-events', label: t('nav.myEvents'), onSelect: () => navigate('/my-events') },
+        { id: 'notifications', label: t('nav.notifications'), onSelect: () => navigate('/notifications') },
         { id: 'lang-es', label: t('language.es'), selected: locale === 'es', onSelect: () => setLocale('es') },
         { id: 'lang-en', label: t('language.en'), selected: locale === 'en', onSelect: () => setLocale('en') },
         { id: 'logout', label: t('nav.logout'), onSelect: () => logout() },

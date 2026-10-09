@@ -1,0 +1,77 @@
+.nt-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  width: 400px;
+  max-width: calc(100vw - var(--space-padding-default));
+  max-height: 80vh;
+  margin-top: var(--space-inline-sm);
+  overflow: hidden;
+  background: var(--bg-surface);
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow-popover);
+  color: var(--text-primary);
+}
+.nt-panel:focus {
+  outline: none;
+}
+.nt-panel__header {
+  display: grid;
+  grid-template-columns: 5fr 3fr 4fr;
+  align-items: center;
+  gap: var(--space-inline-sm);
+  padding: var(--space-padding-compact);
+  border-bottom: 1px solid var(--border-default);
+}
+.nt-panel__title {
+  margin: 0;
+  font: var(--type-heading-s);
+}
+.nt-panel__count {
+  grid-column: 2;
+  justify-self: start;
+  padding: 0 var(--space-inline-sm);
+  background: var(--bg-action-subtle);
+  border-radius: var(--radius-pill);
+  color: var(--text-action);
+  font: var(--type-caption);
+  white-space: nowrap;
+}
+.nt-panel__mark.ui-button {
+  grid-column: 3;
+  min-width: 0;
+  white-space: normal;
+  text-align: center;
+}
+.nt-panel__list {
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.nt-panel__skeleton {
+  height: 72px;
+  background: var(--bg-surface-subtle);
+  border-bottom: 1px solid var(--border-default);
+}
+.nt-panel__all {
+  display: flex;
+  align-items: center;
+  gap: var(--space-inline-sm);
+  min-height: 44px;
+  padding: 0 var(--space-padding-compact);
+  border-top: 1px solid var(--border-default);
+  color: var(--text-action);
+  font: var(--type-ui);
+  text-decoration: none;
+}
+.nt-panel__all:hover {
+  background: var(--bg-surface-subtle);
+}
+.nt-panel__all:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}

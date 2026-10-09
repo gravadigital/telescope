@@ -19,7 +19,101 @@ export const es = {
     languageMenu: 'Idioma: {code}',
     userMenu: 'Menú de usuario de {name}',
     myEvents: 'Mis eventos',
+    notifications: 'Notificaciones',
     logout: 'Cerrar sesión',
+  },
+  notifications: {
+    title: 'Notificaciones',
+    bell: 'Notificaciones',
+    bellWithCount: plural({ one: 'Notificaciones, {count} sin leer', other: 'Notificaciones, {count} sin leer' }),
+    announce: plural({ one: '{count} notificación sin leer', other: '{count} notificaciones sin leer' }),
+    newCount: plural({ one: '{count} nueva', other: '{count} nuevas' }),
+    unreadEyebrow: '{count} SIN LEER',
+    upToDateEyebrow: 'ESTÁS AL DÍA',
+    intro: 'Todo lo que pasa en los eventos donde participas u organizas. Se guardan durante 90 días.',
+    markAll: 'Marcar todo como leído',
+    markAllError: 'No pudimos marcar las notificaciones. Prueba de nuevo.',
+    viewAll: 'Ver todas las notificaciones',
+    loadMore: 'Cargar más',
+    loadingMore: 'Cargando…',
+    loading: 'Cargando notificaciones…',
+    loadingPanel: 'Cargando…',
+    loadError: 'No pudimos cargar tus notificaciones.',
+    empty: 'Estás al día. Te avisaremos aquí cuando pase algo en tus eventos.',
+    unread: 'No leída',
+    back: '← Volver',
+    tags: {
+      registration: 'Inscripción',
+      voting: 'Votación',
+      results: 'Resultados',
+      myEvents: 'Mis eventos',
+    },
+    actions: {
+      viewEvent: 'Ver evento',
+      vote: 'Ir a votar',
+      viewRanking: 'Ver ranking',
+      viewRegistrations: 'Ver inscriptos',
+      uploadFile: 'Subir archivo',
+      viewMyRanking: 'Ver mi ranking',
+    },
+    types: {
+      participationOpened: {
+        title: '«{event}» abrió la inscripción',
+        body: 'Ya puedes inscribirte y subir tu propuesta.',
+      },
+      votingAssigned: {
+        title: 'Ya puedes votar en «{event}»',
+        body: plural({
+          one: 'Te asignamos {count} propuesta para ordenar. Tienes tiempo hasta el {date}.',
+          other: 'Te asignamos {count} propuestas para ordenar. Tienes tiempo hasta el {date}.',
+        }),
+      },
+      votingNoProposal: {
+        title: 'Empezó la votación en «{event}»',
+        body: 'No participas porque no subiste una propuesta.',
+      },
+      results: {
+        title: 'Se publicaron los resultados de «{event}»',
+        bodyPosition: 'Quedaste en el puesto {position} de {total}.',
+        bodyNoPosition: 'Mira el ranking final.',
+      },
+      cancelled: {
+        title: 'Se canceló «{event}»',
+        body: 'El organizador canceló el evento.',
+      },
+      paused: {
+        title: 'Se pausó «{event}»',
+        body: 'El organizador pausó el evento por ahora.',
+      },
+      deadlineChanged: {
+        title: 'Cambió el cierre de «{event}»',
+        bodyParticipation: 'La inscripción ahora cierra el {date}.',
+        bodyVoting: 'La votación ahora cierra el {date}.',
+      },
+      registered: {
+        title: plural({
+          one: '{count} persona se inscribió en «{event}»',
+          other: '{count} personas se inscribieron en «{event}»',
+        }),
+      },
+      registrationConfirmed: {
+        title: 'Te inscribiste en «{event}»',
+        body: 'Ya puedes subir tu propuesta.',
+      },
+      rankingSubmitted: {
+        title: 'Enviaste tu ranking en «{event}»',
+        titleReplaced: 'Actualizaste tu ranking en «{event}»',
+        body: 'Lo puedes modificar hasta que cierre la votación.',
+      },
+      fileReminder: {
+        title: 'Falta tu archivo en «{event}»',
+        body: 'La inscripción cierra el {date}.',
+      },
+      voteReminder: {
+        title: 'Falta tu ranking en «{event}»',
+        body: 'La votación cierra el {date}.',
+      },
+    },
   },
   language: {
     es: 'Español',

@@ -7,6 +7,7 @@ import {
   DistributedVotingService,
   AttachmentService,
   VoteDraftService,
+  NotificationService,
   neutralFilename,
   extensionForMime,
 } from "./api";
@@ -625,5 +626,72 @@ describe("S-016 · servicios de gestión (Task 2)", () => {
     expect("GENERATE_ASSIGNMENTS" in API_CONFIG.ENDPOINTS).toBe(false);
     expect(API_CONFIG.ENDPOINTS.EVENT_REMINDERS("e-1")).toBe("/api/v1/events/e-1/reminders");
     expect(API_CONFIG.ENDPOINTS.VOTING_CONFIG_PREVIEW("e-1")).toBe("/api/v1/events/e-1/voting-config/preview");
+  });
+});
+
+describe("NotificationService (S-018)", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const n1 = {
+    id: "n-1",
+    type: "stage_changed" as const,
+    data: { stage: "voting", can_vote: true, assigned_count: 3, deadline: "2026-10-20" },
+    event: { id: "e-1", name: "Cúmulos 2026", stage: "voting" as const },
+    read_at: null,
+    created_at: "2026-10-09T10:00:00Z",
+  };
+
+  it("TS-1 listar (panel)", async () => {
+    mockedApiRequest.mockResolvedValueOnce({ data: [n1], unread_count: 2, next_cursor: null });
+    const page = await NotificationService.list({ limit: 10 });
+    expect(mockedApiRequest).toHaveBeenCalledWith("/api/v1/notifications?limit=10");
+    expect(page).toEqual({ notifications: [n1], unread_count: 2, next_cursor: null });
+  });
+
+  it("TS-2 listar con cursor tal cual, codificado", async () => {
+    mockedApiRequest.mockResolvedValueOnce({ data: [], unread_count: 0, next_cursor: null });
+    await NotificationService.list({ limit: 20, before: "2026-09-30T08:15:30.000123Z" });
+    expect(mockedApiRequest).toHaveBeenCalledWith(
+      "/api/v1/notifications?limit=20&before=2026-09-30T08%3A15%3A30.000123Z"
+    );
+  });
+
+  it("TS-3 contador", async () => {
+    mockedApiRequest.mockResolvedValueOnce({ data: { unread_count: 2 } });
+    await expect(NotificationService.unreadCount()).resolves.toBe(2);
+    expect(mockedApiRequest).toHaveBeenCalledWith("/api/v1/notifications/unread-count");
+  });
+
+  it("TS-4 marcar una", async () => {
+    mockedApiRequest.mockResolvedValueOnce({
+      data: { id: "n-1", read_at: "2026-10-09T12:00:00Z" },
+      code: "NOTIFICATION_READ",
+    });
+    const result = await NotificationService.markRead("n-1");
+    const [url, options] = mockedApiRequest.mock.calls[0];
+    expect(url).toBe("/api/v1/notifications/n-1/read");
+    expect(options?.method).toBe("PATCH");
+    expect(result).toEqual({ id: "n-1", read_at: "2026-10-09T12:00:00Z" });
+  });
+
+  it("TS-5 marcar todas", async () => {
+    mockedApiRequest.mockResolvedValueOnce({ data: { updated: 3 }, code: "NOTIFICATIONS_READ" });
+    const result = await NotificationService.markAllRead();
+    const [url, options] = mockedApiRequest.mock.calls[0];
+    expect(url).toBe("/api/v1/notifications/read-all");
+    expect(options?.method).toBe("POST");
+    expect(result).toEqual({ updated: 3 });
+  });
+
+  it("TS-6 el error del listado se propaga", async () => {
+    mockedApiRequest.mockRejectedValueOnce(
+      new ApiError({ status: 500, body: { error: "Failed to retrieve notifications", code: "RETRIEVAL_ERROR" } })
+    );
+    await expect(NotificationService.list({ limit: 10 })).rejects.toMatchObject({
+      status: 500,
+      code: "RETRIEVAL_ERROR",
+    });
   });
 });

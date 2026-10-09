@@ -10,3 +10,4 @@ export * from './eventForm';
 export * from './eventDetail';
 export * from './manage';
 export * from './ranking';
+export * from './notifications';

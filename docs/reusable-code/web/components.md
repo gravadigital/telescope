@@ -359,3 +359,27 @@ ReminderDialog({ open: boolean; eventId: string; type: ReminderType; recipients:
 <ReminderDialog open={reminderOpen} eventId={event.id} type={reminderType(event.stage)!}
   recipients={pendingFiles(participants, attachments)} onClose={close} onDone={(r) => toast(r.recipients_count)} />
 ```
+
+
+## Notifications (S-018)
+
+**Location:** `src/components/notifications/{notification-item,notification-bell,notification-panel}/`
+
+**Description:**
+- **NotificationItem** - Renders one `AppNotification` using `describe()` from `domain/notifications` (returns nothing for unknown types). Unread items show a dot, bold title, `--bg-unread` background and a visually hidden "unread" text. `variant="panel"`: the whole item is a `<button>` with "{action} →"; `variant="page"`: tag + relative time and an action `Button` (`primary` when `isActionable`, else `secondary`).
+- **NotificationBell** - `Button variant="icon"` with `BellIcon`, visible counter only when `unreadCount > 0` and `aria-label` including the count. On desktop (`min-width: 768px`) toggles the panel (`aria-expanded`, `aria-controls`); on mobile navigates to `/notifications`.
+- **NotificationPanel** - `role="dialog"` without `aria-modal`; loads `NotificationService.list({ limit: PANEL_LIMIT })` on mount, moves focus to the first item, closes with Escape (focus back to the bell), `mousedown` outside or focus leaving; "Mark all as read" keeps it open. It does not trap focus.
+
+**Signature:**
+```ts
+NotificationItem({ notification: AppNotification; variant: 'panel' | 'page';
+  onActivate: (n: AppNotification, d: NotificationDescription) => void; now?: Date })
+NotificationBell()                       // needs NotificationsProvider
+NotificationPanel({ id: string; onClose: (reason: 'escape' | 'outside' | 'navigate' | 'blur') => void;
+  bellRef: React.RefObject<HTMLButtonElement | null> })
+```
+
+**Usage:**
+```tsx
+<NotificationItem notification={n} variant="page" onActivate={(n, d) => navigate(d.route)} />
+```

@@ -161,3 +161,24 @@ export const BellIcon: React.FC<IconProps> = (props) => (
     <path d="M13.7 21a2 2 0 0 1-3.4 0" />
   </BaseIcon>
 );
+
+export const UsersIcon: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+  </BaseIcon>
+);
+
+export const TrophyIcon: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z" />
+    <path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3" />
+  </BaseIcon>
+);
+
+export const ArrowRightIcon: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M5 12h14M12 5l7 7-7 7" />
+  </BaseIcon>
+);
