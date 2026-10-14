@@ -31,7 +31,7 @@ const fillStep1 = (organizer = '') => {
 
 const goToStep3 = (organizer = 'Club de Diseño') => {
   fillStep1(organizer);
-  next('Siguiente: Cupo →');
+  next('Siguiente: Fechas y cupo →');
   userEvent.click(screen.getByRole('button', { name: 'Sumar uno al cupo' }));
   userEvent.click(screen.getByRole('button', { name: 'Sumar uno al cupo' }));
   next('Siguiente: Revisar →');
@@ -39,6 +39,7 @@ const goToStep3 = (organizer = 'Club de Diseño') => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  localStorage.removeItem('telescopio_event_draft');
 });
 
 describe('CreateEventPage — render y validación', () => {
@@ -47,7 +48,7 @@ describe('CreateEventPage — render y validación', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Crear evento' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Eventos' })).toHaveAttribute('href', '/events');
     const stepsNav = screen.getByRole('navigation', { name: 'Pasos del asistente' });
-    ['Identificación', 'Cupo', 'Revisar y crear'].forEach((name) =>
+    ['Identificación', 'Fechas y cupo', 'Revisar y crear'].forEach((name) =>
       expect(within(stepsNav).getByText(new RegExp(name))).toBeInTheDocument()
     );
     const current = document.querySelector('[aria-current="step"]') as HTMLElement;
@@ -59,7 +60,7 @@ describe('CreateEventPage — render y validación', () => {
     expect(organizerField()).toBeInTheDocument();
     expect(screen.getByText('Vista previa en la lista')).toBeInTheDocument();
     expect(screen.getByText('Consejo')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Siguiente: Cupo →' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Siguiente: Fechas y cupo →' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '← Atrás' })).toBeNull();
     expect(screen.queryByLabelText(/fecha/i)).toBeNull();
   });
@@ -68,7 +69,7 @@ describe('CreateEventPage — render y validación', () => {
     renderPage();
     userEvent.type(nameField(), 'ab');
     userEvent.type(descField(), 'corta');
-    next('Siguiente: Cupo →');
+    next('Siguiente: Fechas y cupo →');
     const nameMsg = screen.getByText('El nombre tiene que tener al menos 3 caracteres.');
     const descMsg = screen.getByText('La descripción tiene que tener al menos 10 caracteres.');
     expect(nameField()).toHaveAttribute('aria-invalid', 'true');
@@ -83,7 +84,7 @@ describe('CreateEventPage — render y validación', () => {
     renderPage();
     userEvent.type(nameField(), 'ab');
     userEvent.type(descField(), 'corta');
-    next('Siguiente: Cupo →');
+    next('Siguiente: Fechas y cupo →');
     userEvent.type(nameField(), 'c');
     expect(screen.queryByText('El nombre tiene que tener al menos 3 caracteres.')).toBeNull();
     expect(screen.getByText('La descripción tiene que tener al menos 10 caracteres.')).toBeInTheDocument();
@@ -93,7 +94,7 @@ describe('CreateEventPage — render y validación', () => {
     renderPage();
     fillStep1();
     fireEvent.change(organizerField(), { target: { value: 'a'.repeat(201) } });
-    next('Siguiente: Cupo →');
+    next('Siguiente: Fechas y cupo →');
     expect(screen.getByText('Puede tener hasta 200 caracteres.')).toBeInTheDocument();
     expect(organizerField()).toHaveFocus();
     expect(screen.getByRole('heading', { level: 2, name: '¿De qué se trata tu evento?' })).toBeInTheDocument();
@@ -104,10 +105,10 @@ describe('CreateEventPage — pasos', () => {
   it('TS-26: avanzar al paso 2', () => {
     renderPage();
     fillStep1();
-    next('Siguiente: Cupo →');
+    next('Siguiente: Fechas y cupo →');
     const h2 = screen.getByRole('heading', { level: 2, name: '¿Cuántas personas pueden participar?' });
     expect(h2).toHaveFocus();
-    expect(screen.getByRole('status')).toHaveTextContent('Paso 2 de 3, Cupo');
+    expect(screen.getByRole('status')).toHaveTextContent('Paso 2 de 3, Fechas y cupo');
     expect(screen.getByRole('spinbutton', { name: /Cupo de participantes/ })).toHaveValue(20);
     expect(screen.getByText('Entre 1 y 100')).toBeInTheDocument();
     expect(screen.getByText(/Cuando se completa el cupo/)).toBeInTheDocument();
@@ -118,7 +119,7 @@ describe('CreateEventPage — pasos', () => {
   it('TS-27: límites del cupo', () => {
     renderPage();
     fillStep1();
-    next('Siguiente: Cupo →');
+    next('Siguiente: Fechas y cupo →');
     const spin = screen.getByRole('spinbutton', { name: /Cupo de participantes/ });
     fireEvent.change(spin, { target: { value: '1' } });
     expect(screen.getByRole('button', { name: 'Restar uno al cupo' })).toBeDisabled();
@@ -129,7 +130,7 @@ describe('CreateEventPage — pasos', () => {
   it('TS-28: la vista previa refleja los datos', () => {
     renderPage();
     fillStep1();
-    next('Siguiente: Cupo →');
+    next('Siguiente: Fechas y cupo →');
     userEvent.click(screen.getByRole('button', { name: 'Sumar uno al cupo' }));
     userEvent.click(screen.getByRole('button', { name: 'Sumar uno al cupo' }));
     expect(screen.getByText('por Ana Pérez')).toBeInTheDocument();
@@ -298,7 +299,7 @@ describe('CreateEventPage — idioma, responsive y reemplazo', () => {
     renderPage('en');
     expect(screen.getByRole('heading', { level: 1, name: 'Create event' })).toBeInTheDocument();
     expect(screen.getAllByText('Step 1 of 3').length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: 'Next: Limit →' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next: Dates and capacity →' })).toBeInTheDocument();
   });
 
   it('TS-60: mobile · presencia en el DOM', () => {
@@ -319,5 +320,76 @@ describe('CreateEventPage — idioma, responsive y reemplazo', () => {
     expect(css).not.toMatch(/\.create-event-|\.form-group|\.btn/);
     expect(tsx).not.toContain('err.message');
     expect(tsx).not.toContain('console.log');
+  });
+});
+
+describe('CreateEventPage — borrador', () => {
+  const DRAFT_KEY = 'telescopio_event_draft';
+
+  beforeEach(() => {
+    localStorage.removeItem(DRAFT_KEY);
+  });
+
+  afterEach(() => {
+    localStorage.removeItem(DRAFT_KEY);
+  });
+
+  it('TS-64: guardar borrador persiste y confirma', () => {
+    renderPage();
+    expect(screen.getByRole('button', { name: 'Guardar borrador' })).toBeInTheDocument();
+    userEvent.type(nameField(), 'Concurso de afiches');
+    userEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }));
+    expect(screen.getByText(/Borrador guardado hace/)).toBeInTheDocument();
+    const raw = localStorage.getItem(DRAFT_KEY);
+    expect(raw).not.toBeNull();
+    expect(JSON.parse(raw as string)).toMatchObject({
+      step: 1,
+      values: expect.objectContaining({ name: 'Concurso de afiches' }),
+    });
+  });
+
+  it('TS-67: autoguardado al escribir sin tocar el botón', async () => {
+    renderPage();
+    expect(screen.queryByText(/Borrador guardado hace/)).toBeNull();
+    userEvent.type(nameField(), 'Concurso de afiches');
+    expect(await screen.findByText(/Borrador guardado hace/, undefined, { timeout: 3000 }))
+      .toBeInTheDocument();
+    const raw = localStorage.getItem(DRAFT_KEY);
+    expect(raw).not.toBeNull();
+    expect(JSON.parse(raw as string)).toMatchObject({
+      values: expect.objectContaining({ name: 'Concurso de afiches' }),
+    });
+  });
+
+  it('TS-65: al volver se restauran valores y paso', () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        step: 2,
+        values: {
+          name: 'Repostería',
+          description: 'Torta decorada para el concurso',
+          organizer: '',
+          maxParticipants: 30,
+        },
+      })
+    );
+    renderPage();
+    expect(
+      screen.getByRole('heading', { level: 2, name: '¿Cuántas personas pueden participar?' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('spinbutton', { name: /Cupo de participantes/ })).toHaveValue(30);
+    next('← Atrás');
+    expect(nameField()).toHaveValue('Repostería');
+  });
+
+  it('TS-66: publicar borra el borrador', async () => {
+    createEvent.mockResolvedValue({ id: 'e-9' });
+    renderPage();
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: 1, values: {} }));
+    goToStep3();
+    next('Crear evento');
+    await waitFor(() => expect(createEvent).toHaveBeenCalled());
+    await waitFor(() => expect(localStorage.getItem(DRAFT_KEY)).toBeNull());
   });
 });
