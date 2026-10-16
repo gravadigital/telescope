@@ -80,6 +80,7 @@ const OpenRegistrationContent: React.FC<ContentProps> = ({ eventId, today, onClo
         disabled={Boolean(issue)}
         loading={saving}
         loadingLabel={t('manage.openRegistration.loading')}
+        className="ev-open-registration__confirm"
         onClick={() => void handleConfirm()}
       >
         {t('manage.openRegistration.confirm')}
@@ -109,6 +110,7 @@ const OpenRegistrationContent: React.FC<ContentProps> = ({ eventId, today, onClo
             presets={presets}
             locale={locale}
             label={t('manage.openRegistration.dateLabel')}
+            required
             help={t('manage.openRegistration.help')}
             error={dateError}
             changeLabel={t('manage.dialog.change')}

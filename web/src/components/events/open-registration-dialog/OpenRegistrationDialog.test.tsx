@@ -41,7 +41,7 @@ describe('OpenRegistrationDialog', () => {
         'El evento pasa a ser público. Las personas van a poder inscribirse y subir su archivo.'
       )
     ).toBeInTheDocument();
-    expect(screen.getByText('¿Hasta cuándo se pueden inscribir?')).toBeInTheDocument();
+    expect(screen.getByText('¿Hasta cuándo se pueden inscribir?', { exact: false })).toBeInTheDocument();
     expect(screen.getByText('lunes, 12 de octubre de 2026')).toBeInTheDocument();
     const week = screen.getByRole('radio', { name: '1 semana' });
     expect(week).toHaveAttribute('aria-checked', 'true');
@@ -75,7 +75,7 @@ describe('OpenRegistrationDialog', () => {
   it('TS-32: rechaza una fecha no posterior a hoy', () => {
     setup();
     userEvent.click(screen.getByRole('button', { name: 'Cambiar' }));
-    const input = screen.getByLabelText('¿Hasta cuándo se pueden inscribir?', { selector: 'input' });
+    const input = screen.getByLabelText('¿Hasta cuándo se pueden inscribir?', { selector: 'input', exact: false });
     expect(input).not.toHaveAttribute('min');
     fireEvent.change(input, { target: { value: '2026-10-05' } });
     expect(screen.getByText('Elige una fecha posterior a hoy.')).toBeInTheDocument();

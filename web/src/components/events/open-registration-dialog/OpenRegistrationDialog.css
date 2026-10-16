@@ -14,3 +14,25 @@
 .ev-open-registration__field {
   min-width: 0;
 }
+
+/* Caja del valor + Cambiar, como el diseño */
+.ev-open-registration__field .ui-date-quick-picker__value-row {
+  border: 1px solid var(--text-field-border);
+  border-radius: var(--radius-field);
+  padding: var(--ref-space-sm) var(--ref-space-md);
+}
+
+/* Confirmar con el violeta del diseño */
+.ev-open-registration__confirm.ui-button--primary {
+  background: var(--ref-color-violet-500);
+  border-color: transparent;
+  color: var(--ref-color-white);
+  font-size: 15px;
+  font-weight: 700;
+  padding: var(--ref-space-ms) 22px;
+  border-radius: var(--ref-radius-lg);
+}
+
+.ev-open-registration__confirm.ui-button--primary:hover:not(:disabled) {
+  background: var(--ref-color-violet-500);
+}

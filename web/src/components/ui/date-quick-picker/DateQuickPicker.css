@@ -8,6 +8,9 @@
   font: var(--type-ui);
   color: var(--text-primary);
 }
+.ui-date-quick-picker__required {
+  color: var(--text-field-error);
+}
 .ui-date-quick-picker__value-row {
   display: flex;
   align-items: center;

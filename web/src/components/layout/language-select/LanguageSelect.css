@@ -1,6 +1,31 @@
 .ly-language-select {
   display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: var(--ref-space-ms);
+  padding: 3px;
+  border: 1px solid var(--border-inverse);
+  border-radius: var(--ref-radius-md);
 }
-.ly-language-select .ui-button {
-  min-width: 44px;
+.ly-language-select__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ref-color-violet-200);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.ly-language-select__option--active {
+  background: var(--ref-color-white);
+  color: var(--ref-color-ink-900);
+}
+.ly-language-select__flag {
+  display: block;
+  border-radius: 2px;
 }

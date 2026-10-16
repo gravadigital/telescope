@@ -125,6 +125,9 @@
   --bg-neutral-subtle: var(--ref-color-gray-150);
   --bg-disabled: var(--ref-color-gray-200);
   --bg-backdrop: rgba(11, 16, 32, 0.55);
+  --countdown-box-bg: #ffffff14;
+  --countdown-box-border: #ffffff29;
+  --countdown-unit-fg: #9aa6bf;
 
   /* Text */
   --text-primary: var(--ref-color-ink-900);
@@ -226,7 +229,7 @@
   --dialog-backdrop: var(--bg-backdrop);
   --dialog-radius: var(--radius-surface);
   --dialog-shadow: var(--shadow-dialog);
-  --dialog-eyebrow: var(--text-muted);
+  --dialog-eyebrow: var(--ref-color-violet-700);
 
   /* Card */
   --card-bg: var(--bg-surface);

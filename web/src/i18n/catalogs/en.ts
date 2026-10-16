@@ -488,6 +488,7 @@ export const en: Catalog = {
   },
   manage: {
     back: '← My events',
+    aside: 'Side panel',
     role: 'You organize this event',
     meta: '{organizer} · created on {date}',
     editData: 'Edit details',
@@ -536,6 +537,7 @@ export const en: Catalog = {
     },
     participants: {
       title: 'Participants',
+      titleWithCount: 'Participants · {count} / {max}',
       caption: 'Event participants',
       name: 'Name',
       email: 'Email',
@@ -608,6 +610,17 @@ export const en: Catalog = {
     after: {
       title: 'Next',
       text: 'Participants register and upload their file until the closing date you set.',
+    },
+    countdown: {
+      registration: {
+        title: 'REGISTRATION CLOSES IN',
+        expired: 'Registration closed',
+        days: 'DAYS',
+        hours: 'HOURS',
+        minutes: 'MIN',
+        seconds: 'SEC',
+        footer: '{date} · 23:59 (ART)',
+      },
     },
     pause: {
       action: 'Pause event',

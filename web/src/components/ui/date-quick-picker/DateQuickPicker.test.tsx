@@ -118,3 +118,12 @@ describe('DateQuickPicker', () => {
     expect(screen.getByRole('radio', { name: '2 semanas' })).toHaveFocus();
   });
 });
+
+describe('DateQuickPicker — requerido', () => {
+  it('TS-44: muestra el asterisco solo con required', () => {
+    const { rerender } = render(<DateQuickPicker {...base()} />);
+    expect(screen.queryByText('*')).toBeNull();
+    rerender(<DateQuickPicker {...base()} required />);
+    expect(screen.getByText('*')).toBeInTheDocument();
+  });
+});

@@ -32,12 +32,12 @@ describe('StageTimeline', () => {
     expect(items).toHaveLength(4);
     expect(items.map((li) => li.querySelector('.ev-stage-timeline__name')?.textContent)).toEqual([
       'Creación',
-      'Participación',
+      'Participación - ahora',
       'Votación',
       'Resultados',
     ]);
     expect(items[1]).toHaveAttribute('aria-current', 'step');
-    expect(within(items[1]).getByText('ahora')).toBeInTheDocument();
+    expect(within(items[1]).getByText(/ahora/)).toBeInTheDocument();
     expect(within(items[0]).getByText('completada')).toBeInTheDocument();
     expect(within(items[2]).getByText('pendiente')).toBeInTheDocument();
     expect(within(items[3]).getByText('pendiente')).toBeInTheDocument();

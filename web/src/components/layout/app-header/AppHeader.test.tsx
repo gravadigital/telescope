@@ -33,8 +33,9 @@ describe('AppHeader', () => {
     expect(within(nav).getByRole('link', { name: 'Inicio' })).toHaveAttribute('href', '/');
     expect(within(nav).getByRole('link', { name: 'Eventos' })).toHaveAttribute('href', '/events');
     expect(within(nav).getByRole('link', { name: 'Cómo funciona' })).toHaveAttribute('href', '/#como-funciona');
-    const language = screen.getByRole('button', { name: 'Idioma: ES' });
-    expect(language).toHaveTextContent('ES');
+    const language = screen.getByRole('group', { name: 'Idioma: ES' });
+    expect(within(language).getByRole('button', { name: 'ES' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(language).getByRole('button', { name: 'EN' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByRole('link', { name: 'Iniciar sesión' })).toHaveAttribute('href', '/login');
     expect(screen.getByRole('link', { name: 'Crear cuenta' })).toHaveAttribute('href', '/register');
     expect(screen.getByRole('link', { name: 'TELESCOPIO' })).toHaveAttribute('href', '/');
@@ -55,7 +56,7 @@ describe('AppHeader', () => {
     expect(trigger).toHaveTextContent('Ana Pérez');
     expect(screen.queryByRole('link', { name: 'Iniciar sesión' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Crear cuenta' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Idioma: ES' })).toBeNull();
+    expect(screen.getByRole('group', { name: 'Idioma: ES' })).toBeInTheDocument();
   });
 
   it('no muestra controles de acceso mientras se restaura la sesión', () => {
@@ -71,35 +72,26 @@ describe('AppHeader', () => {
     const items = [
       within(menu).getByRole('menuitem', { name: 'Mis eventos' }),
       within(menu).getByRole('menuitem', { name: 'Notificaciones' }),
-      within(menu).getByRole('menuitemradio', { name: 'Español' }),
-      within(menu).getByRole('menuitemradio', { name: 'English' }),
       within(menu).getByRole('menuitem', { name: 'Cerrar sesión' }),
     ];
     expect(Array.from(menu.children)).toEqual(items);
-    expect(items.map((i) => i.textContent)).toEqual(['Mis eventos', 'Notificaciones', 'Español', 'English', 'Cerrar sesión']);
+    expect(items.map((i) => i.textContent)).toEqual(['Mis eventos', 'Notificaciones', 'Cerrar sesión']);
     expect(items.map((i) => i.getAttribute('role'))).toEqual([
       'menuitem',
       'menuitem',
-      'menuitemradio',
-      'menuitemradio',
       'menuitem',
     ]);
-    expect(items[2]).toHaveAttribute('aria-checked', 'true');
-    expect(items[3]).toHaveAttribute('aria-checked', 'false');
   });
 
-  it('TS-37: cambia el idioma desde el menú de usuario', () => {
+  it('TS-37: cambia el idioma desde el selector junto al usuario', () => {
     renderWithProviders(<AppHeader />, { locale: 'es', auth: member });
-    const trigger = screen.getByRole('button', { name: 'Menú de usuario de Ana Pérez' });
-    userEvent.click(trigger);
-    userEvent.click(screen.getByRole('menuitemradio', { name: 'English' }));
+    userEvent.click(screen.getByRole('button', { name: 'EN' }));
     expect(screen.getByRole('link', { name: 'Events' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'How it works' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Eventos' })).toBeNull();
     expect(document.documentElement.lang).toBe('en');
     expect(localStorage.getItem('telescopio_locale')).toBe('"en"');
-    expect(screen.queryByRole('menu')).toBeNull();
-    expect(screen.getByRole('button', { name: 'User menu for Ana Pérez' })).toHaveFocus();
+    expect(screen.getByRole('group', { name: 'Language: EN' })).toBeInTheDocument();
   });
 
   it('TS-38: Mis eventos y Cerrar sesión', () => {
@@ -124,15 +116,15 @@ describe('AppHeader', () => {
 
   it('TS-39: selector de idioma del visitante', () => {
     renderWithProviders(<AppHeader />, { locale: 'es', auth: guest });
-    userEvent.click(screen.getByRole('button', { name: 'Idioma: ES' }));
-    expect(screen.getByRole('menuitemradio', { name: 'Español' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('menuitemradio', { name: 'English' })).toHaveAttribute('aria-checked', 'false');
-    userEvent.click(screen.getByRole('menuitemradio', { name: 'English' }));
+    const group = screen.getByRole('group', { name: 'Idioma: ES' });
+    expect(within(group).getByRole('button', { name: 'ES' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(group).getByRole('button', { name: 'EN' })).toHaveAttribute('aria-pressed', 'false');
+    userEvent.click(screen.getByRole('button', { name: 'EN' }));
     expect(screen.getByRole('link', { name: 'Events' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Log in' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Sign up' })).toBeInTheDocument();
-    const trigger = screen.getByRole('button', { name: 'Language: EN' });
-    expect(trigger).toHaveTextContent('EN');
+    const updated = screen.getByRole('group', { name: 'Language: EN' });
+    expect(within(updated).getByRole('button', { name: 'EN' })).toHaveAttribute('aria-pressed', 'true');
     expect(document.documentElement.lang).toBe('en');
   });
 

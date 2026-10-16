@@ -8,3 +8,21 @@
   overflow-wrap: anywhere;
   text-align: start;
 }
+
+/* Descarga con aspecto de píldora de éxito, como el diseño. */
+.ev-participants-table__file.ui-button--tertiary {
+  min-width: 0;
+  min-height: 0;
+  padding: var(--ref-space-xs) 10px;
+  background: var(--status-pill-success-bg);
+  border: 1px solid transparent;
+  border-radius: var(--status-pill-radius);
+  color: var(--status-pill-success-fg);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ev-participants-table__file.ui-button--tertiary:hover:not(:disabled) {
+  background: var(--status-pill-success-bg);
+  text-decoration: underline;
+}

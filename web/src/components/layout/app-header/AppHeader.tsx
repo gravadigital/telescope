@@ -65,6 +65,7 @@ const AppHeader: React.FC = () => {
                   <NotificationBell />
                 </span>
                 <UserMenu />
+                <LanguageSelect />
               </>
             ) : (
               <>

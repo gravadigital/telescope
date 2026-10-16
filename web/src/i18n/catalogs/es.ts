@@ -488,6 +488,7 @@ export const es = {
   },
   manage: {
     back: '← Mis eventos',
+    aside: 'Panel lateral',
     role: 'Organizas este evento',
     meta: '{organizer} · creado el {date}',
     editData: 'Editar datos',
@@ -536,6 +537,7 @@ export const es = {
     },
     participants: {
       title: 'Participantes',
+      titleWithCount: 'Participantes · {count} / {max}',
       caption: 'Participantes del evento',
       name: 'Nombre',
       email: 'Email',
@@ -608,6 +610,17 @@ export const es = {
     after: {
       title: 'Después',
       text: 'Los participantes se inscriben y suben su archivo hasta la fecha de cierre que definas.',
+    },
+    countdown: {
+      registration: {
+        title: 'LA INSCRIPCIÓN CIERRA EN',
+        expired: 'Inscripción cerrada',
+        days: 'DÍAS',
+        hours: 'HORAS',
+        minutes: 'MIN',
+        seconds: 'SEG',
+        footer: '{date} · 23:59 (ART)',
+      },
     },
     pause: {
       action: 'Pausar evento',

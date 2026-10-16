@@ -21,6 +21,21 @@
   display: none;
 }
 
+.mep-hero-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ref-space-ms);
+  align-items: flex-end;
+  min-width: 0;
+}
+
+.mep-hero-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ref-space-ms);
+  justify-content: flex-end;
+}
+
 /*
  * Cuerpo. En mobile el aside se disuelve (`display: contents`) y cada bloque toma su lugar del
  * screen.md: próximo paso → métricas → participantes → configuración → pausar.
@@ -68,6 +83,12 @@
   order: 7;
 }
 
+/* Columnas solo en desktop; en mobile se disuelven y manda el order. */
+.mep-cols,
+.mep-main-col {
+  display: contents;
+}
+
 /* Métricas: 2 columnas en mobile. */
 .mep-metrics {
   display: grid;
@@ -97,8 +118,12 @@
 .mep-participants {
   display: flex;
   flex-direction: column;
-  gap: var(--space-stack-md);
+  gap: var(--ref-space-md);
   min-width: 0;
+  background: var(--ref-color-white);
+  border: 1px solid var(--ref-color-gray-200);
+  border-radius: var(--radius-surface);
+  padding: var(--ref-space-xl);
 }
 
 .mep-participants__header {
@@ -111,34 +136,103 @@
 
 .mep-participants__title {
   margin: 0;
-  font: var(--type-heading-s);
+  font-size: 20px;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
-/* Resumen (Creación) */
+.mep-participants .ui-empty-state {
+  border: 1.5px dashed var(--ref-color-gray-300);
+  border-radius: var(--ref-radius-xl);
+  padding: 40px;
+  gap: var(--ref-space-sm);
+}
+
+.mep-participants .ui-empty-state__title {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.mep-participants .ui-empty-state__text {
+  font-size: 15px;
+  color: var(--ref-color-gray-600);
+}
+
+/* Después: card negra (Creación) */
+.mep-item--after .ui-callout--info {
+  gap: var(--ref-space-sm);
+  background: var(--ref-color-black);
+  border-color: transparent;
+  border-radius: var(--radius-surface);
+  padding: var(--ref-space-lg);
+}
+
+.mep-item--after .ui-callout__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ref-color-cyan-400);
+}
+
+.mep-item--after .ui-callout__text {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-inverse-secondary);
+}
+
+/* Pausar como texto discreto */
+.mep-item--pause .ui-button--tertiary {
+  width: auto;
+  justify-content: flex-start;
+  padding: 0;
+  border: 0;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+/* Resumen: card blanca (Creación) */
+.mep-item--summary .ui-card--subtle {
+  gap: 18px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-surface);
+  padding: var(--ref-space-lx);
+}
+
+.mep-item--summary .ui-card__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
 .mep-summary {
   display: flex;
   flex-direction: column;
-  gap: var(--space-stack-sm);
+  gap: 18px;
   margin: 0;
 }
 
 .mep-summary__row {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-inline-sm);
+  font-size: 15px;
 }
 
 .mep-summary__label {
-  font: var(--type-caption);
-  color: var(--text-muted);
+  color: var(--ref-color-gray-500);
 }
 
 .mep-summary__value {
   margin: 0;
-  font: var(--type-ui);
+  font-weight: 700;
   color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.mep-summary__value--empty {
+  color: var(--ref-color-gray-400);
 }
 
 .mep-item--pause {
@@ -189,20 +283,18 @@
   }
 
   .mep-metrics {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .mep-metric-error {
     grid-column: span 2;
   }
 
-  /* Métricas en fila arriba; abajo participantes 8/12 y aside 4/12. */
+  /* Cuerpo: métricas arriba; abajo columnas fijas (principal + lateral). */
   .mep-body {
-    display: grid;
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    column-gap: var(--space-inline-md);
-    row-gap: var(--space-stack-lg);
-    align-items: start;
+    display: flex;
+    flex-direction: column;
+    gap: var(--ref-space-lg);
   }
 
   .mep-item--metrics {
@@ -210,17 +302,32 @@
     grid-row: 1;
   }
 
-  .mep-main {
-    grid-column: 1 / span 8;
-    grid-row: 2;
+  .mep-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    column-gap: var(--ref-space-lx);
+    align-items: start;
+    order: 3;
+    min-width: 0;
+  }
+
+  .mep-main-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ref-space-lg);
+    grid-column: 1 / 2;
+    min-width: 0;
   }
 
   .mep-aside {
     display: flex;
     flex-direction: column;
-    gap: var(--space-stack-md);
-    grid-column: 9 / span 4;
-    grid-row: 2;
+    gap: 20px;
+    grid-column: 2 / 3;
+    min-width: 0;
+  }
+
+  .mep-main {
     min-width: 0;
   }
 }

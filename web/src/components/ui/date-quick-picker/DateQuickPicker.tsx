@@ -20,6 +20,8 @@ export interface DateQuickPickerProps {
   presets?: DatePreset[];
   locale: string;
   label: string;
+  /** Muestra el asterisco de obligatorio junto a la etiqueta. */
+  required?: boolean;
   help?: string;
   error?: string;
   changeLabel: string;
@@ -36,6 +38,7 @@ const DateQuickPicker: React.FC<DateQuickPickerProps> = ({
   presets = [],
   locale,
   label,
+  required = false,
   help,
   error,
   changeLabel,
@@ -89,6 +92,11 @@ const DateQuickPicker: React.FC<DateQuickPickerProps> = ({
     <div className={`ui-date-quick-picker${error ? ' ui-date-quick-picker--error' : ''}`}>
       <span id={labelId} className="ui-date-quick-picker__label">
         {label}
+        {required && (
+          <span aria-hidden="true" className="ui-date-quick-picker__required">
+            {' *'}
+          </span>
+        )}
       </span>
       <div className="ui-date-quick-picker__value-row">
         <p className="ui-date-quick-picker__value" aria-live="polite">

@@ -31,26 +31,70 @@
 .ev-stage-timeline__item {
   flex: 1;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--ref-space-xs) var(--ref-space-sm);
+  flex-direction: column;
+  gap: 10px;
   min-width: 0;
 }
-.ev-stage-timeline__marker {
-  display: inline-flex;
+.ev-stage-timeline__track {
+  position: relative;
+  height: 30px;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
+}
+.ev-stage-timeline__line {
+  flex: 1 1 0%;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--ref-color-gray-200);
+}
+.ev-stage-timeline__item--completed .ev-stage-timeline__line {
+  background: var(--bg-success);
+}
+.ev-stage-timeline__item--current .ev-stage-timeline__line {
+  background: var(--ref-color-violet-500);
+}
+.ev-stage-timeline__marker {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
   border-radius: var(--radius-pill);
-  background: var(--bg-disabled);
+  background: var(--ref-color-white);
+  border: 2px solid var(--ref-color-gray-300);
+  box-sizing: border-box;
   color: var(--text-inverse);
 }
 .ev-stage-timeline__item--completed .ev-stage-timeline__marker {
+  width: 22px;
+  height: 22px;
   background: var(--bg-success);
+  color: var(--ref-color-white);
+  border: 3px solid var(--ref-color-white);
+  box-sizing: content-box;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
 }
 .ev-stage-timeline__item--current .ev-stage-timeline__marker {
-  background: var(--bg-accent);
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: var(--ref-color-violet-500);
+  box-shadow: var(--ref-color-violet-100) 0 0 0 5px;
+}
+.ev-stage-timeline__check {
+  color: var(--ref-color-white);
+  line-height: 1;
+}
+.ev-stage-timeline__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ref-color-white);
 }
 .ev-stage-timeline__name {
   font: var(--type-ui);
@@ -58,16 +102,19 @@
 .ev-stage-timeline__item--pending .ev-stage-timeline__name {
   color: var(--text-secondary);
 }
-.ev-stage-timeline__now {
-  font: var(--type-eyebrow);
-  letter-spacing: var(--type-tracking-wide);
-  text-transform: uppercase;
-  color: var(--text-action);
+.ev-stage-timeline__item--completed .ev-stage-timeline__name {
+  color: var(--text-success);
+}
+.ev-stage-timeline__item--current .ev-stage-timeline__name {
+  color: var(--ref-color-violet-700);
 }
 .ev-stage-timeline__subtitle {
   flex-basis: 100%;
   font: var(--type-caption);
-  color: var(--text-muted);
+  color: var(--ref-color-gray-400);
+}
+.ev-stage-timeline__item--current .ev-stage-timeline__subtitle {
+  color: var(--ref-color-gray-700);
 }
 
 @media (min-width: 768px) {

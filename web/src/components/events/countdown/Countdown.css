@@ -1,0 +1,53 @@
+.ev-countdown {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+  min-width: 0;
+}
+.ev-countdown__title {
+  margin: 0;
+  font-family: var(--ref-font-family-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--ref-color-cyan-400);
+}
+.ev-countdown__boxes {
+  display: flex;
+  gap: 6px;
+}
+.ev-countdown__box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-width: 66px;
+  padding: 10px var(--ref-space-sm);
+  background: var(--countdown-box-bg);
+  border: 1px solid var(--countdown-box-border);
+  border-radius: var(--ref-radius-lg);
+  box-sizing: border-box;
+}
+.ev-countdown__value {
+  font-family: var(--ref-font-family-mono);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--ref-color-white);
+}
+.ev-countdown__unit {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--countdown-unit-fg);
+}
+.ev-countdown__footer {
+  margin: 0;
+  font-size: 13px;
+  color: var(--countdown-unit-fg);
+}
+.ev-countdown__expired {
+  margin: 0;
+  font: var(--type-ui);
+  color: var(--ref-color-white);
+}

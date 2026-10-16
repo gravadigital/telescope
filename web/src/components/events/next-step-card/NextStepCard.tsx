@@ -61,7 +61,7 @@ const NextStepCard: React.FC<NextStepCardProps> = ({
               className={`ev-next-step__check ev-next-step__check--${item.done ? 'done' : 'pending'}`}
             >
               <span className="ev-next-step__mark" aria-hidden="true">
-                {item.done && <CheckIcon width={14} height={14} />}
+                {item.done && <CheckIcon width={12} height={12} />}
               </span>
               <span>{item.label}</span>
               <span className="ui-visually-hidden">{item.done ? doneLabel : pendingLabel}</span>

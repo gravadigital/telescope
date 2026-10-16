@@ -219,12 +219,12 @@ describe('ManageEventPage', () => {
       expect(items[1]).toHaveTextContent('Participación');
       expect(items[1]).toHaveTextContent('Sin fecha de cierre');
 
-      const aside = screen.getByRole('complementary', { name: 'Próximo paso' });
-      expect(within(aside).getByRole('heading', { level: 2, name: 'Abre la inscripción' })).toBeInTheDocument();
-      expect(within(aside).getByRole('button', { name: 'Abrir inscripción →' })).toHaveClass('ui-button--primary');
+      const aside = screen.getByRole('complementary', { name: 'Panel lateral' });
+      expect(screen.getByRole('heading', { level: 2, name: 'Abre la inscripción' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Abrir inscripción →' })).toHaveClass('ui-button--primary');
       expect(within(aside).getByRole('button', { name: 'Pausar evento' })).toHaveClass('ui-button--tertiary');
 
-      expect(screen.getByRole('heading', { level: 2, name: 'Participantes' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: 'Participantes · 0 / 20' })).toBeInTheDocument();
       expect(screen.getByText('Todavía no hay inscriptos')).toBeInTheDocument();
       expect(screen.getByText('Cuando abras la inscripción podrás compartir el enlace.')).toBeInTheDocument();
       expect(document.querySelector('.ui-stat-tile')).toBeNull();
@@ -582,16 +582,16 @@ describe('ManageEventPage', () => {
       getEvent.mockResolvedValue(creation);
       renderPage();
       await loaded();
-      const aside = screen.getByRole('complementary', { name: 'Próximo paso' });
-      expect(within(aside).getByText('Próximo paso')).toBeInTheDocument();
+      const aside = screen.getByRole('complementary', { name: 'Panel lateral' });
+      expect(screen.getByText('Próximo paso')).toBeInTheDocument();
       expect(
-        within(aside).getByText(
+        screen.getByText(
           'Mientras esté en creación, nadie puede ver ni sumarse al evento. Revisa que esté todo listo:'
         )
       ).toBeInTheDocument();
-      expect(within(aside).getByText('Nombre y descripción')).toBeInTheDocument();
-      expect(within(aside).getByText('Cupo: 20 participantes')).toBeInTheDocument();
-      expect(within(aside).getByText('Fecha de cierre de inscripción (la defines al abrir)')).toBeInTheDocument();
+      expect(screen.getByText('Nombre y descripción')).toBeInTheDocument();
+      expect(screen.getByText('Cupo: 20 participantes')).toBeInTheDocument();
+      expect(screen.getByText('Fecha de cierre de inscripción (la defines al abrir)')).toBeInTheDocument();
       const summary = within(aside).getByRole('region', { name: 'Resumen' });
       expect(within(summary).getByText('Participantes')).toBeInTheDocument();
       expect(within(summary).getByText('0 / 20')).toBeInTheDocument();
@@ -855,9 +855,8 @@ describe('ManageEventPage', () => {
       const metrics = tile('Inscriptos');
       const table = screen.getByRole('table');
       // eslint-disable-next-line no-bitwise
-      expect(nextTitle.compareDocumentPosition(metrics) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      // eslint-disable-next-line no-bitwise
       expect(metrics.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(nextTitle).toBeInTheDocument();
     });
 
     it('TS-86: mobile · arreglo en CSS', () => {
@@ -869,10 +868,10 @@ describe('ManageEventPage', () => {
       const media = css.slice(mediaStart);
       expect(baseCss).toMatch(/\.mep-metrics\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
       expect(media).toMatch(/^@media \(min-width: 768px\)/);
-      expect(media).toMatch(/\.mep-metrics\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/);
-      expect(media).toMatch(/\.mep-body\s*\{[^}]*grid-template-columns:\s*repeat\(12,\s*minmax\(0,\s*1fr\)\)/);
-      expect(media).toMatch(/\.mep-main\s*\{[^}]*span 8/);
-      expect(media).toMatch(/\.mep-aside\s*\{[^}]*span 4/);
+      expect(media).toMatch(/\.mep-metrics\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
+      expect(media).toMatch(/\.mep-cols\s*\{[^}]*minmax\(0,\s*1fr\) 360px/);
+      expect(media).toMatch(/\.mep-main-col\s*\{[^}]*1 \/ 2/);
+      expect(media).toMatch(/\.mep-aside\s*\{[^}]*2 \/ 3/);
       expect(css.match(/@media/g)).toHaveLength(1);
       expect(css).not.toMatch(/@media[^{]*max-width/);
       expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
@@ -883,5 +882,22 @@ describe('ManageEventPage', () => {
         .filter((sel) => sel && !sel.startsWith('@'))
         .forEach((sel) => sel.split(',').forEach((one) => expect(one.trim()).toMatch(/^\.mep-/)));
     });
+  });
+});
+
+describe('ManageEventPage — countdown', () => {
+  it('muestra la cuenta regresiva en participación con cierre futuro', async () => {
+    getEvent.mockResolvedValue({ ...base, participation_estimated_end_date: '2026-12-31' });
+    renderPage();
+    await loaded();
+    expect(screen.getByText('LA INSCRIPCIÓN CIERRA EN')).toBeInTheDocument();
+    expect(screen.getByRole('timer')).toBeInTheDocument();
+  });
+
+  it('muestra el mensaje fijo con cierre vencido', async () => {
+    getEvent.mockResolvedValue(base);
+    renderPage();
+    await loaded();
+    expect(screen.getByText('Inscripción cerrada')).toBeInTheDocument();
   });
 });

@@ -1,6 +1,5 @@
 import React from 'react';
 import Button from '../../ui/button/Button';
-import { CheckIcon } from '../../ui/icons/Icons';
 import { STAGE_ORDER, stageStatus } from '../../../domain/stages';
 import type { EventStage } from '../../../types';
 import '../../ui/visually-hidden.css';
@@ -60,11 +59,17 @@ const StageTimeline: React.FC<StageTimelineProps> = ({
               className={`ev-stage-timeline__item ev-stage-timeline__item--${status}`}
               aria-current={status === 'current' ? 'step' : undefined}
             >
-              <span className="ev-stage-timeline__marker">
-                {status === 'completed' && <CheckIcon width={14} height={14} />}
+              <div className="ev-stage-timeline__track" aria-hidden="true">
+                <div className="ev-stage-timeline__line" />
+                <span className="ev-stage-timeline__marker">
+                  {status === 'completed' && <span className="ev-stage-timeline__check">✓</span>}
+                  {status === 'current' && <span className="ev-stage-timeline__dot" />}
+                </span>
+              </div>
+              <span className="ev-stage-timeline__name">
+                {stageLabels[stage]}
+                {!compact && status === 'current' ? ` - ${nowLabel}` : null}
               </span>
-              <span className="ev-stage-timeline__name">{stageLabels[stage]}</span>
-              {status === 'current' && <span className="ev-stage-timeline__now">{nowLabel}</span>}
               {status === 'completed' && <span className="ui-visually-hidden">{completedLabel}</span>}
               {status === 'pending' && <span className="ui-visually-hidden">{pendingLabel}</span>}
               {!compact && subtitles?.[stage] && (

@@ -4,6 +4,7 @@ import { Button, Callout, Card, Dialog, EmptyState, ProgressBar, StatTile, Statu
 import { BellIcon, EditIcon, LinkIcon, ShareIcon } from '../../components/ui/icons/Icons';
 import EventHero from '../../components/events/event-hero/EventHero';
 import StageTimeline from '../../components/events/stage-timeline/StageTimeline';
+import Countdown from '../../components/events/countdown/Countdown';
 import NextStepCard from '../../components/events/next-step-card/NextStepCard';
 import ParticipantsTable from '../../components/events/participants-table/ParticipantsTable';
 import EditEventDialog from '../../components/events/edit-event-dialog/EditEventDialog';
@@ -27,6 +28,7 @@ import {
   capacityOf,
   currentDeadline,
   daysUntilClose,
+  endOfDay,
   isRecommendedConfig,
   managePill,
   manageStage,
@@ -450,14 +452,30 @@ const ManageEventPage: React.FC = () => {
   })();
   const heroActions =
     showEdit || shareAction ? (
-      <>
+      <div className="mep-hero-buttons">
         {showEdit && (
           <Button variant="onBand" iconStart={<EditIcon />} onClick={() => setOpenDialog('edit')}>
             {t('manage.editData')}
           </Button>
         )}
         {shareAction}
-      </>
+      </div>
+    ) : undefined;
+
+  const countdown =
+    state === 'participation' && deadline ? (
+      <Countdown
+        title={t('manage.countdown.registration.title')}
+        expiredText={t('manage.countdown.registration.expired')}
+        units={{
+          days: t('manage.countdown.registration.days'),
+          hours: t('manage.countdown.registration.hours'),
+          minutes: t('manage.countdown.registration.minutes'),
+          seconds: t('manage.countdown.registration.seconds'),
+        }}
+        target={endOfDay(deadline)}
+        footer={t('manage.countdown.registration.footer', { date: fmt.date(deadline) })}
+      />
     ) : undefined;
 
   // ---------- Línea de etapas ----------
@@ -742,7 +760,14 @@ const ManageEventPage: React.FC = () => {
           organizer: event.organizer ?? '',
           date: event.created_at ? fmt.date(event.created_at.slice(0, 10)) : EMPTY_VALUE,
         })}
-        actions={heroActions}
+        actions={
+          heroActions || countdown ? (
+            <div className="mep-hero-actions">
+              {heroActions}
+              {countdown}
+            </div>
+          ) : undefined
+        }
       />
 
       <div className="mep-container">
@@ -766,73 +791,85 @@ const ManageEventPage: React.FC = () => {
 
         {paused && <Callout tone="warning">{t('manage.pausedNotice')}</Callout>}
 
-        <div className="mep-body">
-          <aside className="mep-aside" aria-label={t('manage.nextStep.eyebrow')}>
-            {nextStep && (
-              <div className="mep-item mep-item--next" ref={nextStepRef}>
-                {nextStep}
+        <div className="mep-body" data-stage={state}>
+          <div className="mep-cols">
+            <div className="mep-main-col">
+              {metrics.length > 0 && <div className="mep-metrics mep-item mep-item--metrics">{metrics}</div>}
+              {state === 'creation' && nextStep && (
+                <div className="mep-item mep-item--next" ref={nextStepRef}>
+                  {nextStep}
+                </div>
+              )}
+              {configBlock && <div className="mep-item mep-item--config">{configBlock}</div>}
+              <div className="mep-main mep-item mep-item--main">
+                {showParticipants && (
+                  <section className="mep-participants" aria-labelledby="mep-participants-title">
+                    <div className="mep-participants__header">
+                      <h2 id="mep-participants-title" className="mep-participants__title">
+                        {state === 'creation' || registeredCount !== null
+                          ? t('manage.participants.titleWithCount', {
+                              count: fmt.number(state === 'creation' ? rows.length : registeredCount ?? 0),
+                              max: fmt.number(capacity),
+                            })
+                          : t('manage.participants.title')}
+                      </h2>
+                      {reminderButton}
+                    </div>
+                    {participantsContent}
+                  </section>
+                )}
+                {state === 'results' && (
+                  <EventResults eventId={event.id} currentUserId={null} recalculateIfMissing />
+                )}
               </div>
-            )}
-            {configBlock && <div className="mep-item mep-item--config">{configBlock}</div>}
-            {state === 'creation' && (
-              <>
-                <div className="mep-item mep-item--summary">
-                  <Card variant="subtle" title={t('manage.summary.title')}>
-                    <dl className="mep-summary">
-                      <div className="mep-summary__row">
-                        <dt className="mep-summary__label">{t('manage.summary.participants')}</dt>
-                        <dd className="mep-summary__value">{t('manage.summary.participantsValue', { max: capacity })}</dd>
-                      </div>
-                      <div className="mep-summary__row">
-                        <dt className="mep-summary__label">{t('manage.summary.files')}</dt>
-                        <dd className="mep-summary__value">{fmt.number(0)}</dd>
-                      </div>
-                      <div className="mep-summary__row">
-                        <dt className="mep-summary__label">{t('manage.summary.deadline')}</dt>
-                        <dd className="mep-summary__value">{t('manage.summary.notSet')}</dd>
-                      </div>
-                    </dl>
-                  </Card>
+            </div>
+            <aside className="mep-aside" aria-label={t('manage.aside')}>
+              {state !== 'creation' && nextStep && (
+                <div className="mep-item mep-item--next" ref={nextStepRef}>
+                  {nextStep}
                 </div>
-                <div className="mep-item mep-item--after">
-                  <Callout tone="info" title={t('manage.after.title')}>
-                    {t('manage.after.text')}
-                  </Callout>
+              )}
+              {state === 'creation' && (
+                <>
+                  <div className="mep-item mep-item--summary">
+                    <Card variant="subtle" title={t('manage.summary.title')}>
+                      <dl className="mep-summary">
+                        <div className="mep-summary__row">
+                          <dt className="mep-summary__label">{t('manage.summary.participants')}</dt>
+                          <dd className="mep-summary__value">{t('manage.summary.participantsValue', { max: capacity })}</dd>
+                        </div>
+                        <div className="mep-summary__row">
+                          <dt className="mep-summary__label">{t('manage.summary.files')}</dt>
+                          <dd className="mep-summary__value">{fmt.number(0)}</dd>
+                        </div>
+                        <div className="mep-summary__row">
+                          <dt className="mep-summary__label">{t('manage.summary.deadline')}</dt>
+                          <dd className="mep-summary__value mep-summary__value--empty">{t('manage.summary.notSet')}</dd>
+                        </div>
+                      </dl>
+                    </Card>
+                  </div>
+                  <div className="mep-item mep-item--after">
+                    <Callout tone="info" title={t('manage.after.title')}>
+                      {t('manage.after.text')}
+                    </Callout>
+                  </div>
+                </>
+              )}
+              {showPause && (
+                <div className="mep-item mep-item--pause">
+                  {resumeError && <Callout tone="error">{t(resumeError)}</Callout>}
+                  <Button
+                    variant="tertiary"
+                    fullWidth
+                    loading={paused && pausing}
+                    onClick={paused ? handleResume : openPauseDialog}
+                  >
+                    {paused ? t('manage.pause.resume') : t('manage.pause.action')}
+                  </Button>
                 </div>
-              </>
-            )}
-            {showPause && (
-              <div className="mep-item mep-item--pause">
-                {resumeError && <Callout tone="error">{t(resumeError)}</Callout>}
-                <Button
-                  variant="tertiary"
-                  fullWidth
-                  loading={paused && pausing}
-                  onClick={paused ? handleResume : openPauseDialog}
-                >
-                  {paused ? t('manage.pause.resume') : t('manage.pause.action')}
-                </Button>
-              </div>
-            )}
-          </aside>
-
-          {metrics.length > 0 && <div className="mep-metrics mep-item mep-item--metrics">{metrics}</div>}
-
-          <div className="mep-main mep-item mep-item--main">
-            {showParticipants && (
-              <section className="mep-participants" aria-labelledby="mep-participants-title">
-                <div className="mep-participants__header">
-                  <h2 id="mep-participants-title" className="mep-participants__title">
-                    {t('manage.participants.title')}
-                  </h2>
-                  {reminderButton}
-                </div>
-                {participantsContent}
-              </section>
-            )}
-            {state === 'results' && (
-              <EventResults eventId={event.id} currentUserId={null} recalculateIfMissing />
-            )}
+              )}
+            </aside>
           </div>
         </div>
       </div>
