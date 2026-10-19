@@ -156,6 +156,8 @@ describe('EventDetailPage', () => {
       expect(screen.getByText('Inscripción abierta · cierra en 5 días')).toBeInTheDocument();
       expect(screen.getByText('Organiza Club de Diseño · 4 de 20 participantes')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Compartir' })).toBeInTheDocument();
+      expect(screen.getByText('LA INSCRIPCIÓN CIERRA EN')).toBeInTheDocument();
+      expect(screen.getByRole('timer')).toBeInTheDocument();
       expect(screen.getByText('Tu próximo paso')).toBeInTheDocument();
       expect(screen.getByRole('heading', { level: 2, name: 'Inscríbete para participar' })).toBeInTheDocument();
       expect(screen.getByText('Imagen o documento')).toBeInTheDocument();
@@ -552,6 +554,8 @@ describe('EventDetailPage', () => {
       getEvent.mockResolvedValue({ ...voting, participant_ids: ['u-2'] });
       const first = renderPage(guest);
       expect(await screen.findByRole('heading', { level: 2, name: 'La votación está en curso' })).toBeInTheDocument();
+      expect(screen.getByText('LA VOTACIÓN CIERRA EN')).toBeInTheDocument();
+      expect(screen.getByRole('timer')).toBeInTheDocument();
       expect(screen.getByText(/Los participantes están evaluando las propuestas/)).toBeInTheDocument();
       expect(screen.getByText(/Al cerrar la votación se publica el ranking final/)).toBeInTheDocument();
       first.unmount();

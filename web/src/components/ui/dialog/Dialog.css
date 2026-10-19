@@ -5,6 +5,8 @@
   z-index: var(--z-dialog);
   display: flex;
   background: var(--dialog-backdrop);
+  -webkit-backdrop-filter: blur(var(--dialog-backdrop-blur));
+  backdrop-filter: blur(var(--dialog-backdrop-blur));
 }
 
 .ui-dialog__panel {
@@ -94,6 +96,19 @@
   }
 }
 
+/* La card crece con el contenido: el scroll queda en el overlay, no dentro de la card. */
+.ui-dialog__backdrop--scroll-page {
+  align-items: flex-start;
+  overflow-y: auto;
+}
+.ui-dialog__panel--scroll-page {
+  height: auto;
+  min-height: 100%;
+}
+.ui-dialog__panel--scroll-page .ui-dialog__body {
+  overflow-y: visible;
+}
+
 @media (min-width: 768px) {
   .ui-dialog__backdrop {
     align-items: center;
@@ -111,6 +126,24 @@
   .ui-dialog__panel--md {
     max-width: 560px;
   }
+  .ui-dialog__panel--lg {
+    max-width: 680px;
+  }
+  .ui-dialog__panel--xl {
+    max-width: 880px;
+  }
+  .ui-dialog__backdrop--scroll-page {
+    align-items: flex-start;
+    padding: var(--space-padding-default) var(--space-padding-compact);
+  }
+  .ui-dialog__panel--scroll-page {
+    min-height: 0;
+    max-height: none;
+  }
+  .ui-dialog__panel--scroll-page .ui-dialog__header,
+  .ui-dialog__panel--scroll-page .ui-dialog__actions {
+    position: static;
+  }
   .ui-dialog__header {
     padding: var(--space-padding-spacious) var(--space-padding-spacious) 0;
   }
@@ -121,5 +154,23 @@
     flex-direction: row;
     justify-content: flex-end;
     padding: 0 var(--space-padding-spacious) var(--space-padding-spacious);
+  }
+}
+
+@media (min-width: 768px) and (max-height: 860px) {
+  .ui-dialog__panel--scroll-page {
+    padding-top: 0;
+  }
+
+  .ui-dialog__backdrop--scroll-page {
+    padding: var(--ref-space-ms) var(--space-padding-compact);
+  }
+
+  .ui-dialog__header {
+    padding-top: var(--space-padding-compact);
+  }
+
+  .ui-dialog__actions {
+    padding-bottom: var(--space-padding-compact);
   }
 }

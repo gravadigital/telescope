@@ -72,13 +72,17 @@ const StageTimeline: React.FC<StageTimelineProps> = ({
               </span>
               {status === 'completed' && <span className="ui-visually-hidden">{completedLabel}</span>}
               {status === 'pending' && <span className="ui-visually-hidden">{pendingLabel}</span>}
-              {!compact && subtitles?.[stage] && (
-                <span className="ev-stage-timeline__subtitle">{subtitles[stage]}</span>
-              )}
-              {editable && (
-                <Button variant="tertiary" size="sm" onClick={() => onEditDeadline!(stage)}>
-                  {editLabel}
-                </Button>
+              {!compact && (subtitles?.[stage] || editable) && (
+                <div className="ev-stage-timeline__meta">
+                  {subtitles?.[stage] && (
+                    <span className="ev-stage-timeline__subtitle">{subtitles[stage]}</span>
+                  )}
+                  {editable && (
+                    <Button variant="tertiary" size="sm" onClick={() => onEditDeadline!(stage)}>
+                      {editLabel}
+                    </Button>
+                  )}
+                </div>
               )}
             </li>
           );

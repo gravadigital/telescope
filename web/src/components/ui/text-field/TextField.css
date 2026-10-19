@@ -5,9 +5,19 @@
   font: var(--type-body);
   color: var(--text-field-fg);
 }
+.ui-text-field__label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ref-space-sm);
+}
 .ui-text-field__label {
   font: var(--type-ui);
   color: var(--text-primary);
+}
+.ui-text-field__label-action {
+  flex: none;
+  font: var(--type-caption);
 }
 .ui-text-field__optional {
   font: var(--type-caption);

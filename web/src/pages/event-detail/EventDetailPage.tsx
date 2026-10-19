@@ -10,6 +10,7 @@ import ShareDialog from '../../components/events/share-dialog/ShareDialog';
 import ParticipantsDialog from '../../components/events/participants-dialog/ParticipantsDialog';
 import EventResults from '../../components/voting/event-results/EventResults';
 import SortableRankList from '../../components/voting/sortable-rank-list/SortableRankList';
+import Countdown from '../../components/events/countdown/Countdown';
 import NotFoundPage from '../not-found/NotFoundPage';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, getErrorCode } from '../../config/api';
@@ -24,7 +25,7 @@ import {
   progressSteps,
 } from '../../domain/eventDetail';
 import type { AssignmentStatus, NextStepState } from '../../domain/eventDetail';
-import { currentDeadline } from '../../domain/events';
+import { currentDeadline, endOfDay } from '../../domain';
 import type { FileRejection } from '../../domain/files';
 import { loginPathFor } from '../../domain/redirect';
 import { STAGE_ORDER, stageNameKey } from '../../domain/stages';
@@ -641,6 +642,22 @@ const EventDetailPage: React.FC = () => {
     ),
   });
 
+  const countdownScope = event.stage === 'voting' ? 'voting' : 'registration';
+  const countdown = deadline ? (
+    <Countdown
+      title={t(`manage.countdown.${countdownScope}.title` as TranslationKey)}
+      expiredText={t(`manage.countdown.${countdownScope}.expired` as TranslationKey)}
+      units={{
+        days: t(`manage.countdown.${countdownScope}.days` as TranslationKey),
+        hours: t(`manage.countdown.${countdownScope}.hours` as TranslationKey),
+        minutes: t(`manage.countdown.${countdownScope}.minutes` as TranslationKey),
+        seconds: t(`manage.countdown.${countdownScope}.seconds` as TranslationKey),
+      }}
+      target={endOfDay(deadline)}
+      footer={t(`manage.countdown.${countdownScope}.footer` as TranslationKey, { date: fmt.date(deadline) })}
+    />
+  ) : undefined;
+
   return (
     <div className="edp-page">
       <EventHero
@@ -651,9 +668,12 @@ const EventDetailPage: React.FC = () => {
         title={event.title}
         meta={meta}
         actions={
-          <Button variant="onBand" iconStart={<ShareIcon />} onClick={() => setShareOpen(true)}>
-            {t('eventDetail.share')}
-          </Button>
+          <div className="edp-hero-actions">
+            <Button variant="onBand" iconStart={<ShareIcon />} onClick={() => setShareOpen(true)}>
+              {t('eventDetail.share')}
+            </Button>
+            {countdown}
+          </div>
         }
       />
 

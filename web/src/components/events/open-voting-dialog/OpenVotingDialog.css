@@ -5,18 +5,49 @@
   min-width: 0;
 }
 
+.ev-open-voting__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-md);
+  min-width: 0;
+}
+
 .ev-open-voting__text {
   margin: 0;
   font: var(--type-body);
   color: var(--text-secondary);
 }
 
-/* Resumen: 3 columnas (4/12) en ambos viewports. */
+/* Resumen del reparto sobre la banda oscura del diseño. */
 .ev-open-voting__summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-inline-sm);
   min-width: 0;
+  padding: var(--space-padding-default);
+  background: var(--bg-band);
+  border-radius: var(--radius-surface);
+}
+
+.ev-open-voting__summary .ui-stat-tile {
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.ev-open-voting__summary .ui-stat-tile__label {
+  color: var(--text-inverse-secondary);
+}
+
+.ev-open-voting__summary .ui-stat-tile__value {
+  color: var(--text-inverse);
+  font-size: var(--ref-font-size-3xl);
+}
+
+.ev-open-voting__summary .ev-open-voting__live .ui-stat-tile__value {
+  color: var(--text-signal);
 }
 
 .ev-open-voting__live {
@@ -25,7 +56,7 @@
 
 .ev-open-voting__skeleton {
   min-height: 64px;
-  background: var(--bg-surface-subtle);
+  background: var(--bg-band-raised);
   border-radius: var(--card-radius);
 }
 
@@ -42,27 +73,176 @@
   min-width: 0;
 }
 
-.ev-open-voting__advanced {
-  min-width: 0;
-  border-top: 1px solid var(--border-default);
-  padding-top: var(--space-stack-sm);
+.ev-open-voting__label {
+  display: block;
+  margin-bottom: var(--ref-space-sm);
+  font: var(--type-ui);
+  font-weight: var(--ref-font-weight-semibold);
+  color: var(--text-primary);
 }
 
-.ev-open-voting__summary-toggle {
+.ev-open-voting__required {
+  color: var(--text-field-error);
+}
+
+/* Fecha: campo completo con calendario nativo superpuesto. */
+.ev-open-voting__date {
+  position: relative;
+  box-sizing: border-box;
   display: flex;
-  flex-direction: column;
-  gap: var(--space-stack-sm);
-  cursor: pointer;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ref-space-sm);
+  min-height: 52px;
+  padding: 0 var(--ref-space-md);
+  background: var(--text-field-bg);
+  border: 1.5px solid var(--text-field-border);
   border-radius: var(--radius-field);
 }
 
-.ev-open-voting__summary-toggle:focus-visible {
-  outline: 2px solid var(--border-focus);
-  outline-offset: 2px;
+.ev-open-voting__date:focus-within {
+  border-color: var(--border-focus);
+  box-shadow: var(--focus-ring);
+}
+
+.ev-open-voting__date--error {
+  border-color: var(--border-error);
+}
+
+.ev-open-voting__date-value {
+  font: var(--type-body);
+  font-size: var(--ref-font-size-lg);
+}
+
+.ev-open-voting__date-icon {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.ev-open-voting__date-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.ev-open-voting__date-input:disabled {
+  cursor: not-allowed;
+}
+
+.ev-open-voting__error {
+  margin: var(--ref-space-xs) 0 0;
+  font: var(--type-caption);
+  color: var(--text-field-error);
+}
+
+/* Stepper: un solo campo con los controles adentro. */
+.ev-open-voting .ui-number-stepper__row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-height: 52px;
+  background: var(--text-field-bg);
+  border: 1px solid var(--number-stepper-border);
+  border-radius: var(--radius-field);
+  overflow: hidden;
+}
+
+.ev-open-voting .ui-number-stepper__row:focus-within {
+  border-color: var(--border-focus);
+  box-shadow: var(--focus-ring);
+}
+
+.ev-open-voting .ui-number-stepper--error .ui-number-stepper__row {
+  border-color: var(--border-error);
+}
+
+.ev-open-voting .ui-number-stepper__button {
+  flex: 0 0 48px;
+  min-width: 0;
+  min-height: 50px;
+  border: 0;
+  border-radius: 0;
+}
+
+.ev-open-voting .ui-number-stepper__input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  min-height: 50px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-size: var(--ref-font-size-lg);
+  font-weight: var(--ref-font-weight-bold);
+}
+
+.ev-open-voting .ui-number-stepper__input:focus {
+  border: 0;
+  box-shadow: none;
+}
+
+.ev-open-voting .ui-number-stepper__unit {
+  padding-right: var(--ref-space-md);
+  white-space: nowrap;
+}
+
+.ev-open-voting .ui-number-stepper--field .ui-number-stepper__row {
+  min-height: 46px;
+  border-radius: var(--radius-control);
+}
+
+.ev-open-voting .ui-number-stepper--field .ui-number-stepper__input {
+  min-height: 44px;
+  padding: 0 var(--ref-space-md);
+  text-align: left;
+  font-size: var(--ref-font-size-md);
+  font-weight: var(--ref-font-weight-regular);
+}
+
+/* Ajustes avanzados: bloque plegable con etiqueta Mostrar/Ocultar. */
+.ev-open-voting__advanced {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-sm);
+  min-width: 0;
+}
+
+.ev-open-voting__advanced-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ref-space-md);
+  padding: var(--ref-space-md) 18px;
+  background: var(--ref-color-gray-50);
+  border: 1px solid var(--ref-color-gray-200);
+  border-radius: var(--radius-field);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.ev-open-voting__advanced-toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.ev-open-voting__advanced-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .ev-open-voting__advanced-title {
   font: var(--type-ui);
+  font-weight: var(--ref-font-weight-bold);
   color: var(--text-primary);
 }
 
@@ -71,13 +251,100 @@
   color: var(--text-secondary);
 }
 
+.ev-open-voting__advanced-action {
+  flex: none;
+  font: var(--type-ui);
+  font-weight: var(--ref-font-weight-semibold);
+  color: var(--text-action);
+}
+
 .ev-open-voting__advanced-grid {
-  margin-top: var(--space-stack-md);
+  margin-top: 0;
+}
+
+/* En pantallas bajas se compacta para que todo entre sin scroll. */
+@media (min-width: 768px) and (max-height: 860px) {
+  .ev-open-voting,
+  .ev-open-voting__main {
+    gap: var(--ref-space-ms);
+  }
+
+  .ev-open-voting__summary {
+    padding: var(--space-padding-compact);
+  }
+
+  .ev-open-voting__advanced {
+    gap: var(--ref-space-sm);
+  }
+
+  .ev-open-voting__advanced-toggle {
+    padding: var(--ref-space-ms) var(--ref-space-md);
+  }
+
+  .ev-open-voting__advanced-grid {
+    gap: var(--ref-space-ms);
+  }
+
+  .ev-open-voting .ui-number-stepper {
+    gap: 6px;
+  }
+
+  .ev-open-voting .ui-number-stepper__label {
+    font-size: var(--ref-font-size-xs);
+  }
+
+  .ev-open-voting .ui-number-stepper__help,
+  .ev-open-voting .ui-number-stepper__error {
+    font-size: var(--ref-font-size-2xs);
+  }
+
+  .ev-open-voting .ui-number-stepper--field .ui-number-stepper__row {
+    min-height: 40px;
+  }
+
+  .ev-open-voting .ui-number-stepper--field .ui-number-stepper__input {
+    min-height: 38px;
+  }
+
+  .ev-open-voting .ui-callout {
+    padding: var(--ref-space-ms);
+  }
+}
+
+/* Pie: aviso a la izquierda y acciones a la derecha. */
+.ev-open-voting__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-inline-md);
+  width: 100%;
+}
+
+.ev-open-voting__irreversible {
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--text-secondary);
+}
+
+.ev-open-voting__actions-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-inline-md);
 }
 
 @media (min-width: 768px) {
   .ev-open-voting__fields,
   .ev-open-voting__advanced-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ev-open-voting__actions {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .ev-open-voting__actions-buttons {
+    flex-direction: row;
+    justify-content: flex-end;
   }
 }

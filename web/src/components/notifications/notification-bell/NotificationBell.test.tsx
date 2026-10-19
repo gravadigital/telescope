@@ -33,6 +33,7 @@ describe('NotificationBell', () => {
     renderBell();
     const bell = await screen.findByRole('button', { name: 'Notificaciones, 2 sin leer' });
     expect(bell).toHaveTextContent('2');
+    expect(bell).toHaveClass('nt-bell__button--unread');
     expect(unreadCount).toHaveBeenCalledTimes(1);
   });
 
@@ -42,6 +43,7 @@ describe('NotificationBell', () => {
     const bell = await screen.findByRole('button', { name: 'Notificaciones' });
     await waitFor(() => expect(unreadCount).toHaveBeenCalled());
     expect(bell).not.toHaveTextContent(/\d/);
+    expect(bell).not.toHaveClass('nt-bell__button--unread');
   });
 
   it('TS-45 en mobile navega a /notifications y no abre el panel', async () => {

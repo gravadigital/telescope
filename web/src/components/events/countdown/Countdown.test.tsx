@@ -5,7 +5,7 @@ const units = { days: 'DÍAS', hours: 'HORAS', minutes: 'MIN', seconds: 'SEG' };
 
 const base = {
   title: 'LA INSCRIPCIÓN CIERRA EN',
-  expiredText: 'Inscripción cerrada',
+  expiredText: 'LA INSCRIPCIÓN YA CERRÓ',
   units,
   footer: '10 oct 2026 · 23:59 (ART)',
 };
@@ -23,7 +23,7 @@ describe('Countdown', () => {
     expect(parts).toMatchObject({ days: 5, hours: 11, minutes: 59, seconds: 59, expired: false });
   });
 
-  it('muestra el mensaje fijo al vencer', () => {
+  it('al vencer se queda en cero sin desaparecer', () => {
     render(
       <Countdown
         {...base}
@@ -31,8 +31,24 @@ describe('Countdown', () => {
         now={new Date(2026, 9, 16, 0, 0, 0).getTime()}
       />
     );
-    expect(screen.getByText('Inscripción cerrada')).toBeInTheDocument();
-    expect(screen.queryByRole('timer')).toBeNull();
+    expect(screen.getByText('LA INSCRIPCIÓN YA CERRÓ')).toBeInTheDocument();
+    expect(screen.queryByText('LA INSCRIPCIÓN CIERRA EN')).toBeNull();
+    expect(screen.getByRole('timer')).toBeInTheDocument();
+    expect(screen.getAllByText('00')).toHaveLength(4);
+  });
+
+  it('deja de actualizarse cuando llega a cero', () => {
+    jest.useFakeTimers();
+    render(<Countdown {...base} target={new Date(Date.now() + 1000)} />);
+    act(() => {
+      jest.advanceTimersByTime(2000);
+    });
+    const zeros = screen.getByRole('timer').textContent;
+    expect(screen.getAllByText('00')).toHaveLength(4);
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+    expect(screen.getByRole('timer').textContent).toBe(zeros);
   });
 
   it('muestra las cajas con ceros a la izquierda', () => {

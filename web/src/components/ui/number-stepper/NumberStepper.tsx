@@ -19,6 +19,8 @@ export interface NumberStepperProps {
   decrementLabel: string;
   incrementLabel: string;
   disabled?: boolean;
+  /** `field` muestra solo el campo editable, sin botones de − y +. */
+  variant?: 'stepper' | 'field';
   onChange: (value: number) => void;
 }
 
@@ -37,6 +39,7 @@ const NumberStepper: React.FC<NumberStepperProps> = ({
   decrementLabel,
   incrementLabel,
   disabled = false,
+  variant = 'stepper',
   onChange,
 }) => {
   const inputId = React.useId();
@@ -94,20 +97,26 @@ const NumberStepper: React.FC<NumberStepperProps> = ({
   const invalid = Boolean(message);
 
   return (
-    <div className={`ui-number-stepper${invalid ? ' ui-number-stepper--error' : ''}`}>
+    <div
+      className={`ui-number-stepper ui-number-stepper--${variant}${
+        invalid ? ' ui-number-stepper--error' : ''
+      }`}
+    >
       <label htmlFor={inputId} className="ui-number-stepper__label">
         {label}
       </label>
       <div className="ui-number-stepper__row">
-        <Button
-          variant="icon"
-          aria-label={decrementLabel}
-          aria-controls={inputId}
-          iconStart={<MinusIcon />}
-          disabled={disabled || value <= min}
-          onClick={() => move(-1)}
-          className="ui-number-stepper__button"
-        />
+        {variant === 'stepper' && (
+          <Button
+            variant="icon"
+            aria-label={decrementLabel}
+            aria-controls={inputId}
+            iconStart={<MinusIcon />}
+            disabled={disabled || value <= min}
+            onClick={() => move(-1)}
+            className="ui-number-stepper__button"
+          />
+        )}
         <input
           id={inputId}
           className="ui-number-stepper__input"
@@ -128,15 +137,17 @@ const NumberStepper: React.FC<NumberStepperProps> = ({
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
         />
-        <Button
-          variant="icon"
-          aria-label={incrementLabel}
-          aria-controls={inputId}
-          iconStart={<PlusIcon />}
-          disabled={disabled || value >= max}
-          onClick={() => move(1)}
-          className="ui-number-stepper__button"
-        />
+        {variant === 'stepper' && (
+          <Button
+            variant="icon"
+            aria-label={incrementLabel}
+            aria-controls={inputId}
+            iconStart={<PlusIcon />}
+            disabled={disabled || value >= max}
+            onClick={() => move(1)}
+            className="ui-number-stepper__button"
+          />
+        )}
         {unit && <span className="ui-number-stepper__unit">{unit}</span>}
         {recommended !== undefined && recommendedLabel && value === recommended && (
           <span className="ui-number-stepper__badge">{recommendedLabel}</span>

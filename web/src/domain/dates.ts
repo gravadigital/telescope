@@ -43,6 +43,15 @@ export const formatDateLong = (date: string, locale: string): string =>
     year: 'numeric',
   }).format(parseLocalDate(date));
 
+/** Fecha compacta con día de la semana, p. ej. "lun, 12 oct 2026". */
+export const formatDateCompact = (date: string, locale: string): string =>
+  new Intl.DateTimeFormat(locale, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(parseLocalDate(date));
+
 export const formatDateTime = (iso: string, locale: string): string =>
   new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso));
 

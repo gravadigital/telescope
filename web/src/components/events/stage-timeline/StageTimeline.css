@@ -108,13 +108,25 @@
 .ev-stage-timeline__item--current .ev-stage-timeline__name {
   color: var(--ref-color-violet-700);
 }
+.ev-stage-timeline__meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: var(--ref-space-sm);
+}
 .ev-stage-timeline__subtitle {
-  flex-basis: 100%;
+  flex: 0 1 auto;
   font: var(--type-caption);
   color: var(--ref-color-gray-400);
 }
 .ev-stage-timeline__item--current .ev-stage-timeline__subtitle {
   color: var(--ref-color-gray-700);
+}
+/* El botón queda pegado al cierre, dentro de la misma etapa. */
+.ev-stage-timeline__meta .ui-button {
+  min-width: 0;
+  padding: 0 var(--ref-space-sm);
 }
 
 @media (min-width: 768px) {

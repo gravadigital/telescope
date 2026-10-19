@@ -40,7 +40,7 @@ describe('AuthLayout', () => {
     expect(ref.current).toBe(screen.getByRole('heading', { level: 1 }));
   });
 
-  it('TS-10: CSS mobile-first, 5/12 + 7/12 desde 768px', () => {
+  it('TS-10: CSS mobile-first, dos columnas iguales desde 768px', () => {
     const css = fs.readFileSync(path.join(__dirname, 'AuthLayout.css'), 'utf8');
     const mediaIndex = css.indexOf('@media (min-width: 768px)');
     expect(mediaIndex).toBeGreaterThan(-1);
@@ -49,7 +49,7 @@ describe('AuthLayout', () => {
     expect(base).toMatch(/\.ly-auth__benefits\s*\{[^}]*display:\s*none/);
     expect(base).toMatch(/\.ly-auth\s*\{[^}]*flex-direction:\s*column/);
     expect(desktop).toMatch(/\.ly-auth__benefits\s*\{[^}]*display:\s*flex/);
-    expect(desktop).toMatch(/grid-template-columns:\s*5fr 7fr/);
+    expect(desktop).toMatch(/grid-template-columns:\s*1fr 1fr/);
     expect(css).not.toMatch(/@media[^{]*max-width/);
   });
 });

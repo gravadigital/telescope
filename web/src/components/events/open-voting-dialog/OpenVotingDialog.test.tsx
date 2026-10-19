@@ -74,17 +74,16 @@ describe('OpenVotingDialog', () => {
       screen.getByText('1 inscripto no subió su propuesta: no va a evaluar ni ser evaluado.')
     ).toBeInTheDocument();
     expect(screen.getByText('Cierre de la votación')).toBeInTheDocument();
-    expect(screen.getByText('lunes, 12 de octubre de 2026')).toBeInTheDocument();
-    const week = screen.getByRole('radio', { name: '1 semana' });
-    expect(week).toHaveAttribute('aria-checked', 'true');
-    await waitFor(() => expect(week).toHaveFocus());
+    expect(screen.getByText('lun, 12 oct 2026')).toBeInTheDocument();
     expect(perReviewer()).toHaveValue(2);
     expect(screen.getByText('Recomendado: 2 · máximo 2')).toBeInTheDocument();
     expect(screen.getByText('Ajustes avanzados de calidad')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Ajustes avanzados de calidad/ })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
     expect(screen.queryByText('Umbral de evaluador confiable')).not.toBeInTheDocument();
-    expect(
-      screen.getByText('No se puede volver a Participación ni rehacer el reparto.')
-    ).toBeInTheDocument();
+    expect(screen.getByText('No se puede volver a Participación.')).toBeInTheDocument();
     expect(confirmButton()).toBeEnabled();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
@@ -120,7 +119,7 @@ describe('OpenVotingDialog', () => {
     expect(minEval()).toHaveValue(2);
     clickTimes('Una propuesta más por evaluador', 3);
     expect(minEval()).toHaveValue(3);
-    clickTimes('Subir Evaluaciones mínimas por archivo', 2);
+    fireEvent.change(minEval(), { target: { value: '5' } });
     expect(minEval()).toHaveValue(5);
     clickTimes('Una propuesta menos por evaluador', 2);
     expect(minEval()).toHaveValue(3);
@@ -147,10 +146,20 @@ describe('OpenVotingDialog', () => {
     expect(screen.queryByText('Cierre de la votación')).not.toBeInTheDocument();
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
     expect(screen.queryByText('Ajustes avanzados de calidad')).not.toBeInTheDocument();
-    expect(
-      screen.queryByText('No se puede volver a Participación ni rehacer el reparto.')
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('No se puede volver a Participación.')).not.toBeInTheDocument();
     expect(confirmButton()).toBeDisabled();
+  });
+
+  it('abre los ajustes hacia abajo sin cambiar el ancho de la card', async () => {
+    setup();
+    await screen.findByText('Propuestas');
+    expect(screen.getByRole('dialog')).toHaveClass('ui-dialog__panel--lg');
+    openAdvanced();
+    expect(screen.getByRole('dialog')).toHaveClass('ui-dialog__panel--lg');
+    expect(screen.getByRole('button', { name: /Ajustes avanzados de calidad/ })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
   });
 
   it('TS-39: umbrales inválidos marcan los dos campos y bloquean', async () => {
@@ -162,8 +171,8 @@ describe('OpenVotingDialog', () => {
     expect(good()).toHaveValue(0.6);
     expect(bad()).toHaveValue(0.3);
     expect(screen.getByRole('spinbutton', { name: 'Peso del ajuste por calidad' })).toHaveValue(3);
-    clickTimes('Bajar Umbral de evaluador confiable', 6);
-    clickTimes('Subir Umbral de evaluador poco confiable', 6);
+    fireEvent.change(good(), { target: { value: '0.3' } });
+    fireEvent.change(bad(), { target: { value: '0.6' } });
     expect(good()).toHaveValue(0.3);
     expect(bad()).toHaveValue(0.6);
     const message = 'El umbral confiable tiene que superar al poco confiable por al menos 0,1.';
@@ -172,14 +181,14 @@ describe('OpenVotingDialog', () => {
     expect(bad()).toHaveAttribute('aria-invalid', 'true');
     expect(confirmButton()).toBeDisabled();
 
-    clickTimes('Subir Umbral de evaluador confiable', 6);
-    clickTimes('Bajar Umbral de evaluador poco confiable', 1);
+    fireEvent.change(good(), { target: { value: '0.6' } });
+    fireEvent.change(bad(), { target: { value: '0.55' } });
     expect(good()).toHaveValue(0.6);
     expect(bad()).toHaveValue(0.55);
     expect(screen.getAllByText(message)).toHaveLength(2);
     expect(confirmButton()).toBeDisabled();
 
-    clickTimes('Bajar Umbral de evaluador poco confiable', 1);
+    fireEvent.change(bad(), { target: { value: '0.5' } });
     expect(screen.queryByText(message)).not.toBeInTheDocument();
     expect(confirmButton()).toBeEnabled();
   });
@@ -244,8 +253,7 @@ describe('OpenVotingDialog', () => {
   it('valida la fecha de cierre', async () => {
     setup();
     await screen.findByText('Propuestas');
-    userEvent.click(screen.getByRole('button', { name: 'Cambiar' }));
-    const input = screen.getByLabelText('Cierre de la votación', { selector: 'input' });
+    const input = screen.getByLabelText(/Cierre de la votación/, { selector: 'input' });
     fireEvent.change(input, { target: { value: '2026-10-05' } });
     expect(screen.getByText('Elige una fecha posterior a hoy.')).toBeInTheDocument();
     expect(confirmButton()).toBeDisabled();

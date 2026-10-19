@@ -67,6 +67,13 @@ export const SearchIcon: React.FC<IconProps> = (props) => (
   </BaseIcon>
 );
 
+export const GlobeIcon: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18" />
+  </BaseIcon>
+);
+
 export const UploadIcon: React.FC<IconProps> = (props) => (
   <BaseIcon {...props}>
     <path d="M12 16V4M7 9l5-5 5 5M5 20h14" />
@@ -180,5 +187,12 @@ export const TrophyIcon: React.FC<IconProps> = (props) => (
 export const ArrowRightIcon: React.FC<IconProps> = (props) => (
   <BaseIcon {...props}>
     <path d="M5 12h14M12 5l7 7-7 7" />
+  </BaseIcon>
+);
+
+export const CalendarIcon: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <path d="M16 2v4M8 2v4M3 10h18" />
   </BaseIcon>
 );

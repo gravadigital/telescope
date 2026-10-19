@@ -29,3 +29,22 @@
   display: block;
   border-radius: 2px;
 }
+.ly-language-select--on-light {
+  background: var(--bg-surface-subtle);
+  border-color: var(--border-default);
+}
+.ly-language-select--on-light .ly-language-select__option {
+  color: var(--text-secondary);
+}
+.ly-language-select--on-light .ly-language-select__option--active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+.ly-language-select--compact .ly-language-select__option {
+  padding-inline: var(--ref-space-sm);
+}
+.ly-language-select__globe {
+  flex: none;
+  margin: 0 var(--ref-space-sm);
+  color: var(--text-muted);
+}

@@ -66,7 +66,7 @@ const NotificationBell: React.FC = () => {
         aria-haspopup={desktop ? 'dialog' : undefined}
         aria-expanded={desktop ? open : undefined}
         aria-controls={panelOpen ? panelId : undefined}
-        className="nt-bell__button"
+        className={`nt-bell__button${unreadCount > 0 ? ' nt-bell__button--unread' : ''}`}
         onClick={handleClick}
       >
         <BellIcon width={24} height={24} />

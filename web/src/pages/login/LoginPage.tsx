@@ -133,10 +133,12 @@ const LoginPage: React.FC = () => {
           onChange={handleChange}
           onBlur={handleBlur}
           error={fieldErrors.password && t(fieldErrors.password)}
+          labelAction={
+            <Link to="/forgot-password" state={{ email: formData.email.trim() }}>
+              {t('auth.login.forgot')}
+            </Link>
+          }
         />
-        <Link className="ly-auth__aside-link" to="/forgot-password" state={{ email: formData.email.trim() }}>
-          {t('auth.login.forgot')}
-        </Link>
         {shownError && <Callout tone="error">{t(shownError)}</Callout>}
         <Button
           type="submit"

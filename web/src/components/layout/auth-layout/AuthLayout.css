@@ -8,16 +8,23 @@
 .ly-auth__brand {
   display: flex;
   flex-direction: column;
-  gap: var(--space-stack-sm);
+  gap: var(--space-stack-md);
   padding: var(--space-padding-compact);
   background: var(--bg-band);
   color: var(--text-inverse);
 }
 .ly-auth__logo {
   margin: 0;
-  font: var(--type-eyebrow);
+  font: var(--type-ui);
+  font-weight: var(--ref-font-weight-bold);
   letter-spacing: var(--type-tracking-wide);
-  color: var(--text-signal);
+  text-transform: uppercase;
+  color: var(--text-inverse);
+}
+.ly-auth__brand-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-lg);
 }
 .ly-auth__brand-title {
   margin: 0;
@@ -32,23 +39,52 @@
 }
 .ly-auth__benefit {
   display: flex;
-  align-items: flex-start;
-  gap: var(--space-inline-sm);
+  align-items: center;
+  gap: 14px;
   font: var(--type-body);
   color: var(--text-inverse-secondary);
 }
+.ly-auth__benefit-mark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: var(--auth-benefit-icon-size);
+  height: var(--auth-benefit-icon-size);
+  border-radius: var(--auth-benefit-radius);
+  background: var(--auth-benefit-icon-bg);
+  color: var(--text-signal);
+}
+.ly-auth__note {
+  display: none;
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--text-muted);
+}
 .ly-auth__panel {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   padding: var(--space-padding-default) var(--space-padding-compact);
-  background: var(--bg-surface);
+  background: var(--bg-canvas);
+}
+.ly-auth__topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-inline-md);
+}
+.ly-auth__topbar .ly-language-select {
+  margin-left: 0;
 }
 .ly-auth__content {
   display: flex;
   flex-direction: column;
-  gap: var(--space-stack-md);
+  gap: var(--ref-space-lg);
   width: 100%;
   max-width: 480px;
-  margin: 0 auto;
+  margin: auto;
+  padding-block: var(--space-stack-md);
 }
 .ly-auth__title {
   margin: 0;
@@ -90,52 +126,53 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-inline-sm);
-  margin: 0;
+  margin: calc(-1 * var(--space-stack-md)) 0 0;
   font: var(--type-ui);
   color: var(--text-secondary);
 }
 .ly-auth__alt a,
 .ly-auth__back,
-.ly-auth__aside-link {
+.ly-auth .ui-text-field__label-action a {
   color: var(--text-action);
   font: var(--type-ui);
   text-decoration: none;
 }
 .ly-auth__alt a:hover,
 .ly-auth__back:hover,
-.ly-auth__aside-link:hover {
+.ly-auth .ui-text-field__label-action a:hover {
   text-decoration: underline;
-}
-.ly-auth__back {
-  align-self: flex-start;
-}
-.ly-auth__aside-link {
-  align-self: flex-end;
 }
 
 @media (min-width: 768px) {
   .ly-auth {
     display: grid;
-    grid-template-columns: 5fr 7fr;
+    grid-template-columns: 1fr 1fr;
     min-height: 100vh;
   }
   .ly-auth__brand {
-    justify-content: center;
+    justify-content: space-between;
     gap: var(--space-stack-lg);
-    padding: var(--space-padding-spacious);
+    padding: calc(var(--ref-space-2xl) + var(--ref-space-sm))
+      calc(var(--ref-space-2xl) + var(--ref-space-xl));
   }
   .ly-auth__brand-title {
-    font: var(--type-heading-l);
+    font: var(--type-display);
+    line-height: 1.08;
+    text-wrap: balance;
   }
   .ly-auth__benefits {
     display: flex;
     flex-direction: column;
-    gap: var(--space-stack-sm);
+    gap: var(--space-stack-md);
+  }
+  .ly-auth__note {
+    display: block;
   }
   .ly-auth__panel {
-    display: flex;
-    align-items: center;
-    padding: var(--space-padding-spacious);
+    padding: var(--ref-space-2xl);
+  }
+  .ly-auth__content {
+    max-width: 440px;
   }
   .ly-auth__title {
     font: var(--type-heading-l);

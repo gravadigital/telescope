@@ -894,10 +894,12 @@ describe('ManageEventPage — countdown', () => {
     expect(screen.getByRole('timer')).toBeInTheDocument();
   });
 
-  it('muestra el mensaje fijo con cierre vencido', async () => {
+  it('mantiene el contador en cero con cierre vencido', async () => {
     getEvent.mockResolvedValue(base);
     renderPage();
     await loaded();
-    expect(screen.getByText('Inscripción cerrada')).toBeInTheDocument();
+    expect(screen.getByText('LA INSCRIPCIÓN YA CERRÓ')).toBeInTheDocument();
+    expect(screen.getByRole('timer')).toBeInTheDocument();
+    expect(screen.getAllByText('00')).toHaveLength(4);
   });
 });

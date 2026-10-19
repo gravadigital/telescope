@@ -9,6 +9,13 @@
   padding: 0 var(--space-inline-sm);
   color: var(--text-inverse);
 }
+.ui-button.nt-bell__button.nt-bell__button--unread {
+  color: var(--text-signal);
+}
+/* Campana rellena: se distingue a simple vista de la versión en reposo. */
+.ui-button.nt-bell__button.nt-bell__button--unread svg path:first-of-type {
+  fill: currentColor;
+}
 .nt-bell__count {
   min-width: var(--space-padding-compact);
   padding: 0 var(--space-inline-sm);

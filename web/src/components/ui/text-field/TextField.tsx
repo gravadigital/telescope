@@ -12,6 +12,8 @@ export interface TextFieldProps {
   optional?: boolean;
   /** Texto de "(opcional)" que da la pantalla. */
   optionalLabel?: string;
+  /** Acción alineada a la derecha del label (p. ej. "¿La olvidaste?"). */
+  labelAction?: React.ReactNode;
   help?: string;
   error?: string;
   maxLength?: number;
@@ -43,6 +45,7 @@ const TextField = React.forwardRef<HTMLInputElement | HTMLTextAreaElement, TextF
       required = false,
       optional = false,
       optionalLabel,
+      labelAction,
       help,
       error,
       maxLength,
@@ -110,20 +113,23 @@ const TextField = React.forwardRef<HTMLInputElement | HTMLTextAreaElement, TextF
           .filter(Boolean)
           .join(' ')}
       >
-        <label
-          htmlFor={inputId}
-          className={isSearch ? 'ui-visually-hidden' : 'ui-text-field__label'}
-        >
-          {label}
-          {required && (
-            <span className="ui-text-field__required" aria-hidden="true">
-              {' *'}
-            </span>
-          )}
-          {optional && optionalLabel && (
-            <span className="ui-text-field__optional"> {optionalLabel}</span>
-          )}
-        </label>
+        <div className="ui-text-field__label-row">
+          <label
+            htmlFor={inputId}
+            className={isSearch ? 'ui-visually-hidden' : 'ui-text-field__label'}
+          >
+            {label}
+            {required && (
+              <span className="ui-text-field__required" aria-hidden="true">
+                {' *'}
+              </span>
+            )}
+            {optional && optionalLabel && (
+              <span className="ui-text-field__optional"> {optionalLabel}</span>
+            )}
+          </label>
+          {labelAction && <span className="ui-text-field__label-action">{labelAction}</span>}
+        </div>
 
         <div className="ui-text-field__box">
           {isSearch && <SearchIcon className="ui-text-field__icon" />}

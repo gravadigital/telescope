@@ -44,22 +44,18 @@ const pad = (n: number): string => String(n).padStart(2, '0');
 
 /** Cuenta regresiva al cierre (inscripción, votación, ranking): mismo diseño, distinto plazo. */
 const Countdown: React.FC<CountdownProps> = ({ title, expiredText, units, target, footer, now }) => {
+  const targetMs = target.getTime();
   const [ticking, setTicking] = React.useState<number>(() => now ?? Date.now());
+  const expired = ticking >= targetMs;
 
   React.useEffect(() => {
-    if (now !== undefined) return;
+    if (now !== undefined || expired) return;
     const id = window.setInterval(() => setTicking(Date.now()), 1000);
     return () => window.clearInterval(id);
-  }, [now]);
+  }, [now, expired, targetMs]);
 
-  const parts = getCountdownParts(target.getTime(), ticking);
-  if (parts.expired) {
-    return (
-      <div className="ev-countdown">
-        <p className="ev-countdown__expired">{expiredText}</p>
-      </div>
-    );
-  }
+  const parts = getCountdownParts(targetMs, ticking);
+  const heading = expired ? expiredText : title;
 
   const boxes: Array<{ value: number; unit: string }> = [
     { value: parts.days, unit: units.days },
@@ -70,11 +66,11 @@ const Countdown: React.FC<CountdownProps> = ({ title, expiredText, units, target
 
   return (
     <div className="ev-countdown">
-      <p className="ev-countdown__title">{title}</p>
+      <p className="ev-countdown__title">{heading}</p>
       <div
         className="ev-countdown__boxes"
         role="timer"
-        aria-label={`${title}: ${parts.days} ${units.days}, ${parts.hours} ${units.hours}, ${parts.minutes} ${units.minutes}, ${parts.seconds} ${units.seconds}`}
+        aria-label={`${heading}: ${parts.days} ${units.days}, ${parts.hours} ${units.hours}, ${parts.minutes} ${units.minutes}, ${parts.seconds} ${units.seconds}`}
       >
         {boxes.map((box) => (
           <div key={box.unit} className="ev-countdown__box">

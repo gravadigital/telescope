@@ -1,7 +1,15 @@
 import React from 'react';
 import { useT, LOCALES } from '../../../i18n';
 import type { Locale } from '../../../i18n';
+import { GlobeIcon } from '../../ui/icons/Icons';
 import './LanguageSelect.css';
+
+export interface LanguageSelectProps {
+  /** `onLight` invierte los colores para fondos claros (AuthLayout). */
+  tone?: 'onBand' | 'onLight';
+  /** Reemplaza las banderas por un ícono de idioma. */
+  compact?: boolean;
+}
 
 const FLAGS: Record<Locale, React.ReactNode> = {
   es: (
@@ -32,15 +40,22 @@ const FLAGS: Record<Locale, React.ReactNode> = {
 };
 
 /** Selector de idioma ES / EN junto al usuario (banderas, sin menú). */
-const LanguageSelect: React.FC = () => {
+const LanguageSelect: React.FC<LanguageSelectProps> = ({ tone = 'onBand', compact = false }) => {
   const { t, locale, setLocale } = useT();
 
   return (
     <span
-      className="ly-language-select"
+      className={[
+        'ly-language-select',
+        tone === 'onLight' ? 'ly-language-select--on-light' : '',
+        compact ? 'ly-language-select--compact' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       role="group"
       aria-label={t('nav.languageMenu', { code: locale.toUpperCase() })}
     >
+      {compact && <GlobeIcon className="ly-language-select__globe" width={16} height={16} />}
       {LOCALES.map((l) => (
         <button
           key={l}
@@ -49,7 +64,7 @@ const LanguageSelect: React.FC = () => {
           aria-pressed={l === locale}
           onClick={() => setLocale(l)}
         >
-          {FLAGS[l]}
+          {compact ? null : FLAGS[l]}
           {l.toUpperCase()}
         </button>
       ))}

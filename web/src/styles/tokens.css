@@ -227,6 +227,7 @@
   /* Dialog */
   --dialog-bg: var(--bg-surface);
   --dialog-backdrop: var(--bg-backdrop);
+  --dialog-backdrop-blur: 6px;
   --dialog-radius: var(--radius-surface);
   --dialog-shadow: var(--shadow-dialog);
   --dialog-eyebrow: var(--ref-color-violet-700);
@@ -299,4 +300,9 @@
   --menu-bg: var(--bg-surface);
   --menu-shadow: var(--shadow-popover);
   --menu-item-hover: var(--bg-surface-subtle);
+
+  /* AuthLayout */
+  --auth-benefit-icon-bg: rgba(53, 214, 242, 0.16);
+  --auth-benefit-icon-size: var(--ref-space-lx);
+  --auth-benefit-radius: var(--ref-radius-sm);
 }

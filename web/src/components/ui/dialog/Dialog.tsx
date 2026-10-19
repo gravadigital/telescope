@@ -9,7 +9,9 @@ export interface DialogProps {
   open: boolean;
   onClose: () => void;
   variant?: 'default' | 'alert';
-  size?: 'sm' | 'md';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  /** `page`: la card crece con su contenido y hace scroll el overlay, no el interior. */
+  scroll?: 'panel' | 'page';
   /** Transición de etapa en eyebrow, p. ej. "CREACIÓN → PARTICIPACIÓN". */
   eyebrow?: string;
   title: string;
@@ -28,6 +30,7 @@ const DialogContent: React.FC<DialogProps> = ({
   onClose,
   variant = 'default',
   size = 'sm',
+  scroll = 'panel',
   eyebrow,
   title,
   busy = false,
@@ -110,10 +113,15 @@ const DialogContent: React.FC<DialogProps> = ({
 
   return (
     <div ref={rootRef} className="ui-dialog">
-      <div className="ui-dialog__backdrop" onClick={handleBackdrop}>
+      <div
+        className={`ui-dialog__backdrop${scroll === 'page' ? ' ui-dialog__backdrop--scroll-page' : ''}`}
+        onClick={handleBackdrop}
+      >
         <div
           ref={panelRef}
-          className={`ui-dialog__panel ui-dialog__panel--${size}`}
+          className={`ui-dialog__panel ui-dialog__panel--${size}${
+            scroll === 'page' ? ' ui-dialog__panel--scroll-page' : ''
+          }`}
           role={variant === 'alert' ? 'alertdialog' : 'dialog'}
           aria-modal="true"
           aria-labelledby={titleId}

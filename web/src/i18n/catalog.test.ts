@@ -105,7 +105,7 @@ describe('catálogo', () => {
     expect(es.auth.completeProfile.title).toBe('Elige tu nombre');
     expect(en.auth.login.createOne).toBe('Create one for free');
     const leaves = flattenLeaves(es.auth);
-    expect(leaves.length).toBe(75);
+    expect(leaves.length).toBe(76);
     leaves.forEach(([key, text]) => {
       expect(findVoseo(text)).toEqual([]);
       expect(findGenderMarks(text)).toEqual([]);

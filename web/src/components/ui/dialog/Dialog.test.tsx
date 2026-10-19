@@ -110,6 +110,15 @@ describe('Dialog', () => {
     main.remove();
   });
 
+  it('scroll page: la card crece y el scroll queda en el overlay', () => {
+    renderDialog({ size: 'lg', scroll: 'page' });
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveClass('ui-dialog__panel--lg', 'ui-dialog__panel--scroll-page');
+    expect(document.querySelector('.ui-dialog__backdrop')).toHaveClass(
+      'ui-dialog__backdrop--scroll-page'
+    );
+  });
+
   it('TS-25: cerrado no renderiza nada', () => {
     renderDialog({ open: false });
     expect(screen.queryByRole('dialog')).toBeNull();
