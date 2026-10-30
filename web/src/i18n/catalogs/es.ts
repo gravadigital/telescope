@@ -905,7 +905,7 @@ export const es = {
     },
     howVoteCounts: {
       title: '¿Cómo cuenta tu voto?',
-      text: 'Tu orden se compara con el de los demás evaluadores. Si evalúas con coherencia, tu propia propuesta sube posiciones en el ranking final; si no, baja.',
+      text: 'Ordena las propuestas según su calidad, como lo haría un jurado imparcial. Al cerrar la votación, tu orden se compara con el ranking general: si se parece, tu propia propuesta sube posiciones; si se aleja mucho o no envías tu ranking, baja.',
     },
     about: 'Sobre el evento',
     details: {

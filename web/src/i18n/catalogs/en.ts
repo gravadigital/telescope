@@ -905,7 +905,7 @@ export const en: Catalog = {
     },
     howVoteCounts: {
       title: 'How does your vote count?',
-      text: "Your order is compared with the other reviewers'. If you review consistently, your own proposal moves up in the final ranking; if not, it moves down.",
+      text: "Rank the proposals by their quality, as an impartial jury would. When voting closes, your order is compared with the overall ranking: if they match, your own proposal moves up; if yours differs a lot or you don't submit it, it moves down.",
     },
     about: 'About the event',
     details: {

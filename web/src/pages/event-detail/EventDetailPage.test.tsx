@@ -586,7 +586,7 @@ describe('EventDetailPage', () => {
       expect(screen.getByRole('list', { name: 'Tu ranking de propuestas' })).toBeInTheDocument();
       const aside = screen.getByRole('complementary');
       expect(within(aside).getByText('¿Cómo cuenta tu voto?')).toBeInTheDocument();
-      expect(within(aside).getByText(/Tu orden se compara con el de los demás evaluadores/)).toBeInTheDocument();
+      expect(within(aside).getByText(/como lo haría un jurado imparcial/)).toBeInTheDocument();
       const progress = within(aside).getByRole('heading', { level: 2, name: 'Tu progreso' }).closest('section')!;
       expect(within(progress).getByText('Pendiente')).toBeInTheDocument();
       first.unmount();
@@ -902,7 +902,7 @@ describe('EventDetailPage', () => {
       await ready();
       const aside = screen.getByRole('complementary');
       expect(within(aside).getByText('¿Cómo cuenta tu voto?')).toBeInTheDocument();
-      expect(within(aside).getByText(/Tu orden se compara con el de los demás evaluadores/)).toBeInTheDocument();
+      expect(within(aside).getByText(/como lo haría un jurado imparcial/)).toBeInTheDocument();
       expect(aside.textContent).not.toMatch(/pese más|pesa más/);
     });
 
