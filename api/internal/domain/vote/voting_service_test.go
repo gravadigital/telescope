@@ -362,7 +362,7 @@ func TestCalculateModifiedBordaCount_ScoreDoesNotDependOnVoteCount(t *testing.T)
 	assert.True(t, top[0].AttachmentID.String() < top[1].AttachmentID.String())
 }
 
-func TestCalculateModifiedBordaCount_AttachmentWithNoVotesRanksLast(t *testing.T) {
+func TestCalculateModifiedBordaCount_AttachmentWithNoVotesHasNoPosition(t *testing.T) {
 	vs, voteRepo, eventID, participants, attachments, config := setupThreeWayVoting(t)
 
 	// Only participants[0] votes, and only on attachments[1]. attachments[0] and
@@ -383,14 +383,27 @@ func TestCalculateModifiedBordaCount_AttachmentWithNoVotesRanksLast(t *testing.T
 		byID[r.AttachmentID] = r
 	}
 
-	assert.Equal(t, 0, byID[attachments[0]].VoteCount)
-	assert.InDelta(t, 0.0, byID[attachments[0]].MBCScore, 1e-9)
-	assert.Equal(t, 0, byID[attachments[2]].VoteCount)
-	assert.InDelta(t, 0.0, byID[attachments[2]].MBCScore, 1e-9)
+	// attachments[0] and attachments[2] got no votes: no score to rank by, so no position.
+	for _, id := range []uuid.UUID{attachments[0], attachments[2]} {
+		assert.Equal(t, 0, byID[id].VoteCount)
+		assert.True(t, byID[id].Unevaluated)
+		assert.Equal(t, 0, byID[id].GlobalRank)
+	}
 
-	// attachments[1] got the only vote, and it was a 1st-place vote -> top score.
-	assert.Greater(t, byID[attachments[1]].MBCScore, byID[attachments[0]].MBCScore)
+	// attachments[1] got the only vote and is the only ranked one.
+	assert.False(t, byID[attachments[1]].Unevaluated)
 	assert.Equal(t, 1, byID[attachments[1]].GlobalRank)
+
+	// Both rankings list the ranked attachment first, then the unevaluated ones in ID order.
+	for name, ranking := range map[string][]AttachmentResult{"global": results.GlobalRanking, "adjusted": results.AdjustedRanking} {
+		require.Len(t, ranking, 3, name)
+		assert.Equal(t, attachments[1], ranking[0].AttachmentID, name)
+		assert.True(t, ranking[1].Unevaluated && ranking[2].Unevaluated, name)
+		assert.True(t, ranking[1].AttachmentID.String() < ranking[2].AttachmentID.String(), name)
+	}
+	for _, r := range results.AdjustedRanking[1:] {
+		assert.Equal(t, 0, r.AdjustedRank, "the incentive must not give an unevaluated attachment a position")
+	}
 }
 
 // ---------------------------------------------------------------------------

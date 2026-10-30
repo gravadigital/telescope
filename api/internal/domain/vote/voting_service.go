@@ -194,42 +194,58 @@ func (vs *VotingService) CalculateModifiedBordaCount(eventID uuid.UUID, config *
 		})
 	}
 
+	// An attachment nobody voted on has no score to rank by: a 0 would place it last as if
+	// every evaluator had ranked it worst. It is left out of G and G' (rank 0, Unevaluated)
+	// and listed after the ranked ones.
+	var ranked, unevaluated []AttachmentResult
+	for _, result := range results {
+		if result.VoteCount == 0 {
+			result.Unevaluated = true
+			unevaluated = append(unevaluated, result)
+			continue
+		}
+		ranked = append(ranked, result)
+	}
+	sort.Slice(unevaluated, func(i, j int) bool {
+		return unevaluated[i].AttachmentID.String() < unevaluated[j].AttachmentID.String()
+	})
+
 	// Sort by MBC score (highest first) to create global ranking G
 	// Ties fall back to attachment ID for deterministic ordering. Vote count is not a
 	// tiebreaker: how many evaluators an attachment got says nothing about its merit.
-	sort.Slice(results, func(i, j int) bool {
-		if results[i].MBCScore == results[j].MBCScore {
-			return results[i].AttachmentID.String() < results[j].AttachmentID.String()
+	sort.Slice(ranked, func(i, j int) bool {
+		if ranked[i].MBCScore == ranked[j].MBCScore {
+			return ranked[i].AttachmentID.String() < ranked[j].AttachmentID.String()
 		}
-		return results[i].MBCScore > results[j].MBCScore
+		return ranked[i].MBCScore > ranked[j].MBCScore
 	})
 
-	for i := range results {
-		results[i].GlobalRank = i + 1
+	for i := range ranked {
+		ranked[i].GlobalRank = i + 1
 	}
 
 	// Calculate participant quality scores Q_i
-	participantQualities, err := vs.calculateParticipantQualities(eventID, results, m)
+	participantQualities, err := vs.calculateParticipantQualities(eventID, ranked, m)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate participant qualities: %w", err)
 	}
 
 	// Count total votes
 	totalVotes := 0
-	for _, result := range results {
+	for _, result := range ranked {
 		totalVotes += result.VoteCount
 	}
 
 	// Apply incentive system to create adjusted ranking G'
-	adjustedResults := vs.applyIncentiveSystem(results, participantQualities, config)
+	adjustedResults := vs.applyIncentiveSystem(ranked, participantQualities, config)
 
 	// Create voting results object
 	votingResults := &VotingResults{
 		ID:                      uuid.New(),
 		EventID:                 eventID,
-		GlobalRanking:           results,
+		GlobalRanking:           append(ranked, unevaluated...),
 		ParticipantQualities:    participantQualities,
-		AdjustedRanking:         adjustedResults,
+		AdjustedRanking:         append(adjustedResults, unevaluated...),
 		TotalParticipants:       len(participantQualities),
 		TotalVotes:              totalVotes,
 		AttachmentsPerEvaluator: m,

@@ -977,6 +977,13 @@ export const es = {
     note: 'El puntaje combina los rankings de todos los participantes, en una escala de 0 a 10. La propuesta de quien evaluó con coherencia sube posiciones; la de quien no, baja.',
     loading: 'Cargando resultados…',
     error: 'No pudimos cargar los resultados.',
+    unevaluated: {
+      title: 'Sin evaluaciones',
+      text: plural({
+        one: 'Esta propuesta no recibió ninguna evaluación, así que no tiene posición en el ranking.',
+        other: 'Estas propuestas no recibieron ninguna evaluación, así que no tienen posición en el ranking.',
+      }),
+    },
   },
   errors: {
     ALREADY_CANCELLED: 'Este evento ya fue cancelado.',

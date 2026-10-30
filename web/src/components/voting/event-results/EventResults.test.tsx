@@ -61,6 +61,27 @@ describe('EventResults', () => {
     expect(onLoaded).toHaveBeenCalledWith(results);
   });
 
+  it('muestra aparte, sin posición, las propuestas sin evaluaciones', async () => {
+    const none: AttachmentResult = {
+      ...r('a-9', 'u-1', 'Ana Pérez', 'nube.pdf', 0, 0),
+      vote_count: 0,
+      average_rank: 0,
+      unevaluated: true,
+    };
+    getResults.mockResolvedValue({
+      ...results,
+      adjusted_ranking: [...results.adjusted_ranking.filter((x) => x.attachment_id !== 'a-1'), none],
+    });
+    renderWithProviders(<EventResults eventId="e-1" currentUserId="u-1" />);
+    expect(await screen.findByText('Sin evaluaciones')).toBeInTheDocument();
+    expect(
+      screen.getByText('Esta propuesta no recibió ninguna evaluación, así que no tiene posición en el ranking.')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Ana Pérez · nube.pdf (Tú)')).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).queryByText('nube.pdf')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('list', { name: 'Podio' })).queryByText(/nube\.pdf/)).not.toBeInTheDocument();
+  });
+
   it('TS-47: sin resultados no es un error y nunca recalcula', async () => {
     getResults.mockRejectedValueOnce(
       new ApiError({ status: 404, body: { error: 'RESULTS_NOT_CALCULATED', message: 'x' } })

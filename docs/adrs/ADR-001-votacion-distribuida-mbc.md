@@ -40,7 +40,8 @@ El modelo tiene cuatro piezas:
    que recibió `f_j`. Promediar por `v_j` deja el resultado en `[0,1]` y hace que no dependa de
    cuántos evaluadores le tocaron ni de si votaron. Produce el **ranking global `G`**. Los empates
    se rompen por UUID, para que el orden sea determinístico (la cantidad de votos no desempata:
-   no dice nada del mérito).
+   no dice nada del mérito). Una propuesta sin ningún voto no tiene posición: se marca
+   `unevaluated` y se lista aparte, en vez de quedar última con puntaje 0.
 
 3. **Calidad del evaluador** — `Q_i = 1 − (1/⌊m²/2⌋) · Σ|R_i(f_j) − RelativeRank_G(f_j, A(p_i))|`,
    la normalización del paper: `⌊m²/2⌋` es el desvío de un orden exactamente invertido, que da

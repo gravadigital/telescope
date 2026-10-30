@@ -171,7 +171,15 @@ describe('splitResults', () => {
     const two = splitResults([r('a-3', 'u-3', 'C', 'l.pdf', 0.6, 2), r('a-2', 'u-2', 'B', 's.png', 0.7, 1)]);
     expect(two.podium).toHaveLength(2);
     expect(two.rest).toEqual([]);
-    expect(splitResults([])).toEqual({ podium: [], rest: [] });
+    expect(splitResults([])).toEqual({ podium: [], rest: [], unevaluated: [] });
+  });
+
+  it('las propuestas sin evaluaciones no entran al podio ni al resto', () => {
+    const none = { ...r('a-9', 'u-9', 'Iván Gil', 'nube.pdf', 0, 0), vote_count: 0, global_rank: 0, unevaluated: true };
+    const { podium, rest, unevaluated } = splitResults([none, ...ranking]);
+    expect(podium.map(x => x.attachment_id)).toEqual(['a-2', 'a-3', 'a-4']);
+    expect(rest.map(x => x.attachment_id)).toEqual(['a-1', 'a-5']);
+    expect(unevaluated.map(x => x.attachment_id)).toEqual(['a-9']);
   });
 });
 

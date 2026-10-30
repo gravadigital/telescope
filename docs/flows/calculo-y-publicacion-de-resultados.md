@@ -119,6 +119,9 @@ donde `R_i(f_j)` es la posición que el evaluador `i` le asignó (**1 = mejor**)
 votos que recibió. Promediar por `v_j(m−1)` deja el resultado en `[0,1]` sin que dependa de cuántas
 evaluaciones tuvo la propuesta.
 
+Una propuesta **sin ningún voto** no tiene puntaje con qué ordenarla: queda fuera de `G` y de `G'`
+(`unevaluated: true`, posiciones en 0), listada al final y sin posición en las notificaciones.
+
 El orden resultante es el **ranking global `G`**. Los empates se rompen **por UUID** — para que el orden sea determinístico y dos cálculos den lo mismo.
 
 **Operación de BD:** `SELECT` sobre `votes` (todos los del evento), `assignments` y `attachments`.

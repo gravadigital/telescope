@@ -977,6 +977,13 @@ export const en: Catalog = {
     note: "The score combines every participant's ranking on a 0 to 10 scale. The proposal of anyone who reviewed consistently moves up; otherwise it moves down.",
     loading: 'Loading results…',
     error: "We couldn't load the results.",
+    unevaluated: {
+      title: 'Not reviewed',
+      text: plural({
+        one: 'This proposal received no reviews, so it has no position in the ranking.',
+        other: 'These proposals received no reviews, so they have no position in the ranking.',
+      }),
+    },
   },
   errors: {
     ALREADY_CANCELLED: 'This event has already been cancelled.',

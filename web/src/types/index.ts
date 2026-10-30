@@ -233,6 +233,7 @@ export interface AttachmentResult {
   adjusted_rank: number;
   vote_count: number;
   average_rank: number;
+  unevaluated?: boolean;                     // No votes: no position (ranks are 0), listed apart
 }
 
 export interface VotingResults {

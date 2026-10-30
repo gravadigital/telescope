@@ -187,12 +187,15 @@ export const progressSteps = (
   return [registration, upload, vote, results];
 };
 
-/** Podio = las 3 primeras por `adjusted_rank`; el resto desde la 4.ª. No muta la entrada. */
+/**
+ * Podio = las 3 primeras por `adjusted_rank`; el resto desde la 4.ª. Las propuestas sin
+ * evaluaciones no tienen posición y van aparte, en `unevaluated`. No muta la entrada.
+ */
 export const splitResults = (
   ranking: AttachmentResult[]
-): { podium: AttachmentResult[]; rest: AttachmentResult[] } => {
-  const sorted = [...ranking].sort((a, b) => a.adjusted_rank - b.adjusted_rank);
-  return { podium: sorted.slice(0, 3), rest: sorted.slice(3) };
+): { podium: AttachmentResult[]; rest: AttachmentResult[]; unevaluated: AttachmentResult[] } => {
+  const sorted = ranking.filter((r) => !r.unevaluated).sort((a, b) => a.adjusted_rank - b.adjusted_rank);
+  return { podium: sorted.slice(0, 3), rest: sorted.slice(3), unevaluated: ranking.filter((r) => r.unevaluated) };
 };
 
 export const shareUrl = (origin: string, eventId: string): string => `${origin}/events/${eventId}`;
