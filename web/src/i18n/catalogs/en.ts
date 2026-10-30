@@ -716,6 +716,14 @@ export const en: Catalog = {
       text: 'The final ranking is calculated and becomes visible to everyone. No one will be able to vote afterwards.',
       missingTitle: '{missing} of {total} rankings are missing',
       missingText: 'With few votes the result is less reliable. Anyone who didn\'t send their ranking gets a quality of 0 and their proposal moves down.',
+      unevaluatedTitle: plural({
+        one: '{count} proposal has no reviews yet',
+        other: '{count} proposals have no reviews yet',
+      }),
+      unevaluatedText: plural({
+        one: 'If you publish now, it will have no position in the ranking.',
+        other: 'If you publish now, they will have no position in the ranking.',
+      }),
       error: 'We couldn\'t publish the results. Try again.',
       wait: 'Keep waiting',
       confirmAnyway: 'Publish anyway',
@@ -974,7 +982,7 @@ export const en: Catalog = {
     ranking: 'Full ranking',
     you: 'You',
     evaluations: plural({ one: '{count} review', other: '{count} reviews' }),
-    note: "The score combines every participant's ranking on a 0 to 10 scale. The proposal of anyone who reviewed consistently moves up; otherwise it moves down.",
+    note: "The score combines every participant's ranking on a 0 to 10 scale. The proposal of anyone whose ranking was close to the overall one moves up; it moves down if theirs differed a lot or they didn't submit it.",
     loading: 'Loading results…',
     error: "We couldn't load the results.",
     unevaluated: {

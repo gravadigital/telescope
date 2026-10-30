@@ -54,6 +54,16 @@ export const votingProgress = (
   return { sent, total, missing: Math.max(total - sent, 0), complete: total > 0 && sent === total };
 };
 
+/**
+ * Propuestas que todavía no recibieron ningún voto. Si se publica así, quedan sin posición en
+ * el ranking. Sin `attachments_with_votes` (API vieja) no se puede saber: 0.
+ */
+export const unevaluatedProposals = (
+  proposalCount: number,
+  s: Pick<VotingStatistics, 'attachments_with_votes'>
+): number =>
+  s.attachments_with_votes === undefined ? 0 : Math.max(proposalCount - s.attachments_with_votes, 0);
+
 export type ManagePillKey =
   | 'manage.pill.draft'
   | 'manage.pill.open'

@@ -39,6 +39,7 @@ import {
   stageNameKey,
   stageStatus,
   transitionDialog,
+  unevaluatedProposals,
   votingProgress,
 } from '../../domain';
 import type { ManageStage, TransitionDialog } from '../../domain';
@@ -904,6 +905,7 @@ const ManageEventPage: React.FC = () => {
           open={openDialog === 'publishResults'}
           eventId={event.id}
           progress={progress}
+          unevaluated={rosterReady && stats.data ? unevaluatedProposals(proposals.length, stats.data) : 0}
           onClose={closeDialog}
           onDone={() => finishDialog('manage.success.resultsPublished', undefined, true)}
         />

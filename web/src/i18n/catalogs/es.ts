@@ -716,6 +716,14 @@ export const es = {
       text: 'Se calcula el ranking final y queda visible para todos. Nadie podrá votar después.',
       missingTitle: 'Faltan {missing} de {total} rankings',
       missingText: 'Con pocos votos el resultado es menos confiable. Quien no envió su ranking queda con calidad 0 y su propuesta baja posiciones.',
+      unevaluatedTitle: plural({
+        one: '{count} propuesta todavía no tiene evaluaciones',
+        other: '{count} propuestas todavía no tienen evaluaciones',
+      }),
+      unevaluatedText: plural({
+        one: 'Si publicas ahora, queda sin posición en el ranking.',
+        other: 'Si publicas ahora, quedan sin posición en el ranking.',
+      }),
       error: 'No pudimos publicar los resultados. Intenta de nuevo.',
       wait: 'Seguir esperando',
       confirmAnyway: 'Publicar igual',
@@ -974,7 +982,7 @@ export const es = {
     ranking: 'Ranking completo',
     you: 'Tú',
     evaluations: plural({ one: '{count} evaluación', other: '{count} evaluaciones' }),
-    note: 'El puntaje combina los rankings de todos los participantes, en una escala de 0 a 10. La propuesta de quien evaluó con coherencia sube posiciones; la de quien no, baja.',
+    note: 'El puntaje combina los rankings de todos los participantes, en una escala de 0 a 10. La propuesta de quien ordenó parecido al ranking general sube posiciones; la de quien se alejó mucho o no envió su ranking, baja.',
     loading: 'Cargando resultados…',
     error: 'No pudimos cargar los resultados.',
     unevaluated: {

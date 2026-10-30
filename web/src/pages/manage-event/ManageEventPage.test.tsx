@@ -682,6 +682,17 @@ describe('ManageEventPage', () => {
       );
     });
 
+    it('avisa al publicar si hay propuestas sin evaluaciones', async () => {
+      getEvent.mockResolvedValue(voting);
+      getStats.mockResolvedValue({ ...stats, attachments_with_votes: 1 });
+      renderPage();
+      await screen.findByText('Faltan 3 de 4 rankings.');
+      userEvent.click(screen.getByRole('button', { name: 'Cerrar votación y publicar' }));
+      const dialog = screen.getByRole('alertdialog', { name: '¿Cerrar votación y publicar?' });
+      expect(within(dialog).getByText('2 propuestas todavía no tienen evaluaciones')).toBeInTheDocument();
+      expect(within(dialog).getByText('Si publicas ahora, quedan sin posición en el ranking.')).toBeInTheDocument();
+    });
+
     it('TS-67: recordatorio de archivo de punta a punta', async () => {
       sendReminder.mockResolvedValue({ type: 'file', recipients_count: 1 });
       renderPage();

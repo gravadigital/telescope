@@ -14,11 +14,18 @@ const apiErr = (status: number, code: string) => new ApiError({ status, body: { 
 const missing: VotingProgress = { sent: 1, total: 4, missing: 3, complete: false };
 const complete: VotingProgress = { sent: 4, total: 4, missing: 0, complete: true };
 
-const setup = (progress: VotingProgress = missing) => {
+const setup = (progress: VotingProgress = missing, unevaluated?: number) => {
   const onClose = jest.fn();
   const onDone = jest.fn();
   renderWithProviders(
-    <PublishResultsDialog open eventId="e-1" progress={progress} onClose={onClose} onDone={onDone} />
+    <PublishResultsDialog
+      open
+      eventId="e-1"
+      progress={progress}
+      unevaluated={unevaluated}
+      onClose={onClose}
+      onDone={onDone}
+    />
   );
   return { onClose, onDone };
 };
@@ -74,6 +81,15 @@ describe('PublishResultsDialog', () => {
     expect(screen.getByRole('alertdialog')).toHaveAccessibleDescription(
       'Se calcula el ranking final y queda visible para todos. Nadie podrá votar después.'
     );
+  });
+
+  it('avisa de las propuestas sin evaluaciones aunque no falten rankings', () => {
+    setup(complete, 1);
+    const dialog = screen.getByRole('alertdialog');
+    expect(within(dialog).getByText('1 propuesta todavía no tiene evaluaciones')).toBeInTheDocument();
+    expect(within(dialog).getByText('Si publicas ahora, queda sin posición en el ranking.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Publicar igual' })).toBeInTheDocument();
+    expect(dialog).toHaveAccessibleDescription(/^Se calcula el ranking final.*1 propuesta todavía no tiene evaluaciones/);
   });
 
   it('TS-47: error de publicación', async () => {

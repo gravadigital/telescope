@@ -42,7 +42,7 @@ const results: VotingResults = {
 };
 
 const NOTE =
-  'El puntaje combina los rankings de todos los participantes, en una escala de 0 a 10. La propuesta de quien evaluó con coherencia sube posiciones; la de quien no, baja.';
+  'El puntaje combina los rankings de todos los participantes, en una escala de 0 a 10. La propuesta de quien ordenó parecido al ranking general sube posiciones; la de quien se alejó mucho o no envió su ranking, baja.';
 
 describe('EventResults', () => {
   beforeEach(() => {
