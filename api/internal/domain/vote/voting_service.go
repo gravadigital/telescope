@@ -156,7 +156,7 @@ func (vs *VotingService) CalculateModifiedBordaCount(eventID uuid.UUID, config *
 	for _, attachment := range attachments {
 		attachmentVotes := votesByAttachment[attachment.GetID()]
 
-		// Calculate MBC(f_j) = (1/(m(m-1))) * Σ(m - R_i(f_j))
+		// Calculate MBC(f_j) = (1/(v_j(m-1))) * Σ(m - R_i(f_j)), with v_j the votes f_j received
 		var mbcSum float64
 		voteCount := len(attachmentVotes)
 
@@ -166,8 +166,12 @@ func (vs *VotingService) CalculateModifiedBordaCount(eventID uuid.UUID, config *
 			mbcSum += bordaPoints
 		}
 
-		// Normalize by m(m-1) to ensure 0 ≤ MBC ≤ 1
-		mbcScore := mbcSum / (float64(m) * float64(m-1))
+		// Average over the votes actually received, so the score does not depend on how many
+		// evaluators the assignment gave this attachment or whether they voted. 0 ≤ MBC ≤ 1.
+		var mbcScore float64
+		if voteCount > 0 {
+			mbcScore = mbcSum / (float64(voteCount) * float64(m-1))
+		}
 
 		// Calculate average rank for additional insight
 		var averageRank float64
@@ -191,15 +195,11 @@ func (vs *VotingService) CalculateModifiedBordaCount(eventID uuid.UUID, config *
 	}
 
 	// Sort by MBC score (highest first) to create global ranking G
-	// In case of ties, use vote count as tiebreaker for deterministic ordering
+	// Ties fall back to attachment ID for deterministic ordering. Vote count is not a
+	// tiebreaker: how many evaluators an attachment got says nothing about its merit.
 	sort.Slice(results, func(i, j int) bool {
 		if results[i].MBCScore == results[j].MBCScore {
-			// More votes wins in case of tie
-			if results[i].VoteCount == results[j].VoteCount {
-				// If still tied, use attachment ID for deterministic order
-				return results[i].AttachmentID.String() < results[j].AttachmentID.String()
-			}
-			return results[i].VoteCount > results[j].VoteCount
+			return results[i].AttachmentID.String() < results[j].AttachmentID.String()
 		}
 		return results[i].MBCScore > results[j].MBCScore
 	})
@@ -239,7 +239,9 @@ func (vs *VotingService) CalculateModifiedBordaCount(eventID uuid.UUID, config *
 	return votingResults, nil
 }
 
-// calculateParticipantQualities implements Q_i = 1 - (2/(m(m-1))) * Σ|R_i(f_j) - RelativeRank_G(f_j, A(p_i))|
+// calculateParticipantQualities implements Q_i = 1 - (1/⌊m²/2⌋) * Σ|R_i(f_j) - RelativeRank_G(f_j, A(p_i))|
+// (Merrifield & Saari 2009). ⌊m²/2⌋ is the largest possible deviation, reached by ranking the
+// subset in exactly the reverse order, so Q_i spans [0,1] without clamping.
 func (vs *VotingService) calculateParticipantQualities(eventID uuid.UUID, globalResults []AttachmentResult, m int) (map[string]float64, error) {
 	assignments, err := vs.voteRepo.GetAssignmentsByEventID(eventID.String())
 	if err != nil {
@@ -303,10 +305,10 @@ func (vs *VotingService) calculateParticipantQualities(eventID uuid.UUID, global
 			continue
 		}
 
-		// Q_i = 1 - (2/(m(m-1))) * Σ|R_i(f_j) - RelativeRank_G(f_j, A(p_i))|
-		quality := 1.0 - (2.0/(float64(m)*float64(m-1)))*deviationSum
+		// Q_i = 1 - (1/⌊m²/2⌋) * Σ|R_i(f_j) - RelativeRank_G(f_j, A(p_i))|
+		quality := 1.0 - deviationSum/float64(maxRankDeviation(m))
 
-		// Clamp quality to [0, 1]
+		// Clamp quality to [0, 1] as a safety net (e.g. duplicated votes)
 		if quality < 0 {
 			quality = 0
 		}
@@ -318,6 +320,12 @@ func (vs *VotingService) calculateParticipantQualities(eventID uuid.UUID, global
 	}
 
 	return qualities, nil
+}
+
+// maxRankDeviation returns ⌊m²/2⌋, the largest Σ|R_i - RelativeRank| over m items:
+// the deviation of a ranking that is the exact reverse of the consensus.
+func maxRankDeviation(m int) int {
+	return m * m / 2
 }
 
 // calculateRelativeRanks computes the relative ranking within a subset A(p_i)
