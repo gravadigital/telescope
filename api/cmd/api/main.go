@@ -33,6 +33,13 @@ func main() {
 
 	log.Info("starting telescope api", "version", version)
 
+	if err := cfg.Validate(); err != nil {
+		log.Fatal("Invalid configuration", "error", err)
+	}
+	if err := auth.SetSecret(cfg.Auth.JWTSecret); err != nil {
+		log.Fatal("Failed to configure authentication", "error", err)
+	}
+
 	gin.SetMode(cfg.Server.GinMode)
 
 	db, err := postgres.Connect(cfg)

@@ -121,8 +121,8 @@ Relevada del código, para que no se confunda con decisión de diseño:
 8. **Código sin `gofmt`**: hay bloques con indentación rota que hacen difícil leer el
    control de flujo (por ejemplo `event_handler.go:196-207`, cuya lógica es correcta pero
    parece rota). `_base` exige `gofumpt`.
-9. **JWT secret con default hardcodeado**: si falta `JWT_SECRET` arranca igual con
-   `"telescopio-dev-secret-change-in-production"` y solo imprime un warning.
+9. ~~**JWT secret con default hardcodeado**~~ — **corregido**: sin `JWT_SECRET` el servicio
+   no arranca (ver la convención `auth-jwt`).
 10. **El CHECK `future_start_date` bloquea editar eventos viejos**: se reevalúa en todo `UPDATE`
     de la fila (aunque sea `NOT VALID`), así que `PATCH /events/:event_id` —y también el cambio
     de etapa, pausar y cancelar— responde `500` si `start_date` es anterior a ayer. Verificado por

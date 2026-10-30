@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"strconv"
 
@@ -60,6 +61,10 @@ type Config struct {
 	Google struct {
 		ClientID string
 	}
+
+	Auth struct {
+		JWTSecret string // no default: Validate rejects an empty one
+	}
 }
 
 // Load loads configuration from environment variables
@@ -105,8 +110,18 @@ func Load() *Config {
 	config.Email.FromName = getEnv("EMAIL_FROM_NAME", "Telescopio")
 	config.Email.Secure = getEnvAsBool("SMTP_SECURE", false)
 	config.Google.ClientID = getEnv("GOOGLE_CLIENT_ID", "")
+	config.Auth.JWTSecret = getEnv("JWT_SECRET", "")
 
 	return config
+}
+
+// Validate checks the settings the API cannot run without. It is separate from Load because
+// other binaries (cmd/migrate) load the same config but do not need them.
+func (c *Config) Validate() error {
+	if c.Auth.JWTSecret == "" {
+		return errors.New("JWT_SECRET is required: set it to a long random value (the Makefile and deploy/docker-compose.yml set one for local development)")
+	}
+	return nil
 }
 
 // GetDatabaseURL returns the database connection URL

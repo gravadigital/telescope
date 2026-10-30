@@ -3,7 +3,6 @@ package auth
 import (
 	"errors"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -12,17 +11,19 @@ import (
 	"github.com/gravadigital/telescopio-api/internal/domain/participant"
 )
 
-// JWT secret key - should be loaded from environment variable
+// jwtSecret signs and verifies tokens. It has no default: main sets it from JWT_SECRET via
+// SetSecret before serving, and the service refuses to start without one.
 var jwtSecret []byte
 
-func init() {
-	// Get JWT secret from environment, use default for development
-	secret := os.Getenv("JWT_SECRET")
+var errNoSecret = errors.New("jwt secret is not configured")
+
+// SetSecret sets the key used to sign and verify tokens. An empty secret is rejected.
+func SetSecret(secret string) error {
 	if secret == "" {
-		secret = "telescopio-dev-secret-change-in-production"
-		fmt.Println("⚠️  WARNING: Using default JWT secret. Set JWT_SECRET environment variable in production!")
+		return errNoSecret
 	}
 	jwtSecret = []byte(secret)
+	return nil
 }
 
 // Claims represents the JWT claims
@@ -35,6 +36,10 @@ type Claims struct {
 
 // GenerateToken generates a JWT token for a user
 func GenerateToken(userID uuid.UUID, email string, role participant.Role) (string, error) {
+	if len(jwtSecret) == 0 {
+		return "", errNoSecret
+	}
+
 	// Token expires in 24 hours
 	expirationTime := time.Now().Add(24 * time.Hour)
 
@@ -67,6 +72,9 @@ func ValidateToken(tokenString string) (*Claims, error) {
 		// Verify signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		if len(jwtSecret) == 0 {
+			return nil, errNoSecret
 		}
 		return jwtSecret, nil
 	})

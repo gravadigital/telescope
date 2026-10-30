@@ -468,7 +468,7 @@ y porque son el insumo directo de los primeros requerimientos de corrección.
 | D-09 | **La fórmula del recomendado está implementada dos veces**, en el front (para sugerir) y en el back (para validar y rechazar). Si una cambia y la otra no, el organizador ve un valor recomendado que el backend rechaza | Media | `VotingConfigurationPanel.tsx:25-31` vs `voting_service.go:48-68` |
 | D-10 | **Una propuesta puede quedar por debajo de `min_evaluations_per_file`.** La fase 1 respeta el tope `m` por participante y saltea a quien ya llegó, así que la cobertura mínima cede si no hay evaluadores elegibles. Es un trade-off deliberado: excederlo haría fallar el trigger | Media (documentado) | `voting_service.go` fase 1 |
 | ~~D-11~~ | **`GET /distributed-results` muta estado** (recalculaba el MBC en cada llamada) — **CORREGIDO 2026-09-28:** el GET público es de solo lectura (`GetStoredResults`); el cálculo ocurre una vez al entrar a la etapa `results` y en `POST .../distributed-results/recalculate` (autenticado) | ~~Media~~ **Corregido** | `api/internal/handlers/distributed_vote_handler.go` |
-| D-12 | **JWT_SECRET con default hardcodeado.** Si falta la variable, el servicio arranca con un secreto conocido y solo emite un warning | Crítica | `api/internal/middleware/auth/jwt.go:20-26` |
+| ~~D-12~~ | **JWT_SECRET con default hardcodeado.** Si falta la variable, el servicio arranca con un secreto conocido y solo emite un warning — **CORREGIDO 2026-10-30:** sin `JWT_SECRET` la API no arranca (`Config.Validate`) y `auth` no tiene default | ~~Crítica~~ **Corregido** | `api/internal/middleware/auth/jwt.go:20-26` |
 | D-13 | **Sin rutas protegidas ni ruta 404.** `/events/create` y `/events/:eventId/manage` son alcanzables por URL sin sesión. Una URL desconocida renderiza la navbar sobre contenido vacío | Media | `web/src/App.tsx:177-184` |
 | D-14 | **El health check de `Auth` está hardcodeado en `true`.** El aviso de API no disponible es código inalcanzable | Baja | `web/src/components/auth/Auth.tsx:30-36` |
 | D-15 | **Los evaluadores no pueden abrir las propuestas que tienen que rankear.** `canDownload` permite la descarga al dueño, al autor del evento y a un `admin`, pero no a quien tiene la propuesta en su asignación. Además, `RankingVotePanel` la abre con un `<a href>` sin token y con la URL `http://localhost:8080` fija. Bloquea el flujo de evaluación. **Parte `api` resuelta en S-007** (el evaluador descarga lo asignado, con nombre neutro); pendiente la parte `web` | Crítica | `api/internal/handlers/attachment_handler.go:canDownload`; `web/src/components/ranking-vote-panel/RankingVotePanel.tsx:242` |
@@ -496,7 +496,7 @@ y porque son el insumo directo de los primeros requerimientos de corrección.
 
 | ID | Requerimiento | Estado |
 |----|---------------|--------|
-| NFR-S-01 | Autenticación por JWT HS256 con vigencia de 24 horas | **Implementado** — ⚠️ pero ver D-12 (secreto por default) |
+| NFR-S-01 | Autenticación por JWT HS256 con vigencia de 24 horas | **Implementado**. El secreto es obligatorio (D-12 corregido) |
 | NFR-S-02 | Contraseñas con bcrypt DefaultCost, mínimo 8 caracteres | **Implementado** |
 | NFR-S-03 | Autorización compuesta por middlewares declarados en la ruta: `RequireEventOwner`, `RequireEventOwnerOrOrganizer`, `RequireParticipantOrOwner` | **Implementado** — ⚠️ el rol global `admin` saltea todas |
 | NFR-S-04 | El conflicto de interés se valida en dos capas independientes (Go y trigger de Postgres) | **Implementado** — es defensa en profundidad deliberada |
