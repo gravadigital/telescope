@@ -1,14 +1,24 @@
 .cev-page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-stack-md);
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: var(--space-padding-default) var(--space-padding-compact);
+  gap: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 32px 16px 0;
   box-sizing: border-box;
   min-width: 0;
 }
-
+.cev-page > :not(.cev-head) {
+  width: 100%;
+  max-width: 1168px;
+  align-self: center;
+}
+.cev-head {
+  width: 100%;
+  max-width: 1168px;
+  align-self: center;
+}
 .cev-sr-only {
   position: absolute;
   width: 1px;
@@ -30,24 +40,30 @@
   padding: 0;
   list-style: none;
   font: var(--type-caption);
-  color: var(--text-secondary);
+  color: #9AA6BF;
 }
 .cev-breadcrumb__list a {
-  color: var(--text-action);
+  color: #CFC9F7;
+  text-decoration: none;
 }
 
 .cev-title {
   margin: 0;
-  font: var(--type-heading-l);
-  color: var(--text-primary);
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0B1020;
 }
 
 .cev-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-inline-sm) var(--space-inline-md);
+  padding: 8px 0 16px;
+  background: transparent;
+  color: #0B1020;
 }
 
 .cev-draft-state {
@@ -56,7 +72,7 @@
   gap: var(--space-inline-sm);
   margin: 0;
   font: var(--type-caption);
-  color: var(--text-success);
+  color: #7FE0B0;
   white-space: nowrap;
 }
 
@@ -66,92 +82,96 @@
   flex: none;
 }
 
-/* Indicador de pasos: mobile = barra compacta + "Paso N de 3"; desde 768px, etiquetas. */
-.cev-steps__list {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  list-style: none;
+/* Indicador de pasos: mobile = lista horizontal de pastillas con scroll; desktop = columna vertical. */
+.cev-steps {
+  min-width: 0;
+  width: 100%;
+  padding: 14px 16px;
+  background: transparent;
 }
-.cev-steps__compact {
+.cev-steps__list {
   display: flex;
   align-items: center;
-  gap: var(--space-inline-md);
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.cev-steps__list::-webkit-scrollbar {
+  display: none;
+}
+.cev-steps__compact {
+  display: none;
 }
 .cev-steps__bar {
-  display: flex;
-  flex: 1;
-  gap: var(--space-inline-sm);
+  display: none;
 }
 .cev-steps__segment {
-  flex: 1;
-  height: var(--space-inline-sm);
-  border-radius: var(--radius-pill);
-  background: var(--bg-disabled);
-}
-.cev-steps__segment--on {
-  background: var(--bg-action-primary);
+  display: none;
 }
 .cev-steps__compact-text {
-  font: var(--type-ui);
-  color: var(--text-secondary);
-  white-space: nowrap;
+  display: none;
 }
 .cev-steps__item {
   display: flex;
   align-items: center;
-  gap: var(--space-inline-sm);
-  font: var(--type-ui);
-  color: var(--text-muted);
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
+  border-radius: 999px;
+  background: #fff;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: #39414D;
+  border: 1.5px solid #E1E5EC;
 }
 .cev-steps__marker {
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  width: var(--space-padding-default);
-  height: var(--space-padding-default);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-pill);
-  background: var(--bg-surface);
-  font: var(--type-caption);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #6E5BF2;
+  font-size: 12px;
+  font-weight: 800;
   line-height: 1;
-  color: var(--text-muted);
+  color: #fff;
+  border: none;
 }
 .cev-steps__text {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-inline-sm);
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.2;
 }
 .cev-steps__item--current {
-  color: var(--text-primary);
+  background: #EAE7F9;
+  border-color: #6E5BF2;
+  color: #4B3FA8;
   font-weight: 700;
+}
+.cev-steps__item--current .cev-steps__label {
+  color: #4B3FA8;
 }
 .cev-steps__item--current .cev-steps__marker,
 .cev-steps__item--done .cev-steps__marker {
-  border-color: var(--bg-action-primary);
-  background: var(--bg-action-primary);
+  border-color: #6E5BF2;
+  background: #6E5BF2;
   color: var(--text-inverse);
 }
 .cev-steps__item--done {
   color: var(--text-action);
 }
-/* "En curso" solo para lectores de pantalla: el paso actual se distingue por el marcador relleno. */
+/* "En curso" visible bajo el paso actual. */
 .cev-steps__state {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
+  font-size: 11px;
+  font-weight: 400;
+  color: #4B3FA8;
+  line-height: 1.2;
 }
 .cev-steps__button {
   display: inline-flex;
@@ -172,15 +192,14 @@
   cursor: default;
 }
 .cev-steps__check {
-  width: var(--space-inline-md);
-  height: var(--space-inline-md);
+  width: 12px;
+  height: 12px;
 }
 
 /* Asistente */
 .cev-form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-stack-lg);
   min-width: 0;
 }
 .cev-wizard {
@@ -197,23 +216,27 @@
   min-width: 0;
 }
 .cev-main {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-surface);
-  padding: var(--space-padding-default);
+  background: #fff;
+  border: 1px solid #E1E5EC;
+  border-radius: 18px;
+  padding: 22px 18px;
 }
 .cev-eyebrow {
-  display: none;
+  display: block;
   margin: 0;
-  font: var(--type-eyebrow);
-  letter-spacing: var(--type-tracking-wide);
+  font-family: var(--ref-font-family-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-action);
+  color: #4B3FA8;
 }
 .cev-question {
   margin: 0;
-  font: var(--type-heading-m);
-  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0B1020;
 }
 .cev-question:focus {
   outline: none;
@@ -235,8 +258,6 @@
   color: var(--text-secondary);
 }
 
-/* Cards: el contenido principal. La vista previa ya trae su propia Card. */
-
 /* Consejo en card oscura, como el diseño de referencia. */
 .cev-tip .ui-callout--info {
   background: #101014;
@@ -250,7 +271,7 @@
   color: rgba(241, 241, 246, 0.75);
 }
 
-/* Resumen */
+/* Resumen agrupado por sección */
 .cev-summary {
   display: flex;
   flex-direction: column;
@@ -259,18 +280,40 @@
   border-radius: var(--radius-surface);
   background: var(--bg-surface);
 }
-.cev-summary__row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: start;
-  gap: var(--space-inline-sm) var(--space-inline-md);
+.cev-summary__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-sm);
   padding: var(--space-padding-compact);
 }
-.cev-summary__row + .cev-summary__row {
+.cev-summary__section + .cev-summary__section {
   border-top: 1px solid var(--border-default);
 }
+.cev-summary__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-inline-md);
+}
+.cev-summary__title {
+  margin: 0;
+  font: var(--type-eyebrow);
+  letter-spacing: var(--type-tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-action);
+}
+.cev-summary__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-stack-sm);
+  margin: 0;
+}
+.cev-summary__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 .cev-summary dt {
-  grid-column: 1 / -1;
   font: var(--type-caption);
   color: var(--text-secondary);
 }
@@ -288,52 +331,133 @@
   display: none;
 }
 
-/* Acciones: mobile = barra fija abajo (Atrás 4/12 + Siguiente 8/12, Borrador y Cancelar debajo). */
+/* Acciones dentro de la tarjeta: navegación a la izquierda, guardar y avanzar juntos. */
 .cev-actions {
-  position: sticky;
-  bottom: 0;
-  margin: 0 calc(-1 * var(--space-padding-compact));
-  background: var(--bg-surface);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-stack-sm) var(--space-inline-sm);
+  margin-top: var(--space-stack-md);
+  padding-top: var(--space-stack-md);
   border-top: 1px solid var(--border-default);
 }
-.cev-actions__inner {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: var(--space-stack-sm) var(--space-inline-md);
-  padding: var(--space-padding-compact);
-}
-.cev-actions__back {
+.cev-actions__start {
   grid-row: 1;
-  grid-column: span 4;
-}
-.cev-actions__next {
-  grid-row: 1;
-  grid-column: span 8;
-}
-.cev-actions__next--alone {
-  grid-column: 1 / -1;
-}
-.cev-actions__draft {
-  grid-row: 2;
-  grid-column: 1 / -1;
-}
-.cev-actions__cancel {
-  grid-row: 3;
-  grid-column: 1 / -1;
+  grid-column: 1;
   display: flex;
+  align-items: center;
+  gap: var(--space-inline-sm);
+  justify-self: start;
+}
+.cev-actions__end {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-inline-sm);
+  min-width: 0;
+  grid-row: 1;
+  grid-column: 2;
+}
+.cev-actions__next.ui-button {
+  min-width: 0;
+  width: auto;
+  background: #6E5BF2;
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  min-height: 48px;
+  height: auto;
+  padding: 8px 16px;
+  border-radius: 12px;
+  border: none;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
 }
+.cev-actions__draft.ui-button {
+  min-width: 0;
+  padding: 8px 12px;
+  background: #fff;
+  color: #0B1020;
+  font-weight: 600;
+  font-size: 15px;
+  height: 48px;
+  border-radius: 12px;
+  border: 1.5px solid #D3D9E2;
+}
+.cev-actions__cancel.ui-button,
+.cev-actions__back.ui-button {
+  min-width: 0;
+  padding: 0 var(--ref-space-xs);
+  color: #39414D;
+  font-weight: 600;
+  font-size: 15px;
+  height: 48px;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
+}
+.cev-actions__draft.ui-button,
+.cev-actions__next.ui-button {
+  white-space: normal;
+  line-height: 1.2;
+  text-align: center;
+}
+.cev-actions__cancel.ui-button:hover:not(:disabled),
+.cev-actions__back.ui-button:hover:not(:disabled) {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
 
-@media (min-width: 768px) {
+@media (max-width: 600px) {
+  .cev-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cev-actions__start {
+    grid-row: 1;
+    grid-column: 1;
+  }
+  .cev-actions__end {
+    grid-row: 2;
+    grid-column: 1;
+  }
+  .cev-actions__end > .ui-button {
+    flex: 1 1 0;
+  }
+  .cev-actions__draft.ui-button,
+  .cev-actions__next.ui-button {
+    padding-right: 6px;
+    padding-left: 6px;
+    font-size: 13px;
+  }
+}
+
+@media (min-width: 1360px) {
   .cev-page {
-    padding: var(--space-padding-spacious) var(--space-padding-default);
+    padding: 40px 120px 0;
+    max-width: none;
+  }
+  .cev-page > :not(.cev-head) {
+    width: 100%;
+    max-width: none;
+  }
+  .cev-head {
+    height: auto;
+    padding: 8px 0 16px;
   }
   /* Pasos en columna lateral, como el diseño de referencia. */
   .cev-body {
     display: grid;
-    grid-template-columns: 240px minmax(0, 1fr);
-    gap: var(--space-stack-lg);
+    grid-template-columns: 240px 1fr 340px;
+    gap: 32px;
     align-items: start;
+  }
+  .cev-steps {
+    padding: 0;
+  }
+  .cev-wizard {
+    grid-column: 2 / 4;
   }
   .cev-steps__list {
     position: static;
@@ -354,10 +478,22 @@
   .cev-steps__item {
     padding: var(--space-padding-compact);
     border-radius: var(--radius-surface);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-color: transparent;
+    background: transparent;
   }
   .cev-steps__item--current {
-    background: var(--bg-surface);
-    border: 1px solid var(--border-default);
+    background: #fff;
+    border: 1px solid #DDE2EA;
+  }
+  .cev-steps__item--current .cev-steps__label {
+    color: var(--text-primary);
+  }
+  .cev-steps__marker {
+    width: var(--space-padding-default);
+    height: var(--space-padding-default);
   }
   .cev-steps__text {
     flex-direction: column;
@@ -385,43 +521,21 @@
   }
   .cev-wizard {
     display: grid;
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    column-gap: var(--space-stack-lg);
+    grid-template-columns: minmax(0, 1fr) 340px;
+    column-gap: 32px;
     align-items: start;
   }
   .cev-main {
-    grid-column: span 7;
+    grid-column: 1;
+    background: #fff;
+    border: 1px solid #E1E5EC;
+    border-radius: 18px;
+    padding: 36px;
   }
   .cev-aside {
-    grid-column: span 5;
+    grid-column: 2;
   }
-  /* Barra de acciones como caja dentro del contenedor. */
   .cev-actions {
-    position: static;
-    margin: 0;
-    padding: var(--space-padding-compact) var(--space-padding-default);
-    background: var(--bg-surface);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-surface);
-  }
-  .cev-actions__inner {
-    margin: 0;
-    padding: 0;
-  }
-  .cev-actions__cancel {
-    grid-row: 1;
-    grid-column: 1 / span 3;
-    justify-content: flex-start;
-  }
-  .cev-actions__back {
-    grid-column: 4 / span 2;
-  }
-  .cev-actions__draft {
-    grid-row: 1;
-    grid-column: 6 / span 3;
-  }
-  .cev-actions__next,
-  .cev-actions__next--alone {
-    grid-column: 9 / span 4;
+    margin-top: 0;
   }
 }

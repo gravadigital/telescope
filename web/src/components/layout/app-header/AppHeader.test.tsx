@@ -74,13 +74,23 @@ describe('AppHeader', () => {
       within(menu).getByRole('menuitem', { name: 'Notificaciones' }),
       within(menu).getByRole('menuitem', { name: 'Cerrar sesión' }),
     ];
-    expect(Array.from(menu.children)).toEqual(items);
     expect(items.map((i) => i.textContent)).toEqual(['Mis eventos', 'Notificaciones', 'Cerrar sesión']);
     expect(items.map((i) => i.getAttribute('role'))).toEqual([
       'menuitem',
       'menuitem',
       'menuitem',
     ]);
+    expect(within(menu).getByRole('menuitemradio', { name: 'Español' })).toHaveAttribute('aria-checked', 'true');
+    expect(within(menu).getByRole('menuitemradio', { name: 'English' })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('el menú de usuario permite cambiar idioma en responsive', () => {
+    renderWithProviders(<AppHeader />, { locale: 'es', auth: member });
+    userEvent.click(screen.getByRole('button', { name: 'Menú de usuario de Ana Pérez' }));
+    userEvent.click(screen.getByRole('menuitemradio', { name: 'English' }));
+    expect(document.documentElement.lang).toBe('en');
+    expect(screen.getByRole('link', { name: 'Events' })).toBeInTheDocument();
+    expect(localStorage.getItem('telescopio_locale')).toBe('"en"');
   });
 
   it('TS-37: cambia el idioma desde el selector junto al usuario', () => {
@@ -136,10 +146,26 @@ describe('AppHeader', () => {
       'Inicio',
       'Eventos',
       'Cómo funciona',
+      'Crear cuenta',
     ]);
     userEvent.click(within(menu).getByRole('menuitem', { name: 'Eventos' }));
     expect(screen.getByTestId('location')).toHaveTextContent('/events');
     expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  it('TS-40: login queda visible y el registro pasa al menú mobile', () => {
+    renderWithProviders(<AppHeader />, { locale: 'es', auth: guest });
+    expect(screen.getByRole('link', { name: 'Iniciar sesión' })).toHaveAttribute('href', '/login');
+    userEvent.click(screen.getByRole('button', { name: 'Menú' }));
+    const menu = screen.getByRole('menu', { name: 'Navegación principal' });
+    userEvent.click(within(menu).getByRole('menuitemradio', { name: 'English' }));
+    expect(document.documentElement.lang).toBe('en');
+
+    userEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    const englishMenu = screen.getByRole('menu', { name: 'Main navigation' });
+    expect(within(englishMenu).getByRole('menuitem', { name: 'Sign up' })).toBeInTheDocument();
+    userEvent.click(within(englishMenu).getByRole('menuitem', { name: 'Sign up' }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/register');
   });
 });
 
@@ -153,22 +179,37 @@ describe('AppHeader.css', () => {
   const rule = (source: string, selector: string) =>
     new RegExp(`${selector.replace(/\./g, '\\.')}\\s*\\{([^}]*)\\}`).exec(source)?.[1] ?? '';
 
-  it('TS-41: mobile primero, un solo corte a 768px', () => {
+  it('TS-41: mobile primero, navegación completa desde 900px', () => {
     expect(rule(base, '.ly-header__menu-toggle')).toMatch(/display:\s*inline-flex/);
     expect(rule(base, '.ly-header__links')).toMatch(/display:\s*none/);
     expect(rule(media, '.ly-header__menu-toggle')).toMatch(/display:\s*none/);
     expect(rule(media, '.ly-header__links')).toMatch(/display:\s*flex/);
     expect(css).not.toMatch(/@media[^{]*max-width/);
-    expect(media).toMatch(/@media \(min-width: 768px\)/);
+    expect(media).toMatch(/@media \(min-width: 900px\)/);
     expect(css).not.toMatch(/slot--notifications\s*\{[^}]*display:\s*none/);
   });
 
-  it('TS-41: el nombre del menú de usuario solo se ve desde 768px', () => {
+  it('TS-41: accesos móviles con un CTA principal y selector compacto', () => {
+    expect(rule(base, '.ly-header__inner')).toMatch(/display:\s*grid/);
+    expect(rule(base, '.ly-header__actions')).toMatch(/display:\s*contents/);
+    expect(rule(base, '.ly-header__inner')).toMatch(/grid-template-columns:\s*auto minmax\(0, 1fr\) auto/);
+    expect(rule(base, '.ly-header__auth')).toMatch(/display:\s*contents/);
+    expect(rule(base, '.ly-header__auth-link--login')).toMatch(/display:\s*inline-flex/);
+    expect(rule(base, '.ly-header__auth-link--login')).toMatch(/grid-column:\s*3/);
+    expect(rule(base, '.ly-header__auth-link--register')).toMatch(/display:\s*none/);
+    expect(rule(base, '.ly-header .ly-language-select__flag')).toMatch(/display:\s*none/);
+    expect(css).toMatch(/\.ly-header__actions > \.ui-menu\s*\{[^}]*grid-column:\s*3/);
+    expect(media).toMatch(/\.ly-header__actions\s*\{[^}]*display:\s*flex/);
+    expect(media).toMatch(/\.ly-header \.ly-language-select__flag\s*\{[^}]*display:\s*block/);
+    expect(media).toMatch(/\.ly-header__auth-link--register\s*\{[^}]*display:\s*inline-flex/);
+  });
+
+  it('TS-41: el nombre del menú de usuario también se ve en responsive', () => {
     const userCss = fs
       .readFileSync(path.join(__dirname, '../user-menu/UserMenu.css'), 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '');
-    const at = userCss.indexOf('@media');
-    expect(rule(userCss.slice(0, at), '.ly-user-menu__name')).toMatch(/display:\s*none/);
-    expect(rule(userCss.slice(at), '.ly-user-menu__name')).toMatch(/display:\s*inline/);
+    expect(rule(userCss, '.ly-user-menu__name')).toMatch(/display:\s*inline/);
+    expect(rule(userCss, '.ly-user-menu__name')).toMatch(/text-overflow:\s*ellipsis/);
+    expect(rule(userCss, '.ly-user-menu__name')).toMatch(/white-space:\s*nowrap/);
   });
 });

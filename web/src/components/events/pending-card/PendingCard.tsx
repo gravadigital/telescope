@@ -26,8 +26,16 @@ const PendingCard: React.FC<PendingCardProps> = ({ task }) => {
     detail = t('events.pending.closes', { date: fmt.date(deadline) });
   }
 
+  // "Ver ranking" es una acción secundaria en el rediseño; el resto, primaria.
+  const actionVariant = kind === 'results' ? 'ui-button--secondary' : 'ui-button--primary';
+
   return (
-    <Card as="article" variant="default" padding="compact" className="ev-pending-card">
+    <Card
+      as="article"
+      variant="default"
+      padding="compact"
+      className={`ev-pending-card ev-pending-card--${kind}`}
+    >
       <div className="ev-pending-card__body">
         <h3 className="ev-pending-card__title">{title}</h3>
         <p className="ev-pending-card__event">{event.name}</p>
@@ -35,7 +43,7 @@ const PendingCard: React.FC<PendingCardProps> = ({ task }) => {
       </div>
       <Link
         to={`/events/${event.id}`}
-        className="ui-button ui-button--sm ui-button--primary ev-pending-card__action"
+        className={`ui-button ui-button--sm ${actionVariant} ev-pending-card__action`}
       >
         {action}
       </Link>

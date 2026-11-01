@@ -282,6 +282,10 @@
     padding: var(--space-padding-default);
   }
 
+  .mep-notice:not(:empty) + .ev-stage-timeline--full {
+    margin-top: 0;
+  }
+
   .mep-metrics {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }

@@ -222,7 +222,7 @@ describe('OpenVotingDialog', () => {
     await screen.findByText('Propuestas');
     userEvent.click(confirmButton());
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'No pudimos abrir la votación. El evento sigue en Participación; intenta de nuevo.'
+      'No pudimos preparar la votación. Inténtalo de nuevo.'
     );
     expect(perReviewer()).toHaveValue(2);
     userEvent.click(confirmButton());

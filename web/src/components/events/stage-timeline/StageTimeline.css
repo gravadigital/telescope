@@ -2,10 +2,11 @@
    (viewport_override del screen.md). Desde 768px: 4 etapas en fila. */
 .ev-stage-timeline {
   box-sizing: border-box;
-  padding: var(--ref-space-md);
+  padding: var(--space-padding-default) var(--space-padding-spacious);
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-surface);
+  box-shadow: var(--shadow-raised);
   font: var(--type-body);
   color: var(--text-primary);
 }
@@ -20,7 +21,7 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  gap: var(--ref-space-md);
+  gap: var(--space-stack-md);
 }
 .ev-stage-timeline__list--compact {
   display: flex;
@@ -45,10 +46,10 @@
   flex: 1 1 0%;
   height: 5px;
   border-radius: 3px;
-  background: var(--ref-color-gray-200);
+  background: var(--ref-color-violet-300);
 }
 .ev-stage-timeline__item--completed .ev-stage-timeline__line {
-  background: var(--bg-success);
+  background: var(--ref-color-green-600);
 }
 .ev-stage-timeline__item--current .ev-stage-timeline__line {
   background: var(--ref-color-violet-500);
@@ -60,23 +61,26 @@
   transform: translate(-50%, -50%);
   display: grid;
   place-items: center;
-  width: 16px;
-  height: 16px;
+  width: 26px;
+  height: 26px;
   border-radius: var(--radius-pill);
   background: var(--ref-color-white);
-  border: 2px solid var(--ref-color-gray-300);
+  border: 2px solid var(--ref-color-violet-300);
   box-sizing: border-box;
-  color: var(--text-inverse);
+  color: var(--ref-color-violet-300);
+  font-size: var(--ref-font-size-2xs);
+  font-weight: var(--ref-font-weight-extrabold);
+  line-height: 1;
 }
 .ev-stage-timeline__item--completed .ev-stage-timeline__marker {
   width: 22px;
   height: 22px;
-  background: var(--bg-success);
+  background: var(--ref-color-green-600);
   color: var(--ref-color-white);
   border: 3px solid var(--ref-color-white);
   box-sizing: content-box;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: var(--ref-font-size-2xs);
+  font-weight: var(--ref-font-weight-extrabold);
   line-height: 1;
 }
 .ev-stage-timeline__item--current .ev-stage-timeline__marker {
@@ -85,28 +89,51 @@
   border: 0;
   background: var(--ref-color-violet-500);
   box-shadow: var(--ref-color-violet-100) 0 0 0 5px;
+  color: var(--ref-color-white);
 }
 .ev-stage-timeline__check {
   color: var(--ref-color-white);
   line-height: 1;
 }
-.ev-stage-timeline__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--ref-color-white);
+.ev-stage-timeline__index {
+  line-height: 1;
+}
+.ev-stage-timeline__eyebrow {
+  margin-bottom: -4px;
+  color: var(--ref-color-violet-700);
+  font-family: var(--ref-font-family-mono);
+  font-size: var(--ref-font-size-2xs);
+  font-weight: var(--ref-font-weight-semibold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.ev-stage-timeline__item--completed .ev-stage-timeline__eyebrow {
+  color: var(--ref-color-green-600);
+}
+.ev-stage-timeline__title {
+  display: flex;
+  align-items: center;
+  gap: var(--ref-space-xs);
+  min-width: 0;
 }
 .ev-stage-timeline__name {
-  font: var(--type-ui);
+  min-width: 0;
+  font: var(--ref-font-weight-bold) var(--ref-font-size-md)/var(--ref-font-leading-normal) var(--ref-font-family-base);
 }
 .ev-stage-timeline__item--pending .ev-stage-timeline__name {
-  color: var(--text-secondary);
+  color: var(--text-primary);
+  font-weight: var(--ref-font-weight-semibold);
 }
 .ev-stage-timeline__item--completed .ev-stage-timeline__name {
-  color: var(--text-success);
+  color: var(--ref-color-green-600);
 }
 .ev-stage-timeline__item--current .ev-stage-timeline__name {
   color: var(--ref-color-violet-700);
+}
+.ev-stage-timeline__name-check {
+  color: var(--ref-color-green-600);
+  font-weight: var(--ref-font-weight-bold);
+  line-height: 1;
 }
 .ev-stage-timeline__meta {
   display: flex;
@@ -118,20 +145,24 @@
 .ev-stage-timeline__subtitle {
   flex: 0 1 auto;
   font: var(--type-caption);
-  color: var(--ref-color-gray-400);
+  color: var(--ref-color-gray-500);
 }
 .ev-stage-timeline__item--current .ev-stage-timeline__subtitle {
   color: var(--ref-color-gray-700);
 }
+.ev-stage-timeline__item--pending .ev-stage-timeline__subtitle {
+  color: var(--ref-color-violet-700);
+}
 /* El botón queda pegado al cierre, dentro de la misma etapa. */
 .ev-stage-timeline__meta .ui-button {
   min-width: 0;
-  padding: 0 var(--ref-space-sm);
+  padding: 0;
+  font-size: var(--ref-font-size-xs);
 }
 
 @media (min-width: 768px) {
-  .ev-stage-timeline {
-    padding: var(--space-padding-default);
+  .ev-stage-timeline--full {
+    margin-top: calc(-1 * var(--ref-space-2xl) - var(--ref-space-sm));
   }
   .ev-stage-timeline__summary {
     display: none;

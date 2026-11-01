@@ -6,6 +6,7 @@ export interface MenuItem {
   id: string;
   label: string;
   icon?: React.ReactNode;
+  className?: string;
   /**
    * Marca el ítem como opción elegida. En `variant="select"` todos los ítems son opciones;
    * en `actions`, un ítem con `selected` definido (`true` o `false`) se vuelve una opción
@@ -134,7 +135,7 @@ const Menu: React.FC<MenuProps> = ({ trigger, variant = 'actions', items, align 
               role={isRadio ? 'menuitemradio' : 'menuitem'}
               aria-checked={isRadio ? Boolean(item.selected) : undefined}
               tabIndex={-1}
-              className="ui-menu__item"
+              className={['ui-menu__item', item.className ?? ''].filter(Boolean).join(' ')}
               onKeyDown={(event) => handleKeyDown(event, index)}
               onClick={() => {
                 item.onSelect();

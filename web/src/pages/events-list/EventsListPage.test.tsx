@@ -208,6 +208,7 @@ describe('EventsListPage', () => {
     const create = screen.getByRole('link', { name: 'Crear un evento' });
     expect(create).toHaveClass('ui-button--secondary');
     expect(create).toHaveAttribute('href', '/login?next=%2Fevents%2Fcreate');
+    expect(create).not.toHaveClass('ui-button--primary');
     expect(screen.getByRole('link', { name: 'Crear cuenta gratis' })).toHaveAttribute('href', '/register');
     expect(screen.getByRole('button', { name: 'Participar Concurso de afiches' })).toBeInTheDocument();
     expect(screen.getByText('Requiere cuenta')).toBeInTheDocument();
@@ -277,13 +278,14 @@ describe('EventsListPage', () => {
     const base = css.slice(0, at);
     const media = css.slice(at);
     expect(base).toMatch(/\.evl-toolbar\s*\{[^}]*flex-direction:\s*column/);
-    expect(base).toMatch(/\.evl-search\s*\{[^}]*order:\s*-1/);
     expect(base).toMatch(/\.evl-pending__list\s*\{[^}]*grid-template-columns:\s*1fr/);
-    expect(media).toMatch(/\.evl-search\s*\{[^}]*order:\s*0/);
     expect(media).toMatch(/\.evl-toolbar\s*\{[^}]*flex-direction:\s*row/);
     expect(media).toMatch(/\.evl-pending__list\s*\{[^}]*repeat\(2, 1fr\)/);
     expect(media).toMatch(/\.evl-header\s*\{[^}]*9fr 3fr/);
-    expect(media).toMatch(/\.evl-banner\s*\{[^}]*9fr 3fr/);
+    expect(media).toMatch(/\.evl-banner[^{]*\{[^}]*9fr 3fr/);
+    expect(base).toMatch(/\.evl-results \.ui-data-table tbody\s*\{[^}]*display:\s*grid/);
+    expect(base).toMatch(/\.evl-results \.ui-data-table__row\s*\{[^}]*border-radius:/);
+    expect(media).toMatch(/\.evl-results \.ui-data-table tbody\s*\{[^}]*display:\s*table-row-group/);
     expect(css).not.toMatch(/@media[^{]*max-width/);
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba\(/);
   });

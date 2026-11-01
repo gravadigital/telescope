@@ -19,3 +19,15 @@
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
+
+/* En la tarjeta apilada de mobile la fecha lleva su etiqueta delante;
+   en la tabla de desktop ya la da la cabecera de columna. */
+.ev-events-table__created-label {
+  display: inline;
+}
+
+@media (min-width: 768px) {
+  .ev-events-table__created-label {
+    display: none;
+  }
+}

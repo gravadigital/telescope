@@ -2,7 +2,8 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Button from '../../ui/button/Button';
 import Menu from '../../ui/menu/Menu';
-import { MenuIcon } from '../../ui/icons/Icons';
+import { MenuIcon, TelescopeLogo } from '../../ui/icons/Icons';
+import '../../ui/visually-hidden.css';
 import NotificationBell from '../../notifications/notification-bell/NotificationBell';
 import { useAuth } from '../../../context/AuthContext';
 import { useT } from '../../../i18n';
@@ -14,7 +15,7 @@ const HOW_IT_WORKS_PATH = '/#como-funciona';
 
 /** Barra global: logo, navegación, idioma y acceso o menú de usuario. */
 const AppHeader: React.FC = () => {
-  const { t } = useT();
+  const { t, locale, setLocale } = useT();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -37,15 +38,33 @@ const AppHeader: React.FC = () => {
                   <MenuIcon />
                 </Button>
               }
-              items={destinations.map((d) => ({
-                id: d.id,
-                label: d.label,
-                onSelect: () => navigate(d.to),
-              }))}
+              items={[
+                ...destinations.map((d) => ({
+                  id: d.id,
+                  label: d.label,
+                  onSelect: () => navigate(d.to),
+                })),
+                { id: 'register', label: t('nav.register'), onSelect: () => navigate('/register') },
+                {
+                  id: 'language-es',
+                  label: t('language.es'),
+                  selected: locale === 'es',
+                  className: 'ly-mobile-menu__language',
+                  onSelect: () => setLocale('es'),
+                },
+                {
+                  id: 'language-en',
+                  label: t('language.en'),
+                  selected: locale === 'en',
+                  className: 'ly-mobile-menu__language',
+                  onSelect: () => setLocale('en'),
+                },
+              ]}
             />
           </span>
           <Link to="/" className="ly-header__logo">
-            {t('common.appName')}
+            <TelescopeLogo className="ly-header__logo-mark" />
+            <span className="ui-visually-hidden">{t('common.appName')}</span>
           </Link>
         </div>
 
@@ -64,18 +83,20 @@ const AppHeader: React.FC = () => {
                 <span data-slot="notifications" className="ly-header__slot--notifications">
                   <NotificationBell />
                 </span>
-                <UserMenu />
+                <UserMenu includeLanguageOptions />
                 <LanguageSelect />
               </>
             ) : (
               <>
                 <LanguageSelect />
-                <Link to="/login" className="ui-button ui-button--sm ui-button--on-band ly-header__auth-link">
-                  {t('nav.login')}
-                </Link>
-                <Link to="/register" className="ui-button ui-button--sm ui-button--on-band ly-header__auth-link">
-                  {t('nav.register')}
-                </Link>
+                <div className="ly-header__auth">
+                  <Link to="/login" className="ui-button ui-button--sm ui-button--on-band ly-header__auth-link ly-header__auth-link--login">
+                    {t('nav.login')}
+                  </Link>
+                  <Link to="/register" className="ui-button ui-button--sm ui-button--on-band ly-header__auth-link ly-header__auth-link--register">
+                    {t('nav.register')}
+                  </Link>
+                </div>
               </>
             )}
           </div>

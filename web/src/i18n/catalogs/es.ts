@@ -134,6 +134,12 @@ export const es = {
   },
   footer: {
     tagline: 'Telescopio · evaluación distribuida entre pares',
+    version: 'V1.0',
+    github: 'GitHub',
+    repo: 'gravadigital/telescope',
+    contact: 'CONTACTO',
+    email: 'info@grava.digital',
+    phone: '+54 9 11 3094 2020',
   },
   auth: {
     layout: {
@@ -240,6 +246,8 @@ export const es = {
     featured: {
       label: 'Evento destacado',
       status: 'Inscripción abierta',
+      sampleName: 'Distributed Telescope Time Allocation 2026',
+      sampleDescription: 'Asignación anual de tiempo de telescopio',
       closesIn: plural({ one: 'Cierra en {count} día', other: 'Cierra en {count} días' }),
       closesToday: 'Cierra hoy',
       capacity: '{count} de {max} lugares ocupados',
@@ -248,6 +256,7 @@ export const es = {
     how: {
       eyebrow: 'Cómo funciona',
       title: 'Cuatro etapas, siempre visibles',
+      demo: 'Ver demo',
       step: '{number} · {stage}',
       creation: 'El organizador define el evento y su cupo.',
       participation: 'Te inscribes y subes tu propuesta antes del cierre.',
@@ -257,6 +266,7 @@ export const es = {
     open: {
       title: 'Abiertos ahora',
       seeAll: 'Ver todos los eventos →',
+      spots: '{count} / {max} lugares',
       cta: 'Ver y participar',
       empty: 'Ahora no hay eventos con inscripción abierta.',
       emptyAction: 'Ver todos los eventos',
@@ -274,6 +284,8 @@ export const es = {
       now: 'Ahora',
       completed: 'Completada',
       pending: 'Pendiente',
+      stage: 'Etapa',
+      upcoming: 'Próxima',
       stepOf: 'Etapa {number} de 4',
     },
     pill: {
@@ -305,6 +317,7 @@ export const es = {
       action: 'Acción',
       capacity: '{count} / {max}',
       capacityText: '{count} de {max} lugares ocupados',
+      participantsCount: plural({ one: '{count} participante', other: '{count} participantes' }),
       registered: plural({ one: '{count} inscrito', other: '{count} inscritos' }),
     },
     myStatus: {

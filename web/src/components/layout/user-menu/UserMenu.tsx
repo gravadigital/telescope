@@ -9,9 +9,13 @@ import { initials } from './initials';
 import './UserMenu.css';
 
 /** Menú de usuario: Mis eventos, notificaciones, idioma (elección con ✓) y Cerrar sesión. */
-const UserMenu: React.FC = () => {
+interface UserMenuProps {
+  includeLanguageOptions?: boolean;
+}
+
+const UserMenu: React.FC<UserMenuProps> = ({ includeLanguageOptions = false }) => {
   const { user, logout } = useAuth();
-  const { t } = useT();
+  const { t, locale, setLocale } = useT();
   const navigate = useNavigate();
 
   if (!user) return null;
@@ -32,6 +36,24 @@ const UserMenu: React.FC = () => {
       items={[
         { id: 'my-events', label: t('nav.myEvents'), onSelect: () => navigate('/my-events') },
         { id: 'notifications', label: t('nav.notifications'), onSelect: () => navigate('/notifications') },
+        ...(includeLanguageOptions
+          ? [
+              {
+                id: 'language-es',
+                label: t('language.es'),
+                selected: locale === 'es',
+                className: 'ly-user-menu__language',
+                onSelect: () => setLocale('es'),
+              },
+              {
+                id: 'language-en',
+                label: t('language.en'),
+                selected: locale === 'en',
+                className: 'ly-user-menu__language',
+                onSelect: () => setLocale('en'),
+              },
+            ]
+          : []),
         { id: 'logout', label: t('nav.logout'), onSelect: () => logout() },
       ]}
     />

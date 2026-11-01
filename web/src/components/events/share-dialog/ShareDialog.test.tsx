@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../../../test-utils/renderWithProviders';
@@ -104,6 +106,15 @@ describe('ShareDialog', () => {
       expect(l).toHaveAttribute('rel', 'noopener noreferrer');
     });
     expect(links[4]).not.toHaveAttribute('target');
+  });
+
+  it('TS-29: opciones sociales cuadradas con iconos de tamaño fijo', () => {
+    const css = fs.readFileSync(path.join(__dirname, 'ShareDialog.css'), 'utf8');
+    expect(css).toMatch(/\.ev-share-dialog__network\s*\{[^}]*aspect-ratio:\s*1/);
+    expect(css).toMatch(/\.ev-share-dialog__network-icon-frame\s*\{[^}]*width:\s*24px;[^}]*height:\s*24px/);
+    expect(css).not.toMatch(/\.ev-share-dialog__network-name\s*\{[^}]*min-height:/);
+    expect(css).toMatch(/\.ev-share-dialog__network-name\s*\{[^}]*white-space:\s*nowrap/);
+    expect(css).not.toMatch(/\.ev-share-dialog__network-name\s*\{[^}]*overflow-wrap:\s*anywhere/);
   });
 
   it('TS-30: texto según la etapa', () => {

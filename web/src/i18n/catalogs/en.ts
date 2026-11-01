@@ -134,6 +134,12 @@ export const en: Catalog = {
   },
   footer: {
     tagline: 'Telescopio · distributed peer review',
+    version: 'V1.0',
+    github: 'GitHub',
+    repo: 'gravadigital/telescope',
+    contact: 'CONTACT',
+    email: 'info@grava.digital',
+    phone: '+54 9 11 3094 2020',
   },
   auth: {
     layout: {
@@ -240,6 +246,8 @@ export const en: Catalog = {
     featured: {
       label: 'Featured event',
       status: 'Registration open',
+      sampleName: 'Distributed Telescope Time Allocation 2026',
+      sampleDescription: 'Annual telescope time allocation',
       closesIn: plural({ one: 'Closes in {count} day', other: 'Closes in {count} days' }),
       closesToday: 'Closes today',
       capacity: '{count} of {max} spots taken',
@@ -248,6 +256,7 @@ export const en: Catalog = {
     how: {
       eyebrow: 'How it works',
       title: 'Four stages, always visible',
+      demo: 'View demo',
       step: '{number} · {stage}',
       creation: 'The organizer defines the event and its capacity.',
       participation: 'You sign up and upload your proposal before the deadline.',
@@ -257,6 +266,7 @@ export const en: Catalog = {
     open: {
       title: 'Open now',
       seeAll: 'See all events →',
+      spots: '{count} / {max} spots',
       cta: 'View and join',
       empty: 'There are no events open for registration right now.',
       emptyAction: 'See all events',
@@ -274,6 +284,8 @@ export const en: Catalog = {
       now: 'Now',
       completed: 'Completed',
       pending: 'Pending',
+      stage: 'Stage',
+      upcoming: 'Upcoming',
       stepOf: 'Stage {number} of 4',
     },
     pill: {
@@ -305,6 +317,7 @@ export const en: Catalog = {
       action: 'Action',
       capacity: '{count} / {max}',
       capacityText: '{count} of {max} spots taken',
+      participantsCount: plural({ one: '{count} participant', other: '{count} participants' }),
       registered: plural({ one: '{count} registered', other: '{count} registered' }),
     },
     myStatus: {

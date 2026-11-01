@@ -1,48 +1,122 @@
-.ev-pending-card {
-  display: flex;
+/* Tarjeta de pendiente: mobile = tarjeta con borde de color y CTA a ancho completo.
+   Desktop = tarjeta blanca dentro del panel negro, con la acción a la derecha. */
+.ev-pending-card.ui-card {
   flex-direction: column;
-  gap: var(--space-stack-md);
+  gap: var(--ref-space-ms);
+  padding: var(--ref-space-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.ev-pending-card--upload.ui-card {
+  border-color: var(--border-warning-subtle);
+}
+
+.ev-pending-card--results.ui-card {
+  border-color: var(--border-success-subtle);
 }
 
 .ev-pending-card__body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-stack-sm);
+  gap: var(--ref-space-xs);
   min-width: 0;
 }
 
 .ev-pending-card__title {
+  align-self: flex-start;
   margin: 0;
-  font: var(--type-heading-s);
-  color: var(--text-primary);
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-warning-subtle);
+  color: var(--text-warning);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: var(--ref-font-leading-snug);
+}
+
+.ev-pending-card--results .ev-pending-card__title {
+  background: var(--bg-success-subtle);
+  color: var(--text-success);
 }
 
 .ev-pending-card__event {
-  margin: 0;
-  font: var(--type-ui);
+  margin: var(--ref-space-xs) 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
   color: var(--text-primary);
 }
 
 .ev-pending-card__deadline {
   margin: 0;
-  font: var(--type-caption);
+  font-size: 13px;
   color: var(--text-secondary);
 }
 
-.ev-pending-card__action {
-  align-self: stretch;
-  justify-content: center;
+.ev-pending-card__action.ui-button {
+  width: 100%;
+  min-height: 44px;
+  height: 44px;
+  padding: 0 var(--ref-space-md);
+  border-radius: var(--radius-control);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ev-pending-card__action.ui-button--primary {
+  background: var(--bg-accent);
+  color: var(--text-inverse);
+}
+
+.ev-pending-card__action.ui-button--secondary {
+  background: transparent;
+  border: 1.5px solid var(--border-focus);
+  color: var(--text-action);
+  font-weight: 600;
 }
 
 @media (min-width: 768px) {
-  .ev-pending-card {
+  .ev-pending-card.ui-card {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
+    gap: var(--ref-space-md);
+    padding: 20px 22px;
+    border-color: transparent;
+    border-radius: var(--radius-area);
   }
 
-  .ev-pending-card__action {
-    align-self: center;
-    flex-shrink: 0;
+  .ev-pending-card__title {
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    font-size: 13px;
+  }
+
+  .ev-pending-card--results .ev-pending-card__title {
+    background: transparent;
+    color: var(--text-success-accent);
+  }
+
+  .ev-pending-card__event {
+    margin: 0;
+    font-size: 17px;
+  }
+
+  .ev-pending-card__deadline {
+    font-size: 14px;
+  }
+
+  .ev-pending-card__action.ui-button {
+    flex: none;
+    width: auto;
+    min-height: 40px;
+    height: auto;
+    padding: 9px var(--ref-space-md);
+    font-size: 14px;
+    font-weight: 600;
   }
 }

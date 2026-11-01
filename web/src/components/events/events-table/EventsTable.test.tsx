@@ -31,7 +31,7 @@ describe('EventsTable', () => {
     const bar = within(row1).getByRole('progressbar');
     expect(bar).toHaveAttribute('aria-valuenow', '12');
     expect(bar).toHaveAttribute('aria-valuemax', '20');
-    expect(within(row1).getByText('12 / 20')).toBeInTheDocument();
+    expect(within(row1).getByText('12 participantes')).toBeInTheDocument();
     expect(within(row1).getByText('28 sept 2026')).toBeInTheDocument();
     expect(within(row1).getAllByRole('button')).toHaveLength(1);
     expect(within(row1).getByRole('button', { name: 'Subir archivo Concurso de afiches' })).toHaveTextContent('Subir archivo');
@@ -89,7 +89,7 @@ describe('EventsTable', () => {
       expect(screen.getByRole('columnheader', { name: h })).toBeInTheDocument()
     );
     expect(screen.getByText('Borrador · no visible')).toBeInTheDocument();
-    expect(screen.getByText('0 / 30')).toBeInTheDocument();
+    expect(screen.getByText('0 participantes')).toBeInTheDocument();
     expect(screen.getByText('—')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Gestionar Feria de ciencias' })).toBeInTheDocument();
     unmount();

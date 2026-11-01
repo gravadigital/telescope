@@ -178,195 +178,200 @@ const EventsListPage: React.FC = () => {
 
   return (
     <div className="evl-page">
-      <div className="evl-header">
-        <div className="evl-header__copy">
-          {!userId && counts && (
-            <p className="evl-eyebrow">{t('events.list.eyebrowGuest', { count: total })}</p>
-          )}
-          <h1 className="evl-title">{t('events.list.title')}</h1>
-          <p className="evl-subtitle">
-            {userId ? t('events.list.subtitle') : t('events.list.subtitleGuest')}
-          </p>
-        </div>
-        <Link
-          to={createPath}
-          className={`ui-button ui-button--md ${userId ? 'ui-button--primary' : 'ui-button--secondary'} evl-header__cta`}
-        >
-          {userId ? t('events.list.create') : t('events.list.createGuest')}
-        </Link>
-      </div>
-
-      {userId && (
-        <section className="evl-pending">
-          {pending.status === 'loading' && (
-            <>
-              <p role="status" className="ui-visually-hidden">
-                {t('events.pending.loading')}
-              </p>
-              <div className="evl-pending__list" aria-hidden="true">
-                {[0, 1].map((n) => (
-                  <Card key={n} variant="default" padding="compact">
-                    <span className="evl-skeleton evl-skeleton--title" />
-                    <span className="evl-skeleton" />
-                  </Card>
-                ))}
-              </div>
-            </>
-          )}
-          {pending.status === 'error' && (
-            <Callout
-              tone="error"
-              action={{ label: t('common.retry'), onClick: () => setPendingTick((n) => n + 1) }}
-            >
-              {t('events.pending.error')}
-            </Callout>
-          )}
-          {pending.status === 'ready' && tasks.length > 0 && (
-            <>
-              <h2 className="evl-section-title">
-                {t('events.pending.title', { count: tasks.length })}
-              </h2>
-              <div className="evl-pending__list">
-                {tasks.slice(0, PENDING_LIMIT).map((task) => (
-                  <PendingCard key={`${task.kind}-${task.event.id}`} task={task} />
-                ))}
-              </div>
-              {tasks.length > PENDING_LIMIT && (
-                <Link to="/my-events" className="evl-link">
-                  {t('events.pending.seeAll')}
-                </Link>
-              )}
-            </>
-          )}
-        </section>
-      )}
-
-      {!userId && (
-        <section className="evl-how">
-          <h2 className="evl-section-title">{t('events.list.howTitle')}</h2>
-          <ol className="evl-how__steps">
-            {GUEST_STEPS.map((key) => (
-              <li key={key} className="evl-how__step">
-                {t(`events.list.${key}` as const)}
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
-
-      <div className="evl-toolbar">
-        <div className="evl-filters">
-          <FilterTabs
-            options={tabOptions}
-            value={stage}
-            onChange={changeStage}
-            loading={list.status === 'loading' && !counts}
-            controls={RESULTS_ID}
-            label={t('events.list.filtersLabel')}
-          />
-        </div>
-        <div className="evl-search">
-          <TextField
-            variant="search"
-            label={t('events.list.searchLabel')}
-            placeholder={t('events.list.searchPlaceholder')}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onClear={clearSearch}
-            clearLabel={t('events.list.searchClear')}
-          />
-        </div>
-      </div>
-
-      <p className="ui-visually-hidden" aria-live="polite">
-        {list.status === 'ready' && pagination
-          ? t('events.list.resultsCount', { count: pagination.total })
-          : ''}
-      </p>
-
-      <div id={RESULTS_ID} className="evl-results">
-        {list.status === 'loading' && (
-          <>
-            <p role="status" className="ui-visually-hidden">
-              {t('events.list.loading')}
+      <div className="evl-body">
+        <div className="evl-header">
+          <div className="evl-header__copy">
+            {!userId && counts && (
+              <p className="evl-eyebrow">{t('events.list.eyebrowGuest', { count: total })}</p>
+            )}
+            <h1 className="evl-title">{t('events.list.title')}</h1>
+            <p className="evl-subtitle">
+              {userId ? t('events.list.subtitle') : t('events.list.subtitleGuest')}
             </p>
-            <EventsTable
-              variant="public"
-              caption={t('events.list.title')}
-              captionHidden
-              rows={[]}
-              userId={userId}
-              loading
-              skeletonRows={5}
-            />
-          </>
-        )}
-        {list.status === 'error' && (
-          <Callout
-            tone="error"
-            action={{ label: t('common.retry'), onClick: () => setListTick((n) => n + 1) }}
-          >
-            {t('events.list.error')}
-          </Callout>
-        )}
-        {list.status === 'ready' && data && data.items.length === 0 && (
-          <EmptyState
-            variant="inline"
-            headingLevel={2}
-            title={filtersActive ? t('events.list.noMatches') : t('events.list.noEvents')}
-            action={
-              filtersActive
-                ? { label: t('events.list.clearFilters'), onClick: clearFilters }
-                : { label: t('events.list.createGuest'), onClick: () => navigate(createPath) }
-            }
-          />
-        )}
-        {list.status === 'ready' && data && data.items.length > 0 && (
-          <EventsTable
-            variant="public"
-            caption={t('events.list.title')}
-            captionHidden
-            rows={data.items}
-            userId={userId}
-            myEventsById={myEventsById}
-          />
-        )}
-        {list.status === 'ready' && pagination && pagination.totalPages > 1 && (
-          <nav className="evl-pagination" aria-label={t('events.list.paginationLabel')}>
-            <Button
-              variant="tertiary"
-              size="sm"
-              disabled={pagination.page <= 1}
-              onClick={() => goToPage(pagination.page - 1)}
-            >
-              {t('events.list.previous')}
-            </Button>
-            <span className="evl-pagination__text">
-              {t('events.list.pageOf', { page: pagination.page, total: pagination.totalPages })}
-            </span>
-            <Button
-              variant="tertiary"
-              size="sm"
-              disabled={pagination.page >= pagination.totalPages}
-              onClick={() => goToPage(pagination.page + 1)}
-            >
-              {t('events.list.next')}
-            </Button>
-          </nav>
-        )}
-      </div>
-
-      {!userId && (
-        <Card variant="feature" className="evl-banner">
-          <div className="evl-banner__copy">
-            <p className="evl-banner__title">{t('events.list.bannerTitle')}</p>
-            <p className="evl-banner__text">{t('events.list.bannerText')}</p>
           </div>
-          <Link to="/register" className="ui-button ui-button--md ui-button--on-band">
-            {t('events.list.bannerCta')}
+          <Link
+            to={createPath}
+            className={`ui-button ui-button--md evl-header__cta ${
+              userId ? 'ui-button--primary' : 'ui-button--secondary'
+            }`}
+          >
+            {userId ? t('events.list.create') : t('events.list.createGuest')}
           </Link>
-        </Card>
-      )}
+        </div>
+
+        <div className="evl-content">
+          {userId && (
+            <section className="evl-pending">
+              {pending.status === 'loading' && (
+                <>
+                  <p role="status" className="ui-visually-hidden">
+                    {t('events.pending.loading')}
+                  </p>
+                  <div className="evl-pending__list" aria-hidden="true">
+                    {[0, 1].map((n) => (
+                      <div key={n} className="evl-pending__skeleton" />
+                    ))}
+                  </div>
+                </>
+              )}
+              {pending.status === 'error' && (
+                <Callout
+                  tone="error"
+                  action={{ label: t('common.retry'), onClick: () => setPendingTick((n) => n + 1) }}
+                >
+                  {t('events.pending.error')}
+                </Callout>
+              )}
+              {pending.status === 'ready' && tasks.length > 0 && (
+                <>
+                  <div className="evl-pending__panel">
+                    <h2 className="evl-pending__eyebrow">
+                      {t('events.pending.title', { count: tasks.length })}
+                    </h2>
+                    <div className="evl-pending__list">
+                      {tasks.slice(0, PENDING_LIMIT).map((task) => (
+                        <PendingCard key={`${task.kind}-${task.event.id}`} task={task} />
+                      ))}
+                    </div>
+                  </div>
+                  {tasks.length > PENDING_LIMIT && (
+                    <Link to="/my-events" className="evl-link">
+                      {t('events.pending.seeAll')}
+                    </Link>
+                  )}
+                </>
+              )}
+            </section>
+          )}
+
+          {!userId && (
+            <section className="evl-how">
+              <h2 className="evl-section-title">{t('events.list.howTitle')}</h2>
+              <ol className="evl-how__steps">
+                {GUEST_STEPS.map((key) => (
+                  <li key={key} className="evl-how__step">
+                    {t(`events.list.${key}` as const)}
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
+
+          <div className="evl-toolbar">
+            <div className="evl-filters">
+              <FilterTabs
+                options={tabOptions}
+                value={stage}
+                onChange={changeStage}
+                loading={list.status === 'loading' && !counts}
+                controls={RESULTS_ID}
+                label={t('events.list.filtersLabel')}
+              />
+            </div>
+            <div className="evl-search">
+              <TextField
+                variant="search"
+                label={t('events.list.searchLabel')}
+                placeholder={t('events.list.searchPlaceholder')}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onClear={clearSearch}
+                clearLabel={t('events.list.searchClear')}
+              />
+            </div>
+          </div>
+
+          <p className="ui-visually-hidden" aria-live="polite">
+            {list.status === 'ready' && pagination
+              ? t('events.list.resultsCount', { count: pagination.total })
+              : ''}
+          </p>
+
+          <div id={RESULTS_ID} className="evl-results">
+            {list.status === 'loading' && (
+              <>
+                <p role="status" className="ui-visually-hidden">
+                  {t('events.list.loading')}
+                </p>
+                <EventsTable
+                  variant="public"
+                  caption={t('events.list.title')}
+                  captionHidden
+                  rows={[]}
+                  userId={userId}
+                  loading
+                  skeletonRows={5}
+                />
+              </>
+            )}
+            {list.status === 'error' && (
+              <Callout
+                tone="error"
+                action={{ label: t('common.retry'), onClick: () => setListTick((n) => n + 1) }}
+              >
+                {t('events.list.error')}
+              </Callout>
+            )}
+            {list.status === 'ready' && data && data.items.length === 0 && (
+              <EmptyState
+                variant="inline"
+                headingLevel={2}
+                title={filtersActive ? t('events.list.noMatches') : t('events.list.noEvents')}
+                action={
+                  filtersActive
+                    ? { label: t('events.list.clearFilters'), onClick: clearFilters }
+                    : { label: t('events.list.createGuest'), onClick: () => navigate(createPath) }
+                }
+              />
+            )}
+            {list.status === 'ready' && data && data.items.length > 0 && (
+              <EventsTable
+                variant="public"
+                caption={t('events.list.title')}
+                captionHidden
+                rows={data.items}
+                userId={userId}
+                myEventsById={myEventsById}
+              />
+            )}
+            {list.status === 'ready' && pagination && pagination.totalPages > 1 && (
+              <nav className="evl-pagination" aria-label={t('events.list.paginationLabel')}>
+                <Button
+                  variant="tertiary"
+                  size="sm"
+                  disabled={pagination.page <= 1}
+                  onClick={() => goToPage(pagination.page - 1)}
+                >
+                  {t('events.list.previous')}
+                </Button>
+                <span className="evl-pagination__text">
+                  {t('events.list.pageOf', { page: pagination.page, total: pagination.totalPages })}
+                </span>
+                <Button
+                  variant="tertiary"
+                  size="sm"
+                  disabled={pagination.page >= pagination.totalPages}
+                  onClick={() => goToPage(pagination.page + 1)}
+                >
+                  {t('events.list.next')}
+                </Button>
+              </nav>
+            )}
+          </div>
+
+          {!userId && (
+            <Card variant="feature" className="evl-banner">
+              <div className="evl-banner__copy">
+                <p className="evl-banner__title">{t('events.list.bannerTitle')}</p>
+                <p className="evl-banner__text">{t('events.list.bannerText')}</p>
+              </div>
+              <Link to="/register" className="ui-button ui-button--md ui-button--on-band evl-banner__cta">
+                {t('events.list.bannerCta')}
+              </Link>
+            </Card>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

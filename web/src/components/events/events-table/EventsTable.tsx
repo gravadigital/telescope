@@ -65,7 +65,7 @@ const EventsTable: React.FC<EventsTableProps> = ({
         size="sm"
         value={count}
         max={max}
-        label={t('events.table.capacity', { count, max })}
+        label={t('events.table.participantsCount', { count })}
         valueText={t('events.table.capacityText', { count, max })}
       />
     );
@@ -103,7 +103,14 @@ const EventsTable: React.FC<EventsTableProps> = ({
       {
         key: 'created',
         header: t('events.table.created'),
-        render: (row) => dateOrDash(row.created_at),
+        render: (row) => (
+          <span className="ev-events-table__created">
+            <span className="ev-events-table__created-label">
+              {t('events.table.created')}{' '}
+            </span>
+            {dateOrDash(row.created_at)}
+          </span>
+        ),
       },
     ];
   } else if (variant === 'organizer') {

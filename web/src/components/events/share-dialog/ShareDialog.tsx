@@ -138,7 +138,9 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, eventId, eventName, sta
                   target={external ? '_blank' : undefined}
                   rel={external ? 'noopener noreferrer' : undefined}
                 >
-                  <Icon className="ev-share-dialog__network-icon" width={24} height={24} />
+                  <span className="ev-share-dialog__network-icon-frame" aria-hidden="true">
+                    <Icon className="ev-share-dialog__network-icon" width={24} height={24} />
+                  </span>
                   <span className="ev-share-dialog__network-name">{name}</span>
                 </a>
               </li>

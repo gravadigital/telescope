@@ -32,7 +32,7 @@ describe('StageTimeline', () => {
     expect(items).toHaveLength(4);
     expect(items.map((li) => li.querySelector('.ev-stage-timeline__name')?.textContent)).toEqual([
       'Creación',
-      'Participación - ahora',
+      'Participación · ahora',
       'Votación',
       'Resultados',
     ]);

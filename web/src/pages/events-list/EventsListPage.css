@@ -1,51 +1,81 @@
+/* ==========================================================================
+   Eventos (1c) — mobile-first.
+   Base = mobile (banda negra de cabecera, tarjetas apiladas).
+   @media 768px = desktop (cabecera sobre el lienzo, panel negro con grid).
+   ========================================================================== */
+
 .evl-page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-stack-lg);
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: var(--space-padding-default) var(--space-padding-compact);
+  width: 100%;
+  background: var(--bg-canvas);
+}
+
+.evl-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  min-width: 0;
+}
+
+/* ---------- Cabecera ---------- */
+.evl-header {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 16px 24px;
+  background: var(--bg-band);
+  color: var(--text-inverse);
+}
+
+.evl-header__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.evl-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-inverse);
+}
+
+.evl-subtitle {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-inverse-secondary);
 }
 
 .evl-eyebrow {
   margin: 0;
-  font: var(--type-eyebrow);
-  letter-spacing: var(--type-tracking-wide);
+  font-family: var(--ref-font-family-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-signal);
 }
 
-.evl-header {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-stack-md);
-  align-items: start;
-}
-.evl-header__copy {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-stack-sm);
-}
-.evl-title {
-  margin: 0;
-  font: var(--type-heading-l);
-  color: var(--text-primary);
-}
-.evl-subtitle {
-  margin: 0;
-  font: var(--type-body);
-  color: var(--text-secondary);
-}
-.evl-header__cta {
+.evl-header__cta.ui-button {
   width: 100%;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .evl-section-title {
   margin: 0;
-  font: var(--type-eyebrow);
-  letter-spacing: var(--type-tracking-wide);
-  text-transform: uppercase;
-  color: var(--text-secondary);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
 }
 
 .evl-link {
@@ -56,136 +86,662 @@
   color: var(--text-action);
 }
 
-/* Pendientes */
+/* ---------- Contenido ---------- */
+.evl-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 16px 32px;
+  min-width: 0;
+}
+
+/* ---------- Pendientes ---------- */
 .evl-pending {
   display: flex;
   flex-direction: column;
-  gap: var(--space-stack-md);
+  gap: 16px;
+  min-width: 0;
 }
+
 .evl-pending:empty {
   display: none;
 }
+
+.evl-pending__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.evl-pending__eyebrow {
+  margin: 0;
+  font-family: var(--ref-font-family-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-action);
+}
+
 .evl-pending__list {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--space-stack-md);
+  gap: 16px;
+  min-width: 0;
 }
 
-/* Cómo participar (visitante) */
+.evl-pending__skeleton {
+  height: 118px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 16px;
+}
+
+/* ---------- Cómo participar (visitante) ---------- */
 .evl-how {
   display: flex;
   flex-direction: column;
-  gap: var(--space-stack-md);
-  padding: var(--space-padding-compact);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-surface);
-  background: var(--bg-surface-subtle);
+  gap: 12px;
 }
+
 .evl-how__steps {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--space-stack-sm);
+  gap: 8px;
   margin: 0;
-  padding: 0 0 0 var(--space-padding-default);
-  font: var(--type-body);
-  color: var(--text-primary);
+  padding: 0;
+  list-style: none;
+  counter-reset: evl-step;
 }
 
-/* Filtros y búsqueda: en mobile la búsqueda va primero (order) */
+.evl-how__step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  font-size: 15px;
+  color: var(--text-primary);
+  counter-increment: evl-step;
+}
+
+.evl-how__step::before {
+  content: counter(evl-step);
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bg-action-subtle);
+  color: var(--text-action);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* ---------- Filtros y búsqueda ---------- */
 .evl-toolbar {
   display: flex;
   flex-direction: column;
-  gap: var(--space-stack-md);
-}
-.evl-filters {
+  gap: 12px;
   min-width: 0;
-  overflow-x: auto;
-}
-.evl-search {
-  order: -1;
 }
 
+.evl-filters {
+  margin: 0 -16px;
+  min-width: 0;
+}
+
+.evl-filters .ui-filter-tabs {
+  gap: 8px;
+  padding: 0 16px 4px;
+}
+
+.evl-filters .ui-filter-tabs__tab {
+  min-height: 0;
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  color: var(--text-body);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.evl-filters .ui-filter-tabs__tab:hover {
+  background: var(--bg-canvas);
+}
+
+.evl-filters .ui-filter-tabs__tab--selected,
+.evl-filters .ui-filter-tabs__tab--selected:hover {
+  background: var(--bg-band);
+  border-color: var(--bg-band);
+  color: var(--text-inverse);
+  font-weight: 600;
+}
+
+.evl-search .ui-text-field {
+  gap: 0;
+}
+
+.evl-search .ui-text-field__label-row,
+.evl-search .ui-text-field__footer {
+  display: none;
+}
+
+.evl-search .ui-text-field__box {
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 12px;
+}
+
+.evl-search .ui-text-field__control {
+  font-size: 15px;
+}
+
+/* ---------- Resultados: tarjetas apiladas en mobile ---------- */
 .evl-results {
   display: flex;
   flex-direction: column;
-  gap: var(--space-stack-md);
+  gap: 16px;
   min-width: 0;
 }
 
+.evl-results .ui-data-table {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.evl-results .ui-data-table tbody {
+  display: grid;
+  gap: 10px;
+}
+
+.evl-results .ui-data-table__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 16px;
+}
+
+.evl-results .ui-data-table__cell {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.evl-results .ui-data-table__cell::before {
+  display: none;
+}
+
+/* Etapa y fecha comparten la primera línea; luego evento, cupo y acción. */
+.evl-results .ui-data-table__cell:nth-child(2) {
+  order: 1;
+  width: auto;
+  align-self: center;
+}
+
+.evl-results .ui-data-table__cell:nth-child(4) {
+  order: 2;
+  width: auto;
+  margin-left: auto;
+  align-self: center;
+  font-size: 12px;
+  color: var(--text-disabled);
+}
+
+.evl-results .ui-data-table__cell:nth-child(1) {
+  order: 3;
+}
+
+.evl-results .ui-data-table__cell:nth-child(3) {
+  order: 4;
+  flex: 1 1 120px;
+  width: auto;
+  align-self: flex-end;
+}
+
+.evl-results .ui-data-table__cell--action {
+  order: 5;
+  display: flex;
+  flex: 0 0 auto;
+  width: auto;
+  align-items: flex-end;
+}
+
+.evl-results .ev-events-table__event {
+  gap: 3px;
+}
+
+.evl-results .ev-events-table__name {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.evl-results .ev-events-table__desc {
+  font-size: 13px;
+}
+
+.evl-results .ui-status-pill {
+  min-height: 0;
+  padding: 3px 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.evl-results .ui-progress-bar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+}
+
+.evl-results .ui-progress-bar__label {
+  order: -1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.evl-results .ui-progress-bar__track {
+  flex: none;
+}
+
+.evl-results .ui-progress-bar__track--sm {
+  height: 5px;
+  background: var(--border-subtle);
+}
+
+.evl-results .ui-data-table__cell--action .ui-button {
+  width: auto;
+  min-height: 44px;
+  height: 44px;
+  margin-top: 0;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.evl-results .ui-data-table__hint {
+  display: none;
+}
+
+/* ---------- Paginación ---------- */
 .evl-pagination {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-inline-md);
+  gap: 12px;
 }
+
 .evl-pagination__text {
-  font: var(--type-ui);
+  font: var(--type-caption);
   color: var(--text-secondary);
 }
 
-.evl-skeleton {
-  display: block;
-  height: var(--ref-space-md);
-  width: 100%;
-  border-radius: var(--radius-control);
-  background: var(--bg-disabled);
-}
-.evl-skeleton--title {
-  width: 60%;
+/* ---------- Estado vacío ---------- */
+.evl-empty-state {
+  padding: 40px 20px;
+  text-align: center;
 }
 
-/* Franja de registro (visitante) */
-.evl-banner {
-  display: grid;
-  grid-template-columns: 1fr;
-  align-items: center;
-  gap: var(--space-stack-md);
-}
-.evl-banner__copy {
+/* ---------- Banner de visitante ---------- */
+.evl-banner.ui-card {
   display: flex;
   flex-direction: column;
-  gap: var(--space-stack-sm);
+  gap: 16px;
+  padding: 24px 20px;
+  border-radius: 18px;
 }
+
 .evl-banner__title {
-  margin: 0;
-  font: var(--type-heading-s);
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
+
 .evl-banner__text {
   margin: 0;
-  font: var(--type-body);
+  font-size: 15px;
+  line-height: 1.5;
   color: var(--text-inverse-secondary);
 }
 
+.evl-banner__cta.ui-button {
+  align-self: flex-start;
+}
+
+/* ==========================================================================
+   Desktop (≥768px)
+   ========================================================================== */
 @media (min-width: 768px) {
-  .evl-page {
-    padding: var(--space-padding-spacious) var(--ref-space-xl);
+  .evl-body {
+    gap: 32px;
+    padding: 56px 120px 96px;
   }
+
   .evl-header {
+    display: grid;
     grid-template-columns: 9fr 3fr;
+    align-items: end;
+    gap: 24px;
+    padding: 0;
+    background: transparent;
+    color: var(--text-primary);
   }
-  .evl-header__cta {
-    width: auto;
+
+  .evl-header__copy {
+    gap: 8px;
+  }
+
+  .evl-title {
+    font-size: 40px;
+    color: var(--text-primary);
+  }
+
+  .evl-subtitle {
+    font-size: 17px;
+    color: var(--text-secondary);
+  }
+
+  .evl-header__cta.ui-button {
+    grid-column: 2;
     justify-self: end;
+    align-self: end;
+    width: auto;
+    min-height: 0;
+    padding: 13px 20px;
+    border-radius: 12px;
   }
+
+  .evl-content {
+    gap: 32px;
+    padding: 0;
+  }
+
+  /* Panel negro único con las tarjetas blancas dentro. */
+  .evl-pending__panel {
+    gap: 18px;
+    padding: 28px 32px;
+    background: var(--bg-band);
+    border-radius: 18px;
+  }
+
+  .evl-pending__eyebrow {
+    font-size: 13px;
+    color: var(--text-signal);
+  }
+
   .evl-pending__list {
     grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
   }
-  .evl-how__steps {
-    grid-template-columns: repeat(4, 1fr);
-    padding-left: var(--space-padding-default);
-  }
+
+  /* Filtros y búsqueda en una fila. */
   .evl-toolbar {
     flex-direction: row;
     align-items: center;
+    justify-content: space-between;
+    gap: 20px;
   }
+
   .evl-filters {
-    flex: 2;
+    margin: 0;
+    padding: 5px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 12px;
   }
+
+  .evl-filters .ui-filter-tabs {
+    gap: 6px;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .evl-filters .ui-filter-tabs__tab {
+    padding: 9px 16px;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    color: var(--text-body);
+    font-size: 15px;
+  }
+
+  .evl-filters .ui-filter-tabs__tab--selected,
+  .evl-filters .ui-filter-tabs__tab--selected:hover {
+    background: var(--bg-band);
+    color: var(--text-inverse);
+  }
+
   .evl-search {
-    order: 0;
-    flex: 1;
+    flex: none;
+    width: 340px;
   }
-  .evl-banner {
+
+  .evl-search .ui-text-field__box {
+    min-height: 46px;
+    padding: 0 16px;
+    border: 1px solid var(--border-default);
+  }
+
+  /* Tabla de eventos. */
+  .evl-results .ui-data-table {
+    display: table;
+    table-layout: fixed;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 18px;
+    border-collapse: separate;
+    border-spacing: 0;
+    overflow: hidden;
+  }
+
+  .evl-results .ui-data-table tbody {
+    display: table-row-group;
+  }
+
+  .evl-results .ui-data-table__head {
+    display: table-header-group;
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+  }
+
+  .evl-results .ui-data-table__th {
+    padding: 16px 28px;
+    background: var(--bg-surface-subtle);
+    border-bottom: 1px solid var(--border-default);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-align: left;
+  }
+
+  .evl-results .ui-data-table__th:nth-child(1) {
+    width: 35.8%;
+  }
+
+  .evl-results .ui-data-table__th:nth-child(2) {
+    width: 16.4%;
+  }
+
+  .evl-results .ui-data-table__th:nth-child(3) {
+    width: 19.4%;
+  }
+
+  .evl-results .ui-data-table__th:nth-child(4) {
+    width: 13.4%;
+  }
+
+  .evl-results .ui-data-table__th:nth-child(5) {
+    width: 14.9%;
+  }
+
+  .evl-results .ui-data-table thead tr th:first-child {
+    border-top-left-radius: 18px;
+  }
+
+  .evl-results .ui-data-table thead tr th:last-child {
+    border-top-right-radius: 18px;
+  }
+
+  .evl-results .ui-data-table__row {
+    display: table-row;
+    height: auto;
+    padding: 0;
+    background: transparent;
+    border: 0;
+  }
+
+  .evl-results .ui-data-table__row:hover {
+    background: var(--bg-surface-subtle);
+  }
+
+  .evl-results .ui-data-table__cell {
+    display: table-cell;
+    width: auto;
+    padding: 20px 28px;
+    border: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: middle;
+  }
+
+  .evl-results .ui-data-table__row:last-child .ui-data-table__cell {
+    border-bottom: 0;
+  }
+
+  .evl-results .ui-data-table tbody tr:last-child td:first-child {
+    border-bottom-left-radius: 18px;
+  }
+
+  .evl-results .ui-data-table tbody tr:last-child td:last-child {
+    border-bottom-right-radius: 18px;
+  }
+
+  .evl-results .ev-events-table__event {
+    gap: 4px;
+    padding-right: 24px;
+  }
+
+  .evl-results .ev-events-table__name {
+    font-size: 16px;
+  }
+
+  .evl-results .ev-events-table__desc {
+    font-size: 14px;
+  }
+
+  .evl-results .ui-status-pill {
+    padding: 5px 11px;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .evl-results .ui-status-pill--success {
+    background: var(--bg-success-subtle);
+    color: var(--text-success-accent);
+  }
+
+  .evl-results .ui-status-pill--action {
+    background: var(--text-signal);
+    color: var(--text-primary);
+  }
+
+  .evl-results .ui-status-pill--neutral {
+    background: var(--bg-highlight);
+    color: var(--text-primary);
+  }
+
+  .evl-results .ui-progress-bar {
+    gap: 6px;
+    padding-right: 32px;
+  }
+
+  .evl-results .ui-progress-bar__label {
+    font-size: 14px;
+  }
+
+  .evl-results .ui-progress-bar__track--sm {
+    height: 6px;
+  }
+
+  .evl-results .ui-data-table__cell--action {
+    padding-right: 28px;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .evl-results .ui-data-table__cell--action .ui-button {
+    min-height: 38px;
+    height: auto;
+    padding: 9px 16px;
+    border: 1.5px solid var(--border-focus);
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .evl-results .ui-data-table__cell--action .ui-button--secondary {
+    background: var(--bg-surface);
+    color: var(--text-action);
+  }
+
+  /* Visitante: cómo participar en columnas. */
+  .evl-how {
+    gap: 16px;
+  }
+
+  .evl-how__steps {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  .evl-how__step {
+    align-items: flex-start;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .evl-pagination {
+    justify-content: flex-end;
+  }
+
+  /* Banner de visitante. */
+  .evl-banner.ui-card {
+    display: grid;
     grid-template-columns: 9fr 3fr;
+    align-items: center;
+    gap: 32px;
+    padding: 32px 40px;
+  }
+
+  .evl-banner__title {
+    font-size: 24px;
+  }
+
+  .evl-banner__cta.ui-button {
+    justify-self: end;
   }
 }

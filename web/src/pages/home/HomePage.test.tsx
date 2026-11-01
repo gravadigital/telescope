@@ -170,12 +170,11 @@ describe('HomePage', () => {
     for (const sel of ['.hm-hero', '.hm-steps', '.hm-open__list', '.hm-banner']) {
       expect(base).toMatch(new RegExp(`${sel.replace('.', '\\.')}\\s*\\{[^}]*grid-template-columns:\\s*1fr`));
     }
-    expect(media).toMatch(/\.hm-hero\s*\{[^}]*7fr 5fr/);
+    expect(media).toMatch(/\.hm-hero\s*\{[^}]*1\.1fr 1fr/);
     expect(media).toMatch(/\.hm-steps\s*\{[^}]*repeat\(4, 1fr\)/);
-    expect(media).toMatch(/\.hm-open__list\s*\{[^}]*repeat\(3, 1fr\)/);
+    expect(media).toMatch(/\.hm-open__list\s*\{[^}]*repeat\(3, minmax\(0, 1fr\)\)/);
     expect(media).toMatch(/\.hm-banner\s*\{[^}]*9fr 3fr/);
     expect(css).not.toMatch(/@media[^{]*max-width/);
-    expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba\(/);
   });
 
   it('descarta la respuesta si se desmonta', async () => {

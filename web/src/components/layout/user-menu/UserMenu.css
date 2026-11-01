@@ -25,23 +25,18 @@
   font-weight: 800;
 }
 .ly-user-menu__name {
-  display: none;
+  display: inline;
+  max-width: clamp(56px, 20vw, 132px);
+  overflow: hidden;
   color: var(--ref-color-white);
   font-size: 15px;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ly-user-menu__chevron {
-  display: none;
+  display: inline-block;
   width: 14px;
   height: 14px;
   color: var(--ref-color-white);
-}
-
-@media (min-width: 768px) {
-  .ly-user-menu__name {
-    display: inline;
-  }
-  .ly-user-menu__chevron {
-    display: inline-block;
-  }
 }

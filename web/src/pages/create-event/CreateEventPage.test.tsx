@@ -102,6 +102,20 @@ describe('CreateEventPage — render y validación', () => {
 });
 
 describe('CreateEventPage — pasos', () => {
+  it('mantiene las acciones dentro de la tarjeta en los tres pasos', () => {
+    renderPage();
+    const mainCard = document.querySelector('.cev-main') as HTMLElement;
+    const actions = document.querySelector('.cev-actions') as HTMLElement;
+    expect(mainCard.contains(actions)).toBe(true);
+
+    fillStep1();
+    next('Siguiente: Fechas y cupo →');
+    expect(mainCard.contains(actions)).toBe(true);
+
+    next('Siguiente: Revisar →');
+    expect(mainCard.contains(actions)).toBe(true);
+  });
+
   it('TS-26: avanzar al paso 2', () => {
     renderPage();
     fillStep1();
@@ -146,9 +160,8 @@ describe('CreateEventPage — pasos', () => {
     expect(screen.getAllByText('Diseña el afiche del festival').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Club de Diseño').length).toBeGreaterThan(0);
     expect(screen.getByText('22 participantes')).toBeInTheDocument();
-    ['nombre', 'descripción', 'organizador', 'cupo'].forEach((f) =>
-      expect(screen.getByRole('button', { name: `Editar ${f}` })).toBeInTheDocument()
-    );
+    expect(screen.getByRole('button', { name: 'Editar identificación' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Editar cupo' })).toBeInTheDocument();
     expect(screen.getByText(/El evento se crea en etapa Creación: nadie más puede verlo/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Crear evento' })).toBeInTheDocument();
   });

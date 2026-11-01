@@ -259,31 +259,43 @@ const CreateEventPage: React.FC = () => {
   };
 
   const capacityHelp = t('eventForm.capacityRange');
-  const summary: Array<{ field: string; label: string; value: string; target: Step }> = [
-    { field: 'name', label: t('createEvent.review.name'), value: values.name.trim(), target: 1 },
+  const reviewSections = [
     {
-      field: 'description',
-      label: t('createEvent.review.description'),
-      value: values.description.trim(),
-      target: 1,
+      id: 'identification',
+      title: t('createEvent.steps.identification'),
+      target: 1 as Step,
+      editLabel: t('createEvent.review.editField', {
+        field: t('createEvent.steps.identification').toLocaleLowerCase(locale),
+      }),
+      items: [
+        { label: t('createEvent.review.name'), value: values.name.trim() },
+        { label: t('createEvent.review.description'), value: values.description.trim() },
+        {
+          label: t('createEvent.review.organizer'),
+          value:
+            values.organizer.trim() ||
+            t('createEvent.review.organizerFallback', { name: user?.name ?? '' }),
+        },
+      ],
     },
     {
-      field: 'organizer',
-      label: t('createEvent.review.organizer'),
-      value:
-        values.organizer.trim() ||
-        t('createEvent.review.organizerFallback', { name: user?.name ?? '' }),
-      target: 1,
-    },
-    {
-      field: 'capacity',
-      label: t('createEvent.review.capacity'),
-      value: t('createEvent.review.capacityValue', { count: values.maxParticipants }),
-      target: 2,
+      id: 'capacity',
+      title: t('createEvent.steps.capacity'),
+      target: 2 as Step,
+      editLabel: t('createEvent.review.editField', {
+        field: t('createEvent.review.capacity').toLocaleLowerCase(locale),
+      }),
+      items: [
+        {
+          label: t('createEvent.review.capacity'),
+          value: t('createEvent.review.capacityValue', { count: values.maxParticipants }),
+        },
+      ],
     },
   ];
 
   return (
+    <form className="cev-form" onSubmit={handleSubmit} noValidate>
     <div className="cev-page">
       <nav className="cev-breadcrumb" aria-label={t('createEvent.breadcrumbLabel')}>
         <ol className="cev-breadcrumb__list">
@@ -377,7 +389,6 @@ const CreateEventPage: React.FC = () => {
         {t('createEvent.stepAnnouncement', { number: step, name: t(STEP_NAME_KEY[step]) })}
       </div>
 
-      <form className="cev-form" onSubmit={handleSubmit} noValidate>
         <div className="cev-wizard">
           <div className="cev-main">
             <p className="cev-eyebrow">{t('createEvent.stepOf', { number: step })}</p>
@@ -446,29 +457,77 @@ const CreateEventPage: React.FC = () => {
 
             {step === 3 && (
               <div className="cev-fields">
-                <dl className="cev-summary">
-                  {summary.map((row) => (
-                    <div key={row.field} className="cev-summary__row">
-                      <dt>{row.label}</dt>
-                      <dd>{row.value}</dd>
-                      <Button
-                        variant="tertiary"
-                        size="sm"
-                        disabled={creating}
-                        aria-label={t('createEvent.review.editField', {
-                          field: row.label.toLocaleLowerCase(locale),
-                        })}
-                        onClick={() => goTo(row.target)}
-                      >
-                        {t('createEvent.review.edit')}
-                      </Button>
-                    </div>
+                <div className="cev-summary">
+                  {reviewSections.map((section) => (
+                    <section key={section.id} className="cev-summary__section">
+                      <div className="cev-summary__header">
+                        <h3 className="cev-summary__title">{section.title}</h3>
+                        <Button
+                          variant="tertiary"
+                          size="sm"
+                          disabled={creating}
+                          aria-label={section.editLabel}
+                          onClick={() => goTo(section.target)}
+                        >
+                          {t('createEvent.review.edit')}
+                        </Button>
+                      </div>
+                      <dl className="cev-summary__list">
+                        {section.items.map((item) => (
+                          <div key={item.label} className="cev-summary__item">
+                            <dt>{item.label}</dt>
+                            <dd>{item.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </section>
                   ))}
-                </dl>
+                </div>
                 <Callout tone="info">{t('createEvent.visibilityNotice')}</Callout>
                 {submitError && <Callout tone="error">{t(submitError)}</Callout>}
               </div>
             )}
+
+            <div className="cev-actions">
+              <div className="cev-actions__start">
+                <Button
+                  variant="tertiary"
+                  className="cev-actions__cancel"
+                  disabled={creating}
+                  onClick={handleCancel}
+                >
+                  {t('createEvent.cancel')}
+                </Button>
+                {step > 1 && (
+                  <Button
+                    variant="tertiary"
+                    className="cev-actions__back"
+                    disabled={creating}
+                    onClick={() => goTo((step - 1) as Step)}
+                  >
+                    {t('createEvent.back')}
+                  </Button>
+                )}
+              </div>
+              <div className="cev-actions__end">
+                <Button
+                  variant="secondary"
+                  className="cev-actions__draft"
+                  disabled={creating}
+                  onClick={handleSaveDraft}
+                >
+                  {t('createEvent.saveDraft')}
+                </Button>
+                <Button
+                  type="submit"
+                  className="cev-actions__next"
+                  loading={creating}
+                  loadingLabel={t('createEvent.submitting')}
+                >
+                  {t(NEXT_LABEL_KEY[step])}
+                </Button>
+              </div>
+            </div>
           </div>
 
           <aside className="cev-aside">
@@ -490,43 +549,6 @@ const CreateEventPage: React.FC = () => {
           </aside>
         </div>
 
-        <div className="cev-actions">
-          <div className="cev-actions__inner">
-            <div className="cev-actions__cancel">
-              <Button variant="tertiary" disabled={creating} onClick={handleCancel}>
-                {t('createEvent.cancel')}
-              </Button>
-            </div>
-            {step > 1 && (
-              <div className="cev-actions__back">
-                <Button
-                  variant="secondary"
-                  fullWidth
-                  disabled={creating}
-                  onClick={() => goTo((step - 1) as Step)}
-                >
-                  {t('createEvent.back')}
-                </Button>
-              </div>
-            )}
-            <div className="cev-actions__draft">
-              <Button variant="secondary" fullWidth disabled={creating} onClick={handleSaveDraft}>
-                {t('createEvent.saveDraft')}
-              </Button>
-            </div>
-            <div className={`cev-actions__next${step === 1 ? ' cev-actions__next--alone' : ''}`}>
-              <Button
-                type="submit"
-                fullWidth
-                loading={creating}
-                loadingLabel={t('createEvent.submitting')}
-              >
-                {t(NEXT_LABEL_KEY[step])}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </form>
       </div>
 
       <Dialog
@@ -550,6 +572,7 @@ const CreateEventPage: React.FC = () => {
         <p id={discardTextId}>{t('createEvent.discard.text')}</p>
       </Dialog>
     </div>
+    </form>
   );
 };
 

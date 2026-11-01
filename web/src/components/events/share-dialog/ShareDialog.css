@@ -56,13 +56,30 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-stack-sm);
-  padding: var(--space-padding-compact) var(--space-inline-sm);
+  justify-content: center;
+  gap: var(--ref-space-xs);
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  padding: var(--ref-space-xs);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-control);
   color: var(--text-primary);
   text-decoration: none;
   font: var(--type-caption);
+}
+
+.ev-share-dialog__network-icon-frame {
+  display: grid;
+  place-items: center;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+}
+.ev-share-dialog__network-icon-frame svg {
+  display: block;
+  flex: none;
+  width: 24px;
+  height: 24px;
 }
 
 .ev-share-dialog__network:hover {
@@ -76,7 +93,10 @@
 }
 
 .ev-share-dialog__network-name {
-  overflow-wrap: anywhere;
+  max-width: 100%;
+  font-size: 11px;
+  line-height: var(--ref-font-leading-snug);
+  white-space: nowrap;
   text-align: center;
 }
 

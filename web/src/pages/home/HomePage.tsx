@@ -3,12 +3,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Card from '../../components/ui/card/Card';
 import Callout from '../../components/ui/callout/Callout';
 import EmptyState from '../../components/ui/empty-state/EmptyState';
-import ProgressBar from '../../components/ui/progress-bar/ProgressBar';
 import StatusPill from '../../components/ui/status-pill/StatusPill';
 import StageTimeline from '../../components/events/stage-timeline/StageTimeline';
 import { useAuth } from '../../context/AuthContext';
 import { useT } from '../../i18n';
-import { daysUntilClose } from '../../domain/dates';
 import { openEvents } from '../../domain/events';
 import { loginPathFor } from '../../domain/redirect';
 import { STAGE_ORDER, stageNameKey } from '../../domain/stages';
@@ -61,7 +59,6 @@ const HomePage: React.FC = () => {
   }, [location.hash]);
 
   const open = React.useMemo(() => openEvents(state.items), [state.items]);
-  const featured = open[0];
   const list = open.slice(0, FEATURED_LIMIT);
   const createPath = user ? '/events/create' : loginPathFor('/events/create');
 
@@ -69,37 +66,6 @@ const HomePage: React.FC = () => {
     (acc, stage) => ({ ...acc, [stage]: t(stageNameKey(stage)) }),
     {} as Record<EventStage, string>
   );
-
-  const closesText = (event: EventListItem): string | null => {
-    const date = event.participation_estimated_end_date;
-    if (!date) return null;
-    const days = daysUntilClose(date);
-    if (days < 0) return null;
-    return days === 0
-      ? t('home.featured.closesToday')
-      : t('home.featured.closesIn', { count: days });
-  };
-
-  const capacity = (event: EventListItem, visible: 'featured' | 'card'): React.ReactNode => {
-    const count = event.participants_count;
-    if (event.max_participants === null) {
-      return <p className="hm-capacity-text">{t('events.table.registered', { count })}</p>;
-    }
-    const max = event.max_participants;
-    return (
-      <ProgressBar
-        size={visible === 'featured' ? 'md' : 'sm'}
-        value={count}
-        max={max}
-        label={
-          visible === 'featured'
-            ? t('home.featured.capacity', { count, max })
-            : t('events.table.capacity', { count, max })
-        }
-        valueText={t('home.featured.capacity', { count, max })}
-      />
-    );
-  };
 
   const loading = state.status === 'loading';
 
@@ -123,65 +89,60 @@ const HomePage: React.FC = () => {
           </div>
         </div>
 
-        {loading && (
-          <div className="hm-hero__featured" aria-hidden="true">
-            <Card variant="raised">
-              <span className="hm-skeleton hm-skeleton--pill" />
-              <span className="hm-skeleton hm-skeleton--title" />
-              <span className="hm-skeleton" />
-              <span className="hm-skeleton hm-skeleton--bar" />
-            </Card>
-          </div>
-        )}
-
-        {state.status === 'ready' && featured && (
-          <section className="hm-hero__featured" aria-label={t('home.featured.label')}>
-            <Card as="article" variant="raised">
+        <section className="hm-hero__featured" aria-label={t('home.featured.label')}>
+          <article className="hm-featured-card">
+            <div className="hm-featured-card__top">
               <StatusPill tone="success" icon="dot" size="sm">
-                {[t('home.featured.status'), closesText(featured)].filter(Boolean).join(' · ')}
+                {t('home.featured.status')}
               </StatusPill>
-              <h3 className="hm-featured__name">{featured.name}</h3>
-              {featured.description && (
-                <p className="hm-featured__description">{featured.description}</p>
-              )}
-              <StageTimeline
-                variant="compact"
-                current="participation"
-                stageLabels={stageLabels}
-                nowLabel={t('events.timeline.now')}
-                completedLabel={t('events.timeline.completed')}
-                pendingLabel={t('events.timeline.pending')}
-                stepOfLabel={t('events.timeline.stepOf', { number: 2 })}
-              />
-              {capacity(featured, 'featured')}
+              <span className="hm-featured-card__closes">
+                {t('home.featured.closesIn', { count: 6 })}
+              </span>
+            </div>
+            <h3 className="hm-featured__name">{t('home.featured.sampleName')}</h3>
+            <p className="hm-featured__description">{t('home.featured.sampleDescription')}</p>
+            <StageTimeline
+              variant="compact"
+              current="participation"
+              stageLabels={stageLabels}
+              nowLabel={t('events.timeline.now')}
+              completedLabel={t('events.timeline.completed')}
+              pendingLabel={t('events.timeline.pending')}
+              stepOfLabel={t('events.timeline.stepOf', { number: 2 })}
+            />
+            <div className="hm-featured-card__footer">
+              <span className="hm-featured-card__capacity">
+                {t('home.featured.capacity', { count: 13, max: 20 })}
+              </span>
               <Link
-                to={`/events/${featured.id}`}
-                className="ui-button ui-button--md ui-button--primary"
+                to="/events?stage=participation"
+                className="ui-button ui-button--md ui-button--primary hm-featured-card__cta"
               >
                 {t('home.featured.participate')}
               </Link>
-            </Card>
-          </section>
-        )}
+            </div>
+          </article>
+        </section>
       </section>
 
+      <div className="hm-divider" aria-hidden="true" />
+
       <section id={HOW_ANCHOR} className="hm-how" aria-labelledby={howTitleId} ref={howSectionRef}>
-        <p className="hm-eyebrow">{t('home.how.eyebrow')}</p>
-        <h2 id={howTitleId} className="hm-section-title" tabIndex={-1} ref={howTitleRef}>
-          {t('home.how.title')}
-        </h2>
+        <div className="hm-how__header">
+          <div>
+            <p className="hm-eyebrow">{t('home.how.eyebrow')}</p>
+            <h2 id={howTitleId} className="hm-section-title" tabIndex={-1} ref={howTitleRef}>
+              {t('home.how.title')}
+            </h2>
+          </div>
+          <Link to="/demo" className="hm-how__demo">{t('home.how.demo')}</Link>
+        </div>
         <ol className="hm-steps">
           {STEP_KEYS.map((key, index) => (
             <li key={key} className="hm-steps__item">
-              <Card variant="subtle" padding="compact">
-                <p className="hm-step__title">
-                  {t('home.how.step', {
-                    number: String(index + 1).padStart(2, '0'),
-                    stage: t(stageNameKey(key)),
-                  })}
-                </p>
-                <p className="hm-step__text">{t(`home.how.${key}` as const)}</p>
-              </Card>
+              <span className="hm-step__number">{String(index + 1).padStart(2, '0')}</span>
+              <span className="hm-step__name">{t(stageNameKey(key))}</span>
+              <span className="hm-step__text">{t(`home.how.${key}` as const)}</span>
             </li>
           ))}
         </ol>
@@ -226,16 +187,27 @@ const HomePage: React.FC = () => {
             <ul className="hm-open__list">
               {list.map((event) => (
                 <li key={event.id} className="hm-open__item">
-                  <Card as="article" variant="default" padding="compact">
-                    <StatusPill tone="success" icon="dot" size="sm">
-                      {t('home.featured.status')}
-                    </StatusPill>
-                    <h3 className="hm-card__name">{event.name}</h3>
-                    {event.description && <p className="hm-card__description">{event.description}</p>}
-                    {capacity(event, 'card')}
+                  <Card as="article" variant="subtle" padding="default" className="hm-open__card">
+                    <div className="hm-open__card-meta">
+                      <StatusPill tone="success" icon="dot" size="sm">
+                        {t('home.featured.status')}
+                      </StatusPill>
+                      <span className="hm-open__card-capacity">
+                        {event.max_participants === null
+                          ? t('events.table.registered', { count: event.participants_count })
+                          : t('home.open.spots', {
+                              count: event.participants_count,
+                              max: event.max_participants,
+                            })}
+                      </span>
+                    </div>
+                    <div className="hm-open__card-details">
+                      <h3 className="hm-card__name">{event.name}</h3>
+                      {event.description && <p className="hm-card__description">{event.description}</p>}
+                    </div>
                     <Link
                       to={`/events/${event.id}`}
-                      className="ui-button ui-button--md ui-button--secondary"
+                      className="ui-button ui-button--md ui-button--secondary hm-open__card-cta"
                     >
                       {t('home.open.cta')}
                     </Link>

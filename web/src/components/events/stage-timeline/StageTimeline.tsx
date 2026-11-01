@@ -1,6 +1,6 @@
 import React from 'react';
 import Button from '../../ui/button/Button';
-import { STAGE_ORDER, stageStatus } from '../../../domain/stages';
+import { STAGE_ORDER, stageIndex, stageStatus } from '../../../domain/stages';
 import type { EventStage } from '../../../types';
 import '../../ui/visually-hidden.css';
 import './StageTimeline.css';
@@ -19,6 +19,10 @@ export interface StageTimelineProps {
   editLabel?: string;
   /** Texto extra del resumen mobile (p. ej. el cierre de la etapa). */
   summaryDetail?: React.ReactNode;
+  /** Etiqueta del número de etapa ("Etapa"). */
+  stageLabel?: string;
+  /** Etiqueta de las etapas que todavía no empezaron ("Próxima"). */
+  upcomingLabel?: string;
 }
 
 const StageTimeline: React.FC<StageTimelineProps> = ({
@@ -33,6 +37,8 @@ const StageTimeline: React.FC<StageTimelineProps> = ({
   onEditDeadline,
   editLabel,
   summaryDetail,
+  stageLabel,
+  upcomingLabel,
 }) => {
   const compact = variant === 'compact';
 
@@ -62,14 +68,30 @@ const StageTimeline: React.FC<StageTimelineProps> = ({
               <div className="ev-stage-timeline__track" aria-hidden="true">
                 <div className="ev-stage-timeline__line" />
                 <span className="ev-stage-timeline__marker">
-                  {status === 'completed' && <span className="ev-stage-timeline__check">✓</span>}
-                  {status === 'current' && <span className="ev-stage-timeline__dot" />}
+                  {status === 'completed' ? (
+                    <span className="ev-stage-timeline__check">✓</span>
+                  ) : (
+                    <span className="ev-stage-timeline__index">{stageIndex(stage) + 1}</span>
+                  )}
                 </span>
               </div>
-              <span className="ev-stage-timeline__name">
-                {stageLabels[stage]}
-                {!compact && status === 'current' ? ` - ${nowLabel}` : null}
-              </span>
+              {!compact && stageLabel && (
+                <span className="ev-stage-timeline__eyebrow">
+                  {stageLabel} {stageIndex(stage) + 1}
+                  {status === 'pending' && upcomingLabel ? ` · ${upcomingLabel}` : null}
+                </span>
+              )}
+              <div className="ev-stage-timeline__title">
+                {status === 'completed' && (
+                  <span className="ev-stage-timeline__name-check" aria-hidden="true">
+                    ✓
+                  </span>
+                )}
+                <span className="ev-stage-timeline__name">
+                  {stageLabels[stage]}
+                  {!compact && status === 'current' ? ` · ${nowLabel}` : null}
+                </span>
+              </div>
               {status === 'completed' && <span className="ui-visually-hidden">{completedLabel}</span>}
               {status === 'pending' && <span className="ui-visually-hidden">{pendingLabel}</span>}
               {!compact && (subtitles?.[stage] || editable) && (

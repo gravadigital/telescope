@@ -686,6 +686,8 @@ const EventDetailPage: React.FC = () => {
           completedLabel={t('events.timeline.completed')}
           pendingLabel={t('events.timeline.pending')}
           stepOfLabel={t('events.timeline.stepOf', { number: STAGE_ORDER.indexOf(event.stage) + 1 })}
+          stageLabel={t('events.timeline.stage')}
+          upcomingLabel={t('events.timeline.upcoming')}
           summaryDetail={deadlineText ? t('eventDetail.timeline.closes', { date: deadlineText }) : undefined}
         />
 
