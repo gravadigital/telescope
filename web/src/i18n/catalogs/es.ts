@@ -729,6 +729,14 @@ export const es = {
       text: 'Se calcula el ranking final y queda visible para todos. Nadie podrá votar después.',
       missingTitle: 'Faltan {missing} de {total} rankings',
       missingText: 'Con pocos votos el resultado es menos confiable. Quien no envió su ranking queda con calidad 0 y su propuesta baja posiciones.',
+      unevaluatedTitle: plural({
+        one: '{count} propuesta todavía no tiene evaluaciones',
+        other: '{count} propuestas todavía no tienen evaluaciones',
+      }),
+      unevaluatedText: plural({
+        one: 'Si publicas ahora, queda sin posición en el ranking.',
+        other: 'Si publicas ahora, quedan sin posición en el ranking.',
+      }),
       error: 'No pudimos publicar los resultados. Intenta de nuevo.',
       wait: 'Seguir esperando',
       confirmAnyway: 'Publicar igual',
@@ -918,7 +926,7 @@ export const es = {
     },
     howVoteCounts: {
       title: '¿Cómo cuenta tu voto?',
-      text: 'Tu orden se compara con el de los demás evaluadores. Si evalúas con coherencia, tu propia propuesta sube posiciones en el ranking final; si no, baja.',
+      text: 'Ordena las propuestas según su calidad, como lo haría un jurado imparcial. Al cerrar la votación, tu orden se compara con el ranking general: si se parece, tu propia propuesta sube posiciones; si se aleja mucho o no envías tu ranking, baja.',
     },
     about: 'Sobre el evento',
     details: {
@@ -987,9 +995,16 @@ export const es = {
     ranking: 'Ranking completo',
     you: 'Tú',
     evaluations: plural({ one: '{count} evaluación', other: '{count} evaluaciones' }),
-    note: 'El puntaje combina los rankings de todos los participantes, en una escala de 0 a 10. La propuesta de quien evaluó con coherencia sube posiciones; la de quien no, baja.',
+    note: 'El puntaje combina los rankings de todos los participantes, en una escala de 0 a 10. La propuesta de quien ordenó parecido al ranking general sube posiciones; la de quien se alejó mucho o no envió su ranking, baja.',
     loading: 'Cargando resultados…',
     error: 'No pudimos cargar los resultados.',
+    unevaluated: {
+      title: 'Sin evaluaciones',
+      text: plural({
+        one: 'Esta propuesta no recibió ninguna evaluación, así que no tiene posición en el ranking.',
+        other: 'Estas propuestas no recibieron ninguna evaluación, así que no tienen posición en el ranking.',
+      }),
+    },
   },
   errors: {
     ALREADY_CANCELLED: 'Este evento ya fue cancelado.',

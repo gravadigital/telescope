@@ -52,7 +52,7 @@ anywhere: changing a value means recreating the container, not rebuilding the im
 
 ### api
 
-**These must be set.** Their defaults are for development and are public:
+**These must be set.** `JWT_SECRET` has no default in the api; the others have development defaults that are public:
 
 | Variable | What goes in it |
 |---|---|
@@ -65,8 +65,8 @@ anywhere: changing a value means recreating the container, not rebuilding the im
 | `FRONTEND_URL` | The public URL of the web, used in the links inside emails |
 | `CORS_ALLOW_ORIGINS` | The public URL of the web. The default, `*`, accepts any origin |
 
-> If `JWT_SECRET` is missing, the api still starts, with a hardcoded default and only a warning
-> in the log. Anyone who knows that default can sign valid tokens. Always set it.
+> If `JWT_SECRET` is missing, the api refuses to start and logs `JWT_SECRET is required`. The
+> development value from `make` and the compose file is public: never reuse it on a server.
 
 **Optional:**
 

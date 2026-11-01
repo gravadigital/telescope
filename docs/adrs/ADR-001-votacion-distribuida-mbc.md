@@ -35,13 +35,17 @@ El modelo tiene cuatro piezas:
    relajada al 60% del máximo posible cuando `k ≤ 10` (la fórmula está pensada para volúmenes
    grandes).
 
-2. **Puntaje de la propuesta (MBC)** — `MBC(f_j) = (1/(m(m−1))) · Σ(m − R_i(f_j))`, donde
-   `R_i(f_j)` es la posición que el evaluador `i` le dio (1 = mejor). La normalización deja el
-   resultado en `[0,1]`. Produce el **ranking global `G`**. Los empates se rompen por cantidad de
-   votos y luego por UUID, para que el orden sea determinístico.
+2. **Puntaje de la propuesta (MBC)** — `MBC(f_j) = (1/(v_j(m−1))) · Σ(m − R_i(f_j))`, donde
+   `R_i(f_j)` es la posición que el evaluador `i` le dio (1 = mejor) y `v_j` la cantidad de votos
+   que recibió `f_j`. Promediar por `v_j` deja el resultado en `[0,1]` y hace que no dependa de
+   cuántos evaluadores le tocaron ni de si votaron. Produce el **ranking global `G`**. Los empates
+   se rompen por UUID, para que el orden sea determinístico (la cantidad de votos no desempata:
+   no dice nada del mérito). Una propuesta sin ningún voto no tiene posición: se marca
+   `unevaluated` y se lista aparte, en vez de quedar última con puntaje 0.
 
-3. **Calidad del evaluador** — `Q_i = 1 − (2/(m(m−1))) · Σ|R_i(f_j) − RelativeRank_G(f_j, A(p_i))|`.
-   Mide cuánto se aparta un evaluador del consenso, **restringido al subconjunto que le tocó**.
+3. **Calidad del evaluador** — `Q_i = 1 − (1/⌊m²/2⌋) · Σ|R_i(f_j) − RelativeRank_G(f_j, A(p_i))|`,
+   la normalización del paper: `⌊m²/2⌋` es el desvío de un orden exactamente invertido, que da
+   `Q_i = 0`; coincidir con el consenso da `Q_i = 1`. Mide cuánto se aparta un evaluador del consenso, **restringido al subconjunto que le tocó**.
    Quien no completa su asignación recibe `Q_i = 0`.
 
 4. **Incentivos** — El ranking `G` se ajusta a `G'`: la propuesta de un evaluador con

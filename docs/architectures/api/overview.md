@@ -38,10 +38,11 @@ Quien vaya a tocar algo de votación necesita entender esto antes:
    propuestas totales, garantizando que nadie evalúe la propia (`m ≤ k-1`) y que cada
    propuesta reciba un mínimo de evaluaciones. Exige `m ≥ 2·log₂(k)` para convergencia,
    relajado al 60% del máximo posible cuando `k ≤ 10`.
-2. **MBC** — `MBC(f) = (1/(m(m-1))) · Σ(m − R_i(f))`, normalizado a `[0,1]`. Produce el
-   ranking global `G`. Los empates se rompen por cantidad de votos y luego por UUID,
-   para que el orden sea determinístico.
-3. **Calidad del evaluador** — `Q_i = 1 − (2/(m(m-1))) · Σ|R_i(f) − RelativeRank_G(f, A(p_i))|`.
+2. **MBC** — `MBC(f) = (1/(v_f(m-1))) · Σ(m − R_i(f))`, con `v_f` los votos que recibió `f`:
+   un promedio en `[0,1]` que no depende de cuántas evaluaciones tuvo. Produce el
+   ranking global `G`. Los empates se rompen por UUID, para que el orden sea determinístico.
+3. **Calidad del evaluador** — `Q_i = 1 − (1/⌊m²/2⌋) · Σ|R_i(f) − RelativeRank_G(f, A(p_i))|`
+   (normalización del paper: el orden invertido da 0).
    Mide la desviación del evaluador respecto del consenso, restringida a lo que le tocó.
    Quien no completa su asignación recibe `Q_i = 0`.
 4. **Incentivos** — la propuesta de un buen evaluador sube `n` posiciones; la de uno
@@ -120,8 +121,8 @@ Relevada del código, para que no se confunda con decisión de diseño:
 8. **Código sin `gofmt`**: hay bloques con indentación rota que hacen difícil leer el
    control de flujo (por ejemplo `event_handler.go:196-207`, cuya lógica es correcta pero
    parece rota). `_base` exige `gofumpt`.
-9. **JWT secret con default hardcodeado**: si falta `JWT_SECRET` arranca igual con
-   `"telescopio-dev-secret-change-in-production"` y solo imprime un warning.
+9. ~~**JWT secret con default hardcodeado**~~ — **corregido**: sin `JWT_SECRET` el servicio
+   no arranca (ver la convención `auth-jwt`).
 10. **El CHECK `future_start_date` bloquea editar eventos viejos**: se reevalúa en todo `UPDATE`
     de la fila (aunque sea `NOT VALID`), así que `PATCH /events/:event_id` —y también el cambio
     de etapa, pausar y cancelar— responde `500` si `start_date` es anterior a ayer. Verificado por

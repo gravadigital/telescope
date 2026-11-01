@@ -277,9 +277,8 @@ común.
 **JWT HS256 con vigencia de 24 horas.** El token lleva `user_id`, `email` y `role`. Dos vías de
 obtención: email/password (bcrypt DefaultCost, mínimo 8 caracteres) y Google OAuth.
 
-⚠️ **`JWT_SECRET` tiene un default hardcodeado.** Si falta la variable de entorno el servicio
-arranca con un secreto conocido y solo emite un warning. Es un defecto crítico (D-12), no un
-patrón.
+**`JWT_SECRET` es obligatorio y no tiene default.** Si falta la variable de entorno el servicio
+no arranca (D-12, corregido).
 
 ### Autorización
 

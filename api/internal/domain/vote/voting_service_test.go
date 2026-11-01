@@ -281,11 +281,9 @@ func TestCalculateModifiedBordaCount_UnanimousRankingProducesExpectedOrder(t *te
 	assert.Equal(t, 3, results.TotalParticipants, "quality map should include all assignments, completed or not")
 }
 
-func TestCalculateModifiedBordaCount_TieBreaksByVoteCountThenID(t *testing.T) {
+func TestCalculateModifiedBordaCount_TieBreaksByID(t *testing.T) {
 	vs, voteRepo, eventID, participants, attachments, config := setupThreeWayVoting(t)
 
-	// Give attachments[0] and attachments[1] the exact same MBC score (0.5) but
-	// different vote counts, so vote count must break the tie.
 	votes := []*Vote{
 		{EventID: eventID, VoterID: participants[2], AttachmentID: attachments[0], RankPosition: 1},
 		{EventID: eventID, VoterID: participants[2], AttachmentID: attachments[1], RankPosition: 2},
@@ -315,7 +313,56 @@ func TestCalculateModifiedBordaCount_TieBreaksByVoteCountThenID(t *testing.T) {
 	assert.True(t, results.GlobalRanking[1].AttachmentID.String() < results.GlobalRanking[2].AttachmentID.String())
 }
 
-func TestCalculateModifiedBordaCount_AttachmentWithNoVotesRanksLast(t *testing.T) {
+// Four participants, m=2. participants[3] never votes, so attachments[0] gets a single
+// 1st-place vote while attachments[1] gets two. Both were ranked first every time they were
+// evaluated, so they must score the same: the MBC averages over votes received instead of
+// rewarding the attachment that happened to get more evaluators.
+func TestCalculateModifiedBordaCount_ScoreDoesNotDependOnVoteCount(t *testing.T) {
+	vs, voteRepo, attachmentRepo, _ := newTestService()
+	eventID := uuid.New()
+	participants := []uuid.UUID{uuid.New(), uuid.New(), uuid.New(), uuid.New()}
+	attachments := make([]uuid.UUID, 4)
+	for i, p := range participants {
+		attachments[i] = uuid.New()
+		attachmentRepo.add(eventID, &fakeAttachment{id: attachments[i], participantID: p, originalName: "a.jpg"})
+	}
+	config := defaultConfig(eventID, 2)
+
+	votes := []*Vote{
+		{EventID: eventID, VoterID: participants[0], AttachmentID: attachments[1], RankPosition: 1},
+		{EventID: eventID, VoterID: participants[0], AttachmentID: attachments[2], RankPosition: 2},
+		{EventID: eventID, VoterID: participants[1], AttachmentID: attachments[1], RankPosition: 1},
+		{EventID: eventID, VoterID: participants[1], AttachmentID: attachments[3], RankPosition: 2},
+		{EventID: eventID, VoterID: participants[2], AttachmentID: attachments[0], RankPosition: 1},
+		{EventID: eventID, VoterID: participants[2], AttachmentID: attachments[3], RankPosition: 2},
+	}
+	for _, v := range votes {
+		v.ID = uuid.New()
+		voteRepo.votes = append(voteRepo.votes, v)
+	}
+	addAssignment(voteRepo, eventID, participants[0], []uuid.UUID{attachments[1], attachments[2]}, true)
+	addAssignment(voteRepo, eventID, participants[1], []uuid.UUID{attachments[1], attachments[3]}, true)
+	addAssignment(voteRepo, eventID, participants[2], []uuid.UUID{attachments[0], attachments[3]}, true)
+	addAssignment(voteRepo, eventID, participants[3], []uuid.UUID{attachments[0], attachments[2]}, false)
+
+	results, err := vs.CalculateModifiedBordaCount(eventID, config)
+	require.NoError(t, err)
+
+	byID := map[uuid.UUID]AttachmentResult{}
+	for _, r := range results.GlobalRanking {
+		byID[r.AttachmentID] = r
+	}
+	assert.Equal(t, 1, byID[attachments[0]].VoteCount)
+	assert.Equal(t, 2, byID[attachments[1]].VoteCount)
+	assert.InDelta(t, 1.0, byID[attachments[0]].MBCScore, 1e-9)
+	assert.InDelta(t, 1.0, byID[attachments[1]].MBCScore, 1e-9)
+
+	// The tie between them is broken by ID, not by who got more votes.
+	top := results.GlobalRanking[:2]
+	assert.True(t, top[0].AttachmentID.String() < top[1].AttachmentID.String())
+}
+
+func TestCalculateModifiedBordaCount_AttachmentWithNoVotesHasNoPosition(t *testing.T) {
 	vs, voteRepo, eventID, participants, attachments, config := setupThreeWayVoting(t)
 
 	// Only participants[0] votes, and only on attachments[1]. attachments[0] and
@@ -336,14 +383,27 @@ func TestCalculateModifiedBordaCount_AttachmentWithNoVotesRanksLast(t *testing.T
 		byID[r.AttachmentID] = r
 	}
 
-	assert.Equal(t, 0, byID[attachments[0]].VoteCount)
-	assert.InDelta(t, 0.0, byID[attachments[0]].MBCScore, 1e-9)
-	assert.Equal(t, 0, byID[attachments[2]].VoteCount)
-	assert.InDelta(t, 0.0, byID[attachments[2]].MBCScore, 1e-9)
+	// attachments[0] and attachments[2] got no votes: no score to rank by, so no position.
+	for _, id := range []uuid.UUID{attachments[0], attachments[2]} {
+		assert.Equal(t, 0, byID[id].VoteCount)
+		assert.True(t, byID[id].Unevaluated)
+		assert.Equal(t, 0, byID[id].GlobalRank)
+	}
 
-	// attachments[1] got the only vote, and it was a 1st-place vote -> top score.
-	assert.Greater(t, byID[attachments[1]].MBCScore, byID[attachments[0]].MBCScore)
+	// attachments[1] got the only vote and is the only ranked one.
+	assert.False(t, byID[attachments[1]].Unevaluated)
 	assert.Equal(t, 1, byID[attachments[1]].GlobalRank)
+
+	// Both rankings list the ranked attachment first, then the unevaluated ones in ID order.
+	for name, ranking := range map[string][]AttachmentResult{"global": results.GlobalRanking, "adjusted": results.AdjustedRanking} {
+		require.Len(t, ranking, 3, name)
+		assert.Equal(t, attachments[1], ranking[0].AttachmentID, name)
+		assert.True(t, ranking[1].Unevaluated && ranking[2].Unevaluated, name)
+		assert.True(t, ranking[1].AttachmentID.String() < ranking[2].AttachmentID.String(), name)
+	}
+	for _, r := range results.AdjustedRanking[1:] {
+		assert.Equal(t, 0, r.AdjustedRank, "the incentive must not give an unevaluated attachment a position")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -423,6 +483,55 @@ func TestCalculateModifiedBordaCount_AllParticipantsAbsentExceptOneStillProduces
 
 	assert.Equal(t, 0.0, results.ParticipantQualities[participants[1].String()])
 	assert.Equal(t, 0.0, results.ParticipantQualities[participants[2].String()])
+}
+
+// ---------------------------------------------------------------------------
+// calculateParticipantQualities - Q_i normalization (Merrifield & Saari 2009)
+// ---------------------------------------------------------------------------
+
+func TestMaxRankDeviation(t *testing.T) {
+	// ⌊m²/2⌋: the Σ|R_i - RelativeRank| of a ranking in exactly reverse order.
+	for m, want := range map[int]int{2: 2, 3: 4, 4: 8, 5: 12} {
+		assert.Equal(t, want, maxRankDeviation(m), "m=%d", m)
+	}
+}
+
+func TestCalculateParticipantQualities_SpansZeroToOne(t *testing.T) {
+	// Global order a0 > a1 > a2; one evaluator per way of ranking that same subset.
+	cases := []struct {
+		name  string
+		ranks [3]int // positions given to a0, a1, a2
+		want  float64
+	}{
+		{"same order as the consensus", [3]int{1, 2, 3}, 1.0},
+		{"one adjacent swap", [3]int{2, 1, 3}, 0.5},
+		{"exact reverse", [3]int{3, 2, 1}, 0.0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			vs, voteRepo, _, _ := newTestService()
+			eventID := uuid.New()
+			attachments := []uuid.UUID{uuid.New(), uuid.New(), uuid.New()}
+			global := make([]AttachmentResult, 3)
+			for i, a := range attachments {
+				global[i] = AttachmentResult{AttachmentID: a, GlobalRank: i + 1}
+			}
+
+			evaluator := uuid.New()
+			for i, a := range attachments {
+				voteRepo.votes = append(voteRepo.votes, &Vote{
+					ID: uuid.New(), EventID: eventID, VoterID: evaluator,
+					AttachmentID: a, RankPosition: tc.ranks[i],
+				})
+			}
+			addAssignment(voteRepo, eventID, evaluator, attachments, true)
+
+			qualities, err := vs.calculateParticipantQualities(eventID, global, 3)
+			require.NoError(t, err)
+			assert.InDelta(t, tc.want, qualities[evaluator.String()], 1e-9)
+		})
+	}
 }
 
 // ---------------------------------------------------------------------------

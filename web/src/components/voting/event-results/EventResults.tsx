@@ -107,11 +107,26 @@ const EventResults: React.FC<EventResultsProps> = ({
     return <p className="vt-event-results__message">{t('errors.RESULTS_NOT_CALCULATED')}</p>;
   }
 
-  const { podium, rest } = splitResults(state.results.adjusted_ranking);
+  const { podium, rest, unevaluated } = splitResults(state.results.adjusted_ranking);
   return (
     <div className="vt-event-results">
       <Podium entries={podium} currentUserId={currentUserId} />
       {rest.length > 0 && <RankingList entries={rest} currentUserId={currentUserId} />}
+      {unevaluated.length > 0 && (
+        <Callout tone="info" title={t('results.unevaluated.title')}>
+          <p className="vt-event-results__unevaluated-text">
+            {t('results.unevaluated.text', { count: unevaluated.length })}
+          </p>
+          <ul className="vt-event-results__unevaluated">
+            {unevaluated.map((entry) => (
+              <li key={entry.attachment_id}>
+                {entry.participant_name || '—'} · {entry.filename}
+                {currentUserId !== null && entry.participant_id === currentUserId && ` (${t('results.you')})`}
+              </li>
+            ))}
+          </ul>
+        </Callout>
+      )}
       <p className="vt-event-results__note">{t('results.note')}</p>
     </div>
   );

@@ -112,14 +112,17 @@ compuesto.
 Para cada propuesta `f_j`:
 
 ```
-MBC(f_j) = (1 / (m(m−1))) · Σ (m − R_i(f_j))
+MBC(f_j) = (1 / (v_j(m−1))) · Σ (m − R_i(f_j))
 ```
 
-donde `R_i(f_j)` es la posición que el evaluador `i` le asignó (**1 = mejor**). La normalización
-por `m(m−1)` deja el resultado en `[0,1]`.
+donde `R_i(f_j)` es la posición que el evaluador `i` le asignó (**1 = mejor**) y `v_j` la cantidad de
+votos que recibió. Promediar por `v_j(m−1)` deja el resultado en `[0,1]` sin que dependa de cuántas
+evaluaciones tuvo la propuesta.
 
-El orden resultante es el **ranking global `G`**. Los empates se rompen **por cantidad de votos** y,
-si persisten, **por UUID** — para que el orden sea determinístico y dos cálculos den lo mismo.
+Una propuesta **sin ningún voto** no tiene puntaje con qué ordenarla: queda fuera de `G` y de `G'`
+(`unevaluated: true`, posiciones en 0), listada al final y sin posición en las notificaciones.
+
+El orden resultante es el **ranking global `G`**. Los empates se rompen **por UUID** — para que el orden sea determinístico y dos cálculos den lo mismo.
 
 **Operación de BD:** `SELECT` sobre `votes` (todos los del evento), `assignments` y `attachments`.
 
@@ -132,12 +135,12 @@ si persisten, **por UUID** — para que el orden sea determinístico y dos cálc
 **Origen:** `api` · **Destino:** `api` · **Tipo:** Interno
 
 ```
-Q_i = 1 − (2 / (m(m−1))) · Σ |R_i(f_j) − RelativeRank_G(f_j, A(p_i))|
+Q_i = 1 − (1 / ⌊m²/2⌋) · Σ |R_i(f_j) − RelativeRank_G(f_j, A(p_i))|
 ```
 
 Mide cuánto se aparta el ranking del evaluador `i` del ranking global **restringido al subconjunto
 que le tocó evaluar** (`A(p_i)`). Un evaluador que coincide con el consenso tiene `Q_i` cercano a
-1. El resultado se recorta a `[0,1]`.
+1; uno que invierte el orden exacto, 0 (`⌊m²/2⌋` es ese desvío máximo, como en el paper).
 
 **Regla explícita:** quien **no completó su asignación recibe `Q_i = 0`**
 (`voting_service.go:278-281`).

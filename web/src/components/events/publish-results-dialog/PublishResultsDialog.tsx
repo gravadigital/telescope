@@ -10,6 +10,8 @@ export interface PublishResultsDialogProps {
   open: boolean;
   eventId: string;
   progress: VotingProgress;
+  /** Propuestas que todavía no tienen ningún voto: si se publica, quedan sin posición. */
+  unevaluated?: number;
   onClose: () => void;
   onDone: () => void;
 }
@@ -20,12 +22,14 @@ const PublishResultsDialog: React.FC<PublishResultsDialogProps> = ({
   open,
   eventId,
   progress,
+  unevaluated = 0,
   onClose,
   onDone,
 }) => {
   const { t } = useT();
   const textId = useId();
   const missingId = useId();
+  const unevaluatedId = useId();
   const waitRef = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<TranslationKey | null>(null);
@@ -37,6 +41,8 @@ const PublishResultsDialog: React.FC<PublishResultsDialogProps> = ({
   }, [open]);
 
   const hasMissing = progress.missing > 0;
+  const hasUnevaluated = unevaluated > 0;
+  const describedBy = [textId, hasMissing && missingId, hasUnevaluated && unevaluatedId].filter(Boolean).join(' ');
 
   const handlePublish = async (): Promise<void> => {
     if (busy) return;
@@ -57,7 +63,7 @@ const PublishResultsDialog: React.FC<PublishResultsDialogProps> = ({
         {t('manage.publish.wait')}
       </Button>
       <Button loading={busy} loadingLabel={t('manage.publish.loading')} onClick={() => void handlePublish()}>
-        {hasMissing ? t('manage.publish.confirmAnyway') : t('manage.publish.confirm')}
+        {hasMissing || hasUnevaluated ? t('manage.publish.confirmAnyway') : t('manage.publish.confirm')}
       </Button>
     </div>
   );
@@ -71,7 +77,7 @@ const PublishResultsDialog: React.FC<PublishResultsDialogProps> = ({
       title={t('manage.publish.title')}
       closeLabel={t('manage.dialog.close')}
       busy={busy}
-      describedBy={hasMissing ? `${textId} ${missingId}` : textId}
+      describedBy={describedBy}
       initialFocusRef={waitRef}
       onClose={onClose}
       actions={actions}
@@ -86,6 +92,15 @@ const PublishResultsDialog: React.FC<PublishResultsDialogProps> = ({
           title={t('manage.publish.missingTitle', { missing: progress.missing, total: progress.total })}
         >
           {t('manage.publish.missingText')}
+        </Callout>
+      )}
+      {hasUnevaluated && (
+        <Callout
+          tone="warning"
+          id={unevaluatedId}
+          title={t('manage.publish.unevaluatedTitle', { count: unevaluated })}
+        >
+          {t('manage.publish.unevaluatedText', { count: unevaluated })}
         </Callout>
       )}
       {error && <Callout tone="error">{t(error)}</Callout>}

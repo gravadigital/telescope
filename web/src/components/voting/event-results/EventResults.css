@@ -11,6 +11,15 @@
   color: var(--text-secondary);
 }
 
+.vt-event-results__unevaluated-text {
+  margin: 0;
+}
+
+.vt-event-results__unevaluated {
+  margin: var(--space-stack-sm) 0 0;
+  padding-left: var(--space-inline-md);
+}
+
 .vt-event-results__note {
   margin: 0;
   font: var(--type-caption);

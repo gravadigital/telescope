@@ -25,10 +25,10 @@ middlewares por ruta. Se documenta como custom por eso.
 token, err := auth.GenerateToken(user.ID, user.Email, user.Role)
 ```
 
-> **Riesgo conocido:** si `JWT_SECRET` no está seteado, el servicio arranca igual con el
-> valor por defecto `"telescopio-dev-secret-change-in-production"` y solo imprime un
-> warning (`jwt.go:20-26`). En producción eso permite firmar tokens válidos a cualquiera
-> que conozca el default. Debería abortar el arranque.
+El secreto **no tiene default**. `config.Load()` lee `JWT_SECRET`, `cmd/api/main.go` aborta el
+arranque si falta (`Config.Validate`) y lo pasa a `auth.SetSecret`. Sin secreto configurado,
+`GenerateToken` y `ValidateToken` fallan en vez de firmar o aceptar tokens. Los tests de los
+paquetes que firman tokens lo fijan en su `TestMain`.
 
 ## Verificación
 

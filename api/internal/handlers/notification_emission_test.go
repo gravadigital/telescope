@@ -121,10 +121,30 @@ func resultsScenario(t *testing.T, s *testEventHandlerSet, withConfig bool) (*ev
 		}
 	}
 	attachments := s.attachmentRepo.byEvent[e.ID.String()]
-	voteRepo.votes = append(voteRepo.votes, &vote.Vote{
-		ID: uuid.New(), EventID: e.ID, VoterID: users[0].ID, AttachmentID: attachments[1].ID, RankPosition: 1,
-	})
+	// Every proposal gets at least one vote, so all three have a position in the ranking.
+	voteRepo.votes = append(voteRepo.votes,
+		&vote.Vote{ID: uuid.New(), EventID: e.ID, VoterID: users[0].ID, AttachmentID: attachments[1].ID, RankPosition: 1},
+		&vote.Vote{ID: uuid.New(), EventID: e.ID, VoterID: users[0].ID, AttachmentID: attachments[2].ID, RankPosition: 2},
+		&vote.Vote{ID: uuid.New(), EventID: e.ID, VoterID: users[1].ID, AttachmentID: attachments[0].ID, RankPosition: 1},
+	)
 	return e, users, resultsRepo
+}
+
+func TestResultPosition_UnevaluatedProposalHasNoPosition(t *testing.T) {
+	ranked, alsoRanked, unevaluated := uuid.New(), uuid.New(), uuid.New()
+	results := &vote.VotingResults{AdjustedRanking: []vote.AttachmentResult{
+		{ParticipantID: ranked, AdjustedRank: 1, VoteCount: 2},
+		{ParticipantID: alsoRanked, AdjustedRank: 2, VoteCount: 1},
+		{ParticipantID: unevaluated, Unevaluated: true},
+	}}
+
+	pos, total, ok := resultPosition(results, alsoRanked)
+	require.True(t, ok)
+	assert.Equal(t, 2, pos)
+	assert.Equal(t, 2, total, "the total counts only proposals that have a position")
+
+	_, _, ok = resultPosition(results, unevaluated)
+	assert.False(t, ok, "a proposal nobody evaluated must not report a position")
 }
 
 func TestUpdateEventStage_ResultsNotificationCarriesPosition(t *testing.T) { // TS-3

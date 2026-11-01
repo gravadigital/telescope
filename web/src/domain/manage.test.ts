@@ -9,6 +9,7 @@ import {
   reminderType,
   voteCell,
   votingProgress,
+  unevaluatedProposals,
 } from './manage';
 
 const p = (id: string, name: string, day = 2): EventParticipant => ({
@@ -85,6 +86,13 @@ describe('manage', () => {
       missing: 0,
       complete: false,
     });
+  });
+
+  it('propuestas sin evaluaciones', () => {
+    expect(unevaluatedProposals(5, { attachments_with_votes: 3 })).toBe(2);
+    expect(unevaluatedProposals(5, { attachments_with_votes: 5 })).toBe(0);
+    expect(unevaluatedProposals(0, { attachments_with_votes: 0 })).toBe(0);
+    expect(unevaluatedProposals(5, {})).toBe(0);
   });
 
   it('TS-12: estado de pantalla y pausa', () => {

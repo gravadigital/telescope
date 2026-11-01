@@ -90,6 +90,9 @@ type AttachmentResult struct {
 	AdjustedRank    int       `json:"adjusted_rank"`
 	VoteCount       int       `json:"vote_count"`
 	AverageRank     float64   `json:"average_rank"`
+	// Unevaluated marks an attachment that received no votes: it has no position
+	// (GlobalRank and AdjustedRank are 0) and comes after the ranked ones.
+	Unevaluated bool `json:"unevaluated,omitempty"`
 }
 
 // AttachmentResultSlice is a custom type for JSONB serialization

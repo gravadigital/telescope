@@ -68,19 +68,19 @@ Si el área es nueva, creá un struct anidado nuevo en vez de colgar el campo en
 | `SMTP_SECURE` | `false` | `true` = TLS directo (465), `false` = STARTTLS (587) |
 | `EMAIL_FROM` / `EMAIL_FROM_NAME` | `""` / `Telescopio` | |
 | `GOOGLE_CLIENT_ID` | `""` | Google OAuth |
-| `JWT_SECRET` | ⚠️ ver abajo | Firma de tokens |
+| `JWT_SECRET` | **ninguno, obligatorio** | Firma de tokens. Sin él la API no arranca (`Config.Validate`) |
 
-## Limitación importante: no hay validación al arranque
+## Validación al arranque
 
-Todos los valores tienen default y **ninguno se valida**. El servicio arranca aunque falte
-configuración crítica, y falla después en runtime:
+`Config.Validate()` comprueba lo que la API no puede usar con un default, y `cmd/api/main.go`
+aborta el arranque si falla. Hoy valida solo `JWT_SECRET`. Está separado de `Load()` porque
+`cmd/migrate` carga la misma configuración y no necesita esos valores.
 
-- **`JWT_SECRET` no se lee en `config.Load()`** sino en el `init()` de
-  `internal/middleware/auth/jwt.go`, y si falta usa un default hardcodeado con solo un
-  warning por consola. En producción eso es explotable.
+El resto de los valores tiene default y no se valida; falla después en runtime:
+
 - Las credenciales de MinIO sí se chequean, pero recién al construir el storage.
 - Una `DB_PASSWORD` incorrecta se descubre al fallar la conexión.
 
 Al agregar una variable que no puede tener default seguro (secretos, credenciales), validá
-su presencia explícitamente en `Load()` y abortá el arranque. Es preferible a fallar más
+su presencia en `Validate()` para que se aborte el arranque. Es preferible a fallar más
 tarde, y es lo que pide el catálogo.
