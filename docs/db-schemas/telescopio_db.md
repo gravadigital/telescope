@@ -223,6 +223,11 @@ Password con bcrypt (`DefaultCost`), mínimo 8 caracteres, validado en el domini
 | `shareable_link` | `varchar(255)` | `/events/{id}` |
 | `is_cancelled` | `boolean` | NOT NULL, default `false` |
 | `is_paused` | `boolean` | NOT NULL, default `false` |
+| `cover_color` | `varchar(32)` | NOT NULL, default `'lavender'`, CHECK `valid_cover_color` (16 identificadores de la paleta) — **S-019, pendiente de implementar** |
+
+> **S-019 (pendiente):** el CHECK de abajo se reemplaza por el trigger `enforce_future_start_date`
+> (`BEFORE INSERT OR UPDATE OF start_date`), que valida la fecha solo al crear el evento o al cambiar
+> su `start_date`. Cierra la deuda #10 de `api`.
 
 CHECK `future_start_date` (`start_date >= now() - 1 día`) declarado `NOT VALID`: no se valida
 contra las filas existentes al crearse, pero PostgreSQL lo reevalúa en **todo** `UPDATE` de la fila,
@@ -552,6 +557,7 @@ Migraciones en Go, no en SQL, con `Up` y `Down` registradas en orden en
 | 022 | `fix_uuid_comparison_in_triggers` | Recrea las funciones de validación comparando `uuid` con `uuid` (la 004 comparaba `text` contra `uuid[]` y fallaba todo insert en `assignments` y `votes`) |
 | 023 | `relax_voting_results_vote_count` | CHECK `valid_participant_counts` pasa a `total_participants > 0 AND total_votes >= 0`. `Down` restaura `total_votes >= total_participants` |
 | 024 | `add_notifications` | Enum `notification_type`, tabla `notifications` e índices |
+| 025 | *(S-019, pendiente)* | `events.cover_color` + CHECK `valid_cover_color`; reemplaza el CHECK `future_start_date` por el trigger `enforce_future_start_date` |
 
 Notas:
 

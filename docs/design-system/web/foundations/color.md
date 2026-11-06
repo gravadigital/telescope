@@ -1,7 +1,7 @@
 ---
 foundation: color
-version: 2.0.0
-last_updated: 2026-10-02
+version: 2.1.0
+last_updated: 2026-11-06
 status: diseñada
 ---
 
@@ -16,8 +16,9 @@ status: diseñada
 
 ## El lenguaje visual
 
-**Bandas oscuras + contenido claro.** El negro se usa **solo** para identidad y navegación: el
-header, el encabezado de evento (EventHero) y el panel de marca de auth. Todo el contenido vive
+**Bandas oscuras + contenido claro.** El negro se usa **solo** para identidad y navegación de la
+plataforma: el header, el footer y el panel de marca de auth. El encabezado de evento (EventHero)
+usa el **color de portada del evento** (REQ-004), para que plataforma y evento no se confundan. Todo el contenido vive
 sobre fondo claro, en superficies blancas con borde fino. Cada pantalla tiene **un único** paso
 destacado en el color de acción. `[fuente: diseño — nota "Sistema" del Turno 1]`
 
@@ -67,6 +68,45 @@ destacado en el color de acción. `[fuente: diseño — nota "Sistema" del Turno
 > ⚠️ **El diseño no define un fondo suave de error.** Se usa `#B8381F` como texto y borde sobre
 > blanco. Si hace falta un fondo, se pide al diseño; no se inventa (regla 13).
 
+### Portada del evento (REQ-004)
+
+Paleta **cerrada** de 16 pasteles para el fondo del EventHero (`events.cover_color`). El
+**identificador** es el contrato: la API lo valida como enum y lo guarda; `web` lo traduce a
+`--cover-{id}`. Recalibrar un hex es PATCH y no migra datos; **renombrar o quitar un
+identificador es MAJOR** y exige migración en `api`. `[fuente: input-cliente — REQ-004; valores
+elegidos por Claude con autorización del usuario]`
+
+Criterio: todos tienen la **misma luminancia relativa (≈ 0,69)**, repartidos en el círculo
+cromático más dos neutros (`sand`, `mist`). Así ninguno compite con el texto y los contrastes son
+parejos: el que se elija no cambia la legibilidad.
+
+| # | Identificador | Nombre (ES / EN) | Hex | Primitivo | `text.primary` | `text.secondary` | vs `bg.canvas` |
+|---|---|---|---|---|---|---|---|
+| 1 | `lavender` **(default)** | Lavanda / Lavender | `#D9D4FA` | `color.cover.lavender` | 13.3 | 4.58 | 1.28 |
+| 2 | `periwinkle` | Vincapervinca / Periwinkle | `#CDD8F9` | `color.cover.periwinkle` | 13.3 | 4.59 | 1.28 |
+| 3 | `sky` | Cielo / Sky | `#B6DEF7` | `color.cover.sky` | 13.3 | 4.59 | 1.28 |
+| 4 | `ice` | Hielo / Ice | `#A8E3E9` | `color.cover.ice` | 13.4 | 4.61 | 1.27 |
+| 5 | `aqua` | Agua / Aqua | `#ADE4D7` | `color.cover.aqua` | 13.4 | 4.62 | 1.27 |
+| 6 | `mint` | Menta / Mint | `#B0E5C2` | `color.cover.mint` | 13.4 | 4.61 | 1.27 |
+| 7 | `pistachio` | Pistacho / Pistachio | `#C5E2A8` | `color.cover.pistachio` | 13.4 | 4.60 | 1.27 |
+| 8 | `lemon` | Limón / Lemon | `#E3DB90` | `color.cover.lemon` | 13.3 | 4.60 | 1.28 |
+| 9 | `butter` | Manteca / Butter | `#F4D49E` | `color.cover.butter` | 13.3 | 4.59 | 1.28 |
+| 10 | `peach` | Durazno / Peach | `#F9D0B9` | `color.cover.peach` | 13.3 | 4.58 | 1.28 |
+| 11 | `coral` | Coral / Coral | `#F9CFCA` | `color.cover.coral` | 13.3 | 4.60 | 1.28 |
+| 12 | `rose` | Rosa / Rose | `#F8CEDA` | `color.cover.rose` | 13.4 | 4.61 | 1.27 |
+| 13 | `pink` | Chicle / Bubblegum | `#F4CDE9` | `color.cover.pink` | 13.3 | 4.58 | 1.28 |
+| 14 | `lilac` | Lila / Lilac | `#EECEF5` | `color.cover.lilac` | 13.3 | 4.59 | 1.28 |
+| 15 | `sand` | Arena / Sand | `#E2D7CA` | `color.cover.sand` | 13.3 | 4.60 | 1.28 |
+| 16 | `mist` | Bruma / Mist | `#D2D9E4` | `color.cover.mist` | 13.3 | 4.59 | 1.28 |
+
+**Orden canónico (enum de la API):** `lavender`, `periwinkle`, `sky`, `ice`, `aqua`, `mint`, `pistachio`, `lemon`, `butter`, `peach`, `coral`, `rose`, `pink`, `lilac`, `sand`, `mist`.
+
+**Contraste (mínimo sobre los 16):** `text.primary` 13,3:1 · `text.secondary` 4,58:1 ·
+`text.action` 5,73:1 — todos AA. **`text.muted` no se usa sobre la portada** (3,2:1, no
+llega a AA). Contra `bg.canvas` el pastel queda en ≥ 1,27:1
+y ΔE ≥ 11 (antes 1,01:1): se distingue del fondo de la página, y el EventHero suma un borde
+inferior `border.default` para el caso de baja visión. Entre pastel y pastel, ΔE76 ≥ 6,1.
+
 ## Tokens semánticos de color
 
 Los componentes consumen **estos**, nunca los primitivos. Detalle completo en
@@ -77,7 +117,9 @@ Los componentes consumen **estos**, nunca los primitivos. Detalle completo en
 | `bg.canvas` | `color.gray.100` | Fondo de página |
 | `bg.surface` | `color.white` | Tarjetas, diálogos, tablas |
 | `bg.surface.subtle` | `color.gray.50` | Superficie secundaria |
-| `bg.band` | `color.black` | Header, EventHero, panel de marca |
+| `bg.band` | `color.black` | Header, footer y panel de marca (REQ-004: el EventHero deja la banda) |
+| `bg.cover.{id}` | `color.cover.{id}` | Fondo del EventHero según `cover_color` (REQ-004) |
+| `bg.cover.default` | `color.cover.lavender` | EventHero de un evento sin elección explícita |
 | `bg.band.raised` | `color.ink.800` | Superficie dentro de una banda |
 | `bg.action.primary` | `color.violet.700` | Botón primario |
 | `bg.action.subtle` | `color.violet.100` | Fondo suave de acción |
@@ -107,7 +149,7 @@ wireframes.
 ## Guidelines
 
 **Do:**
-- Usar el negro solo en bandas de identidad y navegación (header, EventHero, auth).
+- Usar el negro solo en bandas de identidad y navegación de la plataforma (header, footer, auth). El EventHero usa `bg.cover.{id}` (REQ-004).
 - Un solo elemento en `bg.action.primary` por pantalla: el paso destacado.
 - Comunicar estado con texto además de color ("✓ Enviado", "Pendiente").
 - Usar `text.inverse.secondary` y `text.signal` para jerarquía dentro de una banda.
@@ -148,3 +190,4 @@ de WCAG 2.1.
 - 2026-10-02 v2.0.0 — **Breaking.** Paleta del rediseño de REQ-003: bandas oscuras + contenido
   claro, acción `#4B3FA8`, acento `#6E5BF2`, señal `#35D6F2`. Se eliminan los tokens glass y los
   fondos degradados.
+- 2026-11-06 v2.1.0 — REQ-004: paleta de 16 pasteles de portada (`color.cover.*`, default `lavender`), tokens `bg.cover.*`; `bg.band` pasa a header + footer y el EventHero toma el color del evento.

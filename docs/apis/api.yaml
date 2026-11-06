@@ -542,6 +542,7 @@ paths:
                   maximum: 100
                   default: 20
                   nullable: true
+                cover_color: { $ref: '#/components/schemas/CoverColor' }
       responses:
         '201':
           description: Evento creado
@@ -563,6 +564,7 @@ paths:
                       max_participants: { type: integer, nullable: true }
                       stage: { $ref: '#/components/schemas/Stage' }
                       author_id: { type: string, format: uuid }
+                      cover_color: { $ref: '#/components/schemas/CoverColor' }
                       created_at: { type: string, format: date-time }
                   message: { type: string, example: Event created successfully }
                   code: { type: string, example: EVENT_CREATED }
@@ -570,7 +572,8 @@ paths:
           description: |
             `INVALID_PAYLOAD`, `INVALID_START_DATE`, `INVALID_END_DATE`, `PAST_START_DATE`,
             `INVALID_DATE_RANGE`, `DURATION_TOO_SHORT`, `DURATION_TOO_LONG`,
-            `INVALID_MAX_PARTICIPANTS`, `MAX_PARTICIPANTS_LIMIT_EXCEEDED`, `VALIDATION_FAILED`
+            `INVALID_MAX_PARTICIPANTS`, `MAX_PARTICIPANTS_LIMIT_EXCEEDED`, `VALIDATION_FAILED`,
+            `INVALID_COVER_COLOR` (S-019)
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '401':
           description: '`UNAUTHORIZED`, `USER_NOT_FOUND`'
@@ -625,6 +628,9 @@ paths:
         S-008. Solo el autor (`RequireEventOwner`) y solo en `creation` o `participation`.
         Al menos un campo. Las fechas no se editan acá.
 
+        S-019 (REQ-004): si el body trae **solo** `cover_color`, se acepta en cualquier etapa y
+        aunque el evento esté pausado o cancelado. Con cualquier otro campo rige la regla de etapa.
+
         `RequireEventOwner` corre antes del handler: para un no-admin y un evento inexistente
         responde la forma B `404 { error: NOT_FOUND }`, no `EVENT_NOT_FOUND`; un `admin` llega
         al `404 EVENT_NOT_FOUND` del handler.
@@ -642,6 +648,7 @@ paths:
                 description: { type: string, minLength: 10, maxLength: 2000 }
                 organizer: { type: string, maxLength: 200 }
                 max_participants: { type: integer, minimum: 1, maximum: 100, description: 'No puede ser menor a los inscriptos' }
+                cover_color: { $ref: '#/components/schemas/CoverColor' }
       responses:
         '200':
           description: Evento actualizado
@@ -654,7 +661,7 @@ paths:
                   message: { type: string }
                   code: { type: string, example: EVENT_UPDATED }
         '400':
-          description: '`INVALID_PAYLOAD`, `MAX_PARTICIPANTS_BELOW_REGISTERED` (+ `current_count`)'
+          description: '`INVALID_PAYLOAD`, `MAX_PARTICIPANTS_BELOW_REGISTERED` (+ `current_count`), `INVALID_COVER_COLOR` (S-019)'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '401': { $ref: '#/components/responses/MiddlewareUnauthorized' }
         '403': { $ref: '#/components/responses/MiddlewareForbidden' }
@@ -662,7 +669,7 @@ paths:
           description: '`EVENT_NOT_FOUND`'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '409':
-          description: '`INVALID_UPDATE_STAGE` (+ `current_stage`), `DUPLICATE_EVENT_NAME`'
+          description: '`INVALID_UPDATE_STAGE` (+ `current_stage`; desde S-019 solo si el body trae campos distintos de `cover_color`), `DUPLICATE_EVENT_NAME`'
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '500':
           description: '`PARTICIPANT_CHECK_ERROR`, `DB_UPDATE_ERROR`, `RETRIEVAL_ERROR`'
@@ -2121,6 +2128,15 @@ components:
         current_stage: { $ref: '#/components/schemas/Stage' }
       required: [error]
 
+    CoverColor:
+      type: string
+      enum: [lavender, periwinkle, sky, ice, aqua, mint, pistachio, lemon, butter, peach, coral, rose, pink, lilac, sand, mist]
+      default: lavender
+      description: |
+        Identificador del color de portada del evento (S-019 / REQ-004). Paleta cerrada de 16
+        pasteles; los hex viven en `docs/design-system/web/foundations/color.md` y la API solo
+        guarda el identificador. Renombrar o quitar un valor es un cambio incompatible.
+
     Stage:
       type: string
       enum: [creation, participation, voting, results]
@@ -2161,6 +2177,7 @@ components:
         participants_count: { type: integer, description: 'S-008' }
         is_cancelled: { type: boolean }
         is_paused: { type: boolean }
+        cover_color: { $ref: '#/components/schemas/CoverColor' }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 

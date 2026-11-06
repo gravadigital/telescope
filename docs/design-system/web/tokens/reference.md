@@ -49,6 +49,27 @@ Component
 | `color.amber.100` | `#F7EDD6` |
 | `color.red.700` | `#B8381F` |
 
+### Portada (REQ-004)
+
+| Token | Valor |
+|---|---|
+| `color.cover.lavender` | `#D9D4FA` |
+| `color.cover.periwinkle` | `#CDD8F9` |
+| `color.cover.sky` | `#B6DEF7` |
+| `color.cover.ice` | `#A8E3E9` |
+| `color.cover.aqua` | `#ADE4D7` |
+| `color.cover.mint` | `#B0E5C2` |
+| `color.cover.pistachio` | `#C5E2A8` |
+| `color.cover.lemon` | `#E3DB90` |
+| `color.cover.butter` | `#F4D49E` |
+| `color.cover.peach` | `#F9D0B9` |
+| `color.cover.coral` | `#F9CFCA` |
+| `color.cover.rose` | `#F8CEDA` |
+| `color.cover.pink` | `#F4CDE9` |
+| `color.cover.lilac` | `#EECEF5` |
+| `color.cover.sand` | `#E2D7CA` |
+| `color.cover.mist` | `#D2D9E4` |
+
 ## Tipografía
 
 | Token | Valor |
@@ -91,3 +112,4 @@ Component
 
 - 2026-09-18 v0.1.0 — Placeholder inicial.
 - 2026-10-02 v2.0.0 — Primitivos del rediseño de REQ-003.
+- 2026-11-06 v2.1.0 — REQ-004: primitivos `color.cover.*` (16 pasteles).

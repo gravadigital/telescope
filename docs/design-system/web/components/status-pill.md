@@ -32,7 +32,7 @@ Comunica en pocas palabras el estado de un evento o de la situación personal de
 | warning | Falta archivo, Pendiente, Pausado | `bg.warning.subtle` + `text.warning` |
 | action | Votación, Te toca votar | `bg.action.subtle` + `text.action` |
 | neutral | Finalizado, No participa, Borrador | `bg.neutral.subtle` + `text.secondary` |
-| on-band | Sobre `bg.band` (EventHero, rol) | `bg.band.raised` + `text.inverse` (texto clave en `text.signal`) |
+| on-band | Sobre `bg.band` (rol en el header). Desde REQ-004 el EventHero usa los tonos por defecto | `bg.band.raised` + `text.inverse` (texto clave en `text.signal`) |
 
 Nombres de etapa **únicos** en todo el producto, del catálogo i18n: Creación · Participación (pill: "Inscripción abierta") · Votación · Resultados (pill: "Finalizado"). Resuelve el "Completed" vs "Results" de la v1.0.
 
@@ -84,3 +84,4 @@ Máximo ~40 caracteres · etapa + dato clave separados por " · " · copy neutro
 
 - 2026-09-18 v1.0.0 — Relevado como `status-badge` (CSS duplicado por archivo).
 - 2026-10-02 v2.0.0 — **Breaking.** Renombrado a `status-pill` con los tonos del rediseño de REQ-003 y nombres de etapa únicos.
+- 2026-11-06 v2.1.0 — REQ-004: el EventHero usa los tonos por defecto; `onBand` queda para fondos de banda.
