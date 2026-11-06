@@ -382,7 +382,7 @@ paths:
         estado personal se hacen por lote, sin N+1.
 
         Los campos nuevos (`role`, `max_participants`, `participants_count`, fechas estimadas,
-        `is_paused`, `is_cancelled`, `my_status`) vienen **solo con `scope=all`**: sin `scope`
+        `is_paused`, `is_cancelled`, `cover_color`, `my_status`) vienen **solo con `scope=all`**: sin `scope`
         (o con `participating`) la respuesta es la histórica. `scope=all` sobre otro usuario
         responde `403`, salvo que quien consulta sea `admin`.
 
@@ -427,6 +427,7 @@ paths:
                         voting_estimated_end_date: { type: string, format: date, nullable: true }
                         is_paused: { type: boolean }
                         is_cancelled: { type: boolean }
+                        cover_color: { $ref: '#/components/schemas/CoverColor', description: 'S-019. Solo con scope=all' }
                         my_status:
                           type: object
                           nullable: true

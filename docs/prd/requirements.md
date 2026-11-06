@@ -48,8 +48,10 @@ esta sección son el vocabulario único del PRD.
 - **Relaciones:** belongs_to Usuario (autor), has_many Participación, has_many Propuesta,
   has_one ConfiguracionVotacion, has_many Asignación, has_one ResultadoVotacion
 - **Reglas:** La etapa avanza en un solo sentido, sin saltos. `is_cancelled` e `is_paused` son
-  independientes de `stage`: un evento puede pausarse en cualquier etapa. El CHECK
-  `future_start_date` es `NOT VALID` (solo aplica a filas nuevas o modificadas).
+  independientes de `stage`: un evento puede pausarse en cualquier etapa. Un evento no se crea con
+  `start_date` anterior a ayer: lo impone el trigger `enforce_future_start_date`, que solo mira
+  `start_date` al insertar o cuando cambia (S-019), así que los eventos viejos se pueden editar,
+  pausar, cancelar y cambiar de etapa.
   ⚠️ **`start_date` se autogenera como hoy+1día sin que el usuario lo vea ni lo elija**
   (`CreateEventPage.tsx:43-49`)
 - **Cambios REQ-004:** `cover_color` solo admite valores de la paleta cerrada; solo el `creator`

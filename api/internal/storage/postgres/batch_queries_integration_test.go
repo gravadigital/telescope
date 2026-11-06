@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/gravadigital/telescopio-api/internal/domain/event"
 	"github.com/gravadigital/telescopio-api/internal/domain/vote"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -152,35 +153,40 @@ func TestBatchQueries_MalformedIDsFail(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// Verifies risk D20 of the S-008 plan: whether the future_start_date CHECK, declared
-// NOT VALID, is re-evaluated when a row with an old start_date is updated.
-func TestEventUpdate_FutureStartDateCheckOnOldEvent(t *testing.T) {
+// Covers CA-8 of S-019: an event whose start_date is older than a day can be edited, change
+// stage, be paused and be cancelled. The future_start_date CHECK used to be re-evaluated on every
+// UPDATE of the row (the risk D20 of the S-008 plan) and made all of these fail; migration 025
+// replaced it with a trigger that only looks at start_date when it is inserted or changes.
+func TestEventUpdate_OldEventIsEditable(t *testing.T) {
 	tx := migratedTx(t)
 	author := insertUser(t, tx)
 	eventID := uuid.New()
 
-	// Same sequence as migration 012: the old row exists before the CHECK does.
-	require.NoError(t, tx.Exec(`ALTER TABLE events DROP CONSTRAINT IF EXISTS future_start_date`).Error)
+	// Events that started more than a day ago exist in real databases from before the rule,
+	// so the trigger is switched off just for the insert.
+	require.NoError(t, tx.Exec(`ALTER TABLE events DISABLE TRIGGER enforce_future_start_date`).Error)
 	require.NoError(t, tx.Exec(
 		`INSERT INTO events (id, name, description, author_id, start_date, end_date, stage, shareable_link)
 		 VALUES (?, 'Evento viejo', 'Descripción', ?, NOW() - INTERVAL '10 days', NOW() + INTERVAL '7 days', 'participation', ?)`,
 		eventID, author, eventID.String()).Error)
-	require.NoError(t, tx.Exec(
-		`ALTER TABLE events ADD CONSTRAINT future_start_date
-		 CHECK (start_date >= CURRENT_TIMESTAMP - INTERVAL '1 day') NOT VALID`).Error)
+	require.NoError(t, tx.Exec(`ALTER TABLE events ENABLE TRIGGER enforce_future_start_date`).Error)
 
 	repo := NewPostgresEventRepository(tx)
 	evt, err := repo.GetByID(eventID.String())
 	require.NoError(t, err)
 	evt.Name = "Evento viejo renombrado"
+	evt.CoverColor = event.CoverColorMint
 
-	// A failed statement aborts the surrounding transaction, so this is the last query.
-	err = repo.Update(evt)
+	require.NoError(t, repo.Update(evt))
+	require.NoError(t, repo.UpdateStage(eventID.String(), event.StageVoting))
+	require.NoError(t, repo.PauseEvent(eventID.String(), true))
+	require.NoError(t, repo.CancelEvent(eventID.String()))
 
-	// Documents D20 of the S-008 plan: PostgreSQL re-checks a NOT VALID constraint on
-	// every UPDATE of the row, whether or not start_date changes. Editing, changing the
-	// stage of, pausing or cancelling an event whose start_date is older than a day
-	// therefore fails. Fixing it needs a design decision (a migration that drops the
-	// CHECK or restricts it to INSERT); when that lands, flip this assertion.
-	require.ErrorContains(t, err, "future_start_date")
+	got, err := repo.GetByID(eventID.String())
+	require.NoError(t, err)
+	assert.Equal(t, "Evento viejo renombrado", got.Name)
+	assert.Equal(t, event.CoverColorMint, got.CoverColor)
+	assert.Equal(t, event.StageVoting, got.Stage)
+	assert.True(t, got.IsPaused)
+	assert.True(t, got.IsCancelled)
 }

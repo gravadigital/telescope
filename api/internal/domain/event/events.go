@@ -26,6 +26,7 @@ type Event struct {
 	ShareableLink                 string     `json:"shareable_link,omitempty" gorm:"default:''"`
 	IsCancelled                   bool       `json:"is_cancelled" gorm:"default:false"`
 	IsPaused                      bool       `json:"is_paused" gorm:"default:false"`
+	CoverColor                    CoverColor `json:"cover_color" gorm:"type:varchar(32);not null;default:'lavender'"`
 	CreatedAt                     time.Time  `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt                     time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
 }
@@ -55,6 +56,7 @@ func NewEvent(name, description string, authorID uuid.UUID, startDate, endDate t
 		EndDate:       endDate,
 		Organizer:     organizer,
 		Stage:         StageCreation,
+		CoverColor:    DefaultCoverColor,
 		ShareableLink: "/events/" + id.String(),
 		CreatedAt:     time.Now(),
 	}
@@ -182,6 +184,7 @@ func StageFromString(s string) (Stage, bool) {
 		return StageCreation, false
 	}
 }
+
 // Scan implements the sql.Scanner interface for database deserialization
 func (s *Stage) Scan(value interface{}) error {
 	if value == nil {

@@ -123,8 +123,7 @@ Relevada del código, para que no se confunda con decisión de diseño:
    parece rota). `_base` exige `gofumpt`.
 9. ~~**JWT secret con default hardcodeado**~~ — **corregido**: sin `JWT_SECRET` el servicio
    no arranca (ver la convención `auth-jwt`).
-10. **El CHECK `future_start_date` bloquea editar eventos viejos**: se reevalúa en todo `UPDATE`
-    de la fila (aunque sea `NOT VALID`), así que `PATCH /events/:event_id` —y también el cambio
-    de etapa, pausar y cancelar— responde `500` si `start_date` es anterior a ayer. Verificado por
-    `TestEventUpdate_FutureStartDateCheckOnOldEvent`. Requiere decidir en producto/diseño si se
-    elimina el CHECK o se restringe a `INSERT`.
+10. ~~**El CHECK `future_start_date` bloquea editar eventos viejos**~~ — **corregido en S-019**
+    (migración 025): el CHECK se reemplazó por el trigger `enforce_future_start_date`, que valida
+    `start_date` solo al crear el evento o al cambiarlo. Editar, cambiar de etapa, pausar y cancelar
+    un evento viejo funciona; lo cubre `TestEventUpdate_OldEventIsEditable`.
