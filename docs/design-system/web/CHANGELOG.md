@@ -3,6 +3,40 @@
 Sigue el formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/)
 y el versionado [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.1.1] - 2026-11-06
+
+### Corregido
+- `components/color-swatch-picker.md`: la API suma `names` (nombre de cada color en el idioma activo; los
+  componentes del kit reciben los textos por props) y `selectedRef` (foco inicial en diálogos). Se
+  aclara el teclado: las flechas mueven el foco y eligen, y no dan la vuelta en los bordes. Surge de
+  implementar S-021; no cambia ningún valor ni token.
+
+---
+
+## [2.1.0] - 2026-11-06
+
+> Origen: la sección `## Revisión UX` de REQ-004, que dejó estos cambios en `pendiente-DS`. Los
+> valores de color los eligió Claude con autorización explícita del usuario.
+
+### Agregado
+- `foundations/color.md`: paleta cerrada de **16 pasteles de portada** (`color.cover.*`):
+  `lavender` (default), `periwinkle`, `sky`, `ice`, `aqua`, `mint`, `pistachio`, `lemon`, `butter`,
+  `peach`, `coral`, `rose`, `pink`, `lilac`, `sand`, `mist`. Misma luminancia (≈ 0,69): AA con
+  `text.primary` (≥ 13,3:1), `text.secondary` (≥ 4,58:1) y `text.action` (≥ 5,73:1); se distinguen
+  del canvas (≥ 1,27:1). Los identificadores son el enum de `cover_color` en la API.
+- `tokens/`: primitivos `color.cover.*`; semánticos `bg.cover.{id}` y `bg.cover.default`; tokens
+  de componente `swatchPicker.*`.
+- `components/color-swatch-picker.md`: selector de color de paleta cerrada (S-03 y O-18), grilla
+  8 × 2 / 4 × 4, `radiogroup` accesible.
+
+### Cambiado
+- El EventHero deja `bg.band` y usa `bg.cover.{id}`; `bg.band` queda para header, footer y panel de
+  marca. Documentación de uso actualizada en `color.md`, `semantic.md`, `button.md` (acciones del
+  hero en `secondary`) y `status-pill.md` (tonos por defecto en el hero). No cambia el valor de
+  ningún token existente.
+
+---
+
 ## [2.0.0] - 2026-10-02
 
 > **Breaking.** Reemplaza el lenguaje visual relevado del código (glassmorphism oscuro) por el del

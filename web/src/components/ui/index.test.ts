@@ -1,7 +1,7 @@
 import * as UI from '.';
 
 describe('barrel de primitivos', () => {
-  it('TS-11: expone los 15 primitivos', () => {
+  it('TS-11: expone los 16 primitivos', () => {
     const names = [
       'Button',
       'TextField',
@@ -18,6 +18,7 @@ describe('barrel de primitivos', () => {
       'DateQuickPicker',
       'FileDropzone',
       'Menu',
+      'ColorSwatchPicker',
     ] as const;
     names.forEach((name) => {
       const component = (UI as Record<string, unknown>)[name];

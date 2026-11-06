@@ -157,14 +157,16 @@ graph TD
 ```
 
 **Pasos (happy path):**
-1. Crea el evento en 3 pasos con vista previa; queda en Creación, invisible para los demás.
+1. Crea el evento en 3 pasos con vista previa (en el paso 1 elige el color de portada, o queda el
+   default); queda en Creación, invisible para los demás.
 2. Abre la inscripción eligiendo un atajo de duración; el evento pasa a ser público.
 3. Sigue inscriptos y archivos; recuerda a quien falta.
 4. Abre la votación en un solo diálogo; se asignan propuestas solo a quienes subieron archivo.
 5. Sigue "Rankings enviados N de M"; recuerda a los pendientes.
 6. Publica (con aviso si faltan rankings); ve el resultado como lo ve cualquiera.
 
-**Acciones laterales:** "Editar datos" (O-18) en Creación y Participación; "editar" el cierre (O-07, solo posponer); "Pausar evento".
+**Acciones laterales:** "Editar datos" (O-18) en Creación y Participación; en Votación, Resultados
+o con el evento cancelado, O-18 permite cambiar solo el color de portada (REQ-004); "editar" el cierre (O-07, solo posponer); "Pausar evento".
 
 ### Caminos no felices
 
@@ -175,6 +177,7 @@ graph TD
 | Umbrales inválidos | En O-16: "El umbral confiable tiene que superar al poco confiable por al menos 0,1." |
 | Cierre anterior al actual | En O-07: "El cierre solo se puede posponer." |
 | Cupo menor a los inscriptos | En O-18: "El cupo no puede ser menor a los N inscriptos." |
+| Falla el cambio de color | En O-18: "No pudimos guardar los cambios. Probá de nuevo."; el hero conserva el color anterior (REQ-004) |
 | Sin pendientes | El botón de recordatorio no se muestra |
 | Falla una carga de la gestión | En ese bloque: "No pudimos cargar los participantes." + "Reintentar"; avanzar queda deshabilitado (REQ-001) |
 | No es el autor | "No tenés permiso para gestionar este evento." + "Ir a Eventos" |

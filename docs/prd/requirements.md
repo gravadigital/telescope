@@ -42,14 +42,21 @@ esta sección son el vocabulario único del PRD.
   (string(200), default `''`), `stage` (enum: `creation`/`participation`/`voting`/`results`,
   default `creation`), `max_participants` (int, default 20), `participation_estimated_end_date`
   (date, nullable), `voting_estimated_end_date` (date, nullable), `shareable_link` (string,
-  `/events/{id}`), `is_cancelled` (bool, default false), `is_paused` (bool, default false)
+  `/events/{id}`), `is_cancelled` (bool, default false), `is_paused` (bool, default false),
+  `cover_color` (string, req, uno de los 16 identificadores de la paleta pastel de portada; default
+  el pastel por defecto — REQ-004)
 - **Relaciones:** belongs_to Usuario (autor), has_many Participación, has_many Propuesta,
   has_one ConfiguracionVotacion, has_many Asignación, has_one ResultadoVotacion
 - **Reglas:** La etapa avanza en un solo sentido, sin saltos. `is_cancelled` e `is_paused` son
-  independientes de `stage`: un evento puede pausarse en cualquier etapa. El CHECK
-  `future_start_date` es `NOT VALID` (solo aplica a filas nuevas o modificadas).
+  independientes de `stage`: un evento puede pausarse en cualquier etapa. Un evento no se crea con
+  `start_date` anterior a ayer: lo impone el trigger `enforce_future_start_date`, que solo mira
+  `start_date` al insertar o cuando cambia (S-019), así que los eventos viejos se pueden editar,
+  pausar, cancelar y cambiar de etapa.
   ⚠️ **`start_date` se autogenera como hoy+1día sin que el usuario lo vea ni lo elija**
   (`CreateEventPage.tsx:43-49`)
+- **Cambios REQ-004:** `cover_color` solo admite valores de la paleta cerrada; solo el `creator`
+  lo cambia, en **cualquier** `stage` y con independencia de `is_paused` / `is_cancelled`. Es la
+  única excepción a la regla de edición por etapa de REQ-003 (`creation`/`participation`).
 - **Cambios REQ-003 (diseñados, pendientes de implementación):**
   - **Visibilidad:** un evento en `creation` no es visible ni accesible para nadie salvo su
     autor (o un `admin`): no aparece en el listado y su detalle responde como inexistente.

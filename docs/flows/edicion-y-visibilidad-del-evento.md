@@ -4,8 +4,8 @@ title: Edición y visibilidad del evento
 type: feature
 status: Active
 created: 2026-10-02
-last_updated: 2026-10-05
-stories: [S-008, S-014]
+last_updated: 2026-11-06
+stories: [S-008, S-014, S-019, S-021]
 ---
 
 # Edición y visibilidad del evento
@@ -13,8 +13,8 @@ stories: [S-008, S-014]
 **Tipo:** Feature
 **Status:** Active (implementado en `api` por S-008; la parte de `web` es S-013 y S-014)
 **Creado:** 2026-10-02
-**Última actualización:** 2026-10-05
-**Stories:** S-008, S-014
+**Última actualización:** 2026-11-06
+**Stories:** S-008, S-014, S-019, S-021
 
 ## Descripción
 
@@ -56,7 +56,7 @@ sequenceDiagram
     Note over U,WEB: el autor, desde la gestión
     U->>WEB: "Editar datos" → guarda
     WEB->>API: PATCH /api/v1/events/{event_id} { campos cambiados }
-    alt etapa voting/results
+    alt etapa voting/results y el body trae campos distintos de cover_color
         API-->>WEB: 409 INVALID_UPDATE_STAGE
     else cupo < inscriptos
         API-->>WEB: 400 MAX_PARTICIPANTS_BELOW_REGISTERED
@@ -105,12 +105,17 @@ responde 401 ni acepta un token inválido como identidad. Lo usa todo el grupo `
     "name": "string — 3..200",
     "description": "string — 10..2000",
     "organizer": "string — 0..200",
-    "max_participants": "integer — 1..100, >= inscriptos"
+    "max_participants": "integer — 1..100, >= inscriptos",
+    "cover_color": "CoverColor — uno de los 16 identificadores (S-019)"
   }
   ```
 - **Response 200:** `{ "data": "EventDetail", "message": "string", "code": "EVENT_UPDATED" }`
 
 **Operación de BD:** `UPDATE events` vía `EventRepository.Update`. Las fechas no se editan acá.
+
+**S-019 (REQ-004):** si el body trae **solo** `cover_color`, la regla de etapa no aplica: se acepta en
+cualquier etapa y con el evento pausado o cancelado. `web` lo usa en el modo "solo color" de O-18
+(S-021). Un `cover_color` fuera de la paleta responde `400 INVALID_COVER_COLOR`.
 
 Orden de validaciones: id → body (`400 INVALID_PAYLOAD`) → evento (`404 EVENT_NOT_FOUND`) →
 etapa (`409`) → cupo (`400`) → nombre único (`409`) → `UPDATE`. Reenviar el nombre propio no es

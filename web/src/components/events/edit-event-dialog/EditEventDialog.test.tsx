@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EditEventDialog from './EditEventDialog';
 import { renderWithProviders } from '../../../test-utils/renderWithProviders';
@@ -13,6 +13,7 @@ const apiErr = (status: number, code: string, extra: Record<string, unknown> = {
   new ApiError({ status, body: { error: 'x', code, ...extra } });
 
 const baseEvent: Event = {
+  cover_color: 'lavender',
   id: 'e-1',
   title: 'Concurso de afiches',
   description: 'Diseña el afiche del festival',
@@ -181,5 +182,123 @@ describe('EditEventDialog', () => {
     userEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('¿Descartar los cambios?')).toBeNull();
+  });
+});
+
+describe('EditEventDialog — color de portada (S-021)', () => {
+  const group = () => screen.getByRole('radiogroup', { name: 'Color de portada' });
+  const radio = (name: string) => within(group()).getByRole('radio', { name });
+  const colorOnlyEvent = (extra: Partial<Event>): Event => ({ ...baseEvent, ...extra });
+
+  it('TS-17: en modo completo el selector va debajo del cupo, con el color del evento', () => {
+    setup({ ...baseEvent, cover_color: 'peach' });
+
+    expect(radio('Durazno')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('dialog', { name: 'Editar datos del evento' })).toBeInTheDocument();
+    expect(
+      spin().compareDocumentPosition(group()) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(screen.queryByText(/solo puedes cambiar el color de portada/)).toBeNull();
+  });
+
+  it('TS-17: guarda el color junto con otros cambios', async () => {
+    const updated = { ...baseEvent, title: 'Otro nombre', cover_color: 'sky' as const };
+    updateEvent.mockResolvedValue(updated);
+    const { onSaved } = setup();
+    replace(nameField(), 'Otro nombre');
+    userEvent.click(radio('Cielo'));
+    save();
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(updated));
+    expect(updateEvent).toHaveBeenCalledWith('e-1', { name: 'Otro nombre', cover_color: 'sky' });
+  });
+
+  it('TS-17: cambiar solo el color también es un cambio', async () => {
+    updateEvent.mockResolvedValue({ ...baseEvent, cover_color: 'mint' });
+    setup();
+    userEvent.click(radio('Menta'));
+    save();
+
+    await waitFor(() => expect(updateEvent).toHaveBeenCalledWith('e-1', { cover_color: 'mint' }));
+  });
+
+  it('TS-17: cerrar con el color cambiado pide confirmar el descarte', () => {
+    setup();
+    userEvent.click(radio('Menta'));
+    userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+
+    expect(screen.getByText('¿Descartar los cambios?')).toBeInTheDocument();
+  });
+
+  it('TS-18: en votación solo se puede cambiar el color', async () => {
+    const event = colorOnlyEvent({ stage: 'voting' });
+    updateEvent.mockResolvedValue({ ...event, cover_color: 'mint' });
+    const { onClose, onSaved } = setup(event);
+
+    expect(screen.getByRole('dialog', { name: 'Cambiar color de portada' })).toBeInTheDocument();
+    expect(
+      screen.getByText('El evento ya está en votación: solo puedes cambiar el color de portada.')
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Nombre del evento/)).toBeNull();
+    expect(screen.queryByLabelText(/^Descripción/)).toBeNull();
+    expect(screen.queryByLabelText(/^Organizador/)).toBeNull();
+    expect(screen.queryByRole('spinbutton')).toBeNull();
+    expect(radio('Lavanda')).toHaveFocus();
+
+    userEvent.click(radio('Menta'));
+    userEvent.click(screen.getByRole('button', { name: 'Guardar color' }));
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(updateEvent).toHaveBeenCalledTimes(1);
+    expect(updateEvent).toHaveBeenCalledWith('e-1', { cover_color: 'mint' });
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('TS-19: en resultados y con el evento cancelado avisa por qué', () => {
+    const results = setup(colorOnlyEvent({ stage: 'results' }));
+    expect(
+      screen.getByText('El evento ya está en resultados: solo puedes cambiar el color de portada.')
+    ).toBeInTheDocument();
+    expect(results.onClose).not.toHaveBeenCalled();
+  });
+
+  it('TS-19: cancelado en participación también es solo color', () => {
+    setup(colorOnlyEvent({ stage: 'participation', is_cancelled: true }));
+
+    expect(screen.getByRole('dialog', { name: 'Cambiar color de portada' })).toBeInTheDocument();
+    expect(
+      screen.getByText('El evento está cancelado: solo puedes cambiar el color de portada.')
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Nombre del evento/)).toBeNull();
+  });
+
+  it('TS-20: guardar sin elegir otro color no llama a la api', () => {
+    const { onClose, onSaved } = setup(colorOnlyEvent({ stage: 'voting' }));
+
+    userEvent.click(screen.getByRole('button', { name: 'Guardar color' }));
+
+    expect(updateEvent).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('TS-21: falla el guardado del color y el diálogo sigue abierto', async () => {
+    updateEvent.mockRejectedValueOnce(apiErr(500, 'DB_UPDATE_ERROR'));
+    const { onClose, onSaved } = setup(colorOnlyEvent({ stage: 'voting' }));
+    userEvent.click(radio('Menta'));
+    userEvent.click(screen.getByRole('button', { name: 'Guardar color' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'No pudimos guardar los cambios. Inténtalo de nuevo.'
+    );
+
+    updateEvent.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    userEvent.click(screen.getByRole('button', { name: 'Guardar color' }));
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('No pudimos conectar con el servidor.')
+    );
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Cambiar color de portada' })).toBeInTheDocument();
   });
 });

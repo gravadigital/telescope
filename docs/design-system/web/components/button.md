@@ -31,7 +31,7 @@ sistema de clases `.btn-*` de la v1.0.
 | primary | **El** paso destacado; uno por pantalla | `button.primary.*` | "Abrir inscripción →" |
 | secondary | Acción alternativa (contorno) | `button.secondary.*` | "Cancelar", "Cerrar votación y publicar" mientras falten votos |
 | tertiary | Acción discreta, estilo texto | `button.tertiary.*` | "Pausar evento", "Marcar todo como leído" |
-| on-band | Acción sobre `bg.band` | `button.onBand.*` | "Compartir" en EventHero |
+| on-band | Acción sobre `bg.band` | `button.onBand.*` | Acciones sobre el header. Desde REQ-004 el EventHero ya no es banda: "Compartir" usa `secondary` |
 | icon | Solo ícono (cerrar, ↑ ↓) | `button.icon.*` | "×" de un diálogo |
 
 `destructive` no existe: el producto no tiene acciones destructivas con tratamiento propio (cancelar evento está fuera de alcance).
@@ -107,3 +107,4 @@ En mobile, el botón del paso destacado ocupa el ancho completo.
 
 - 2026-09-18 v1.0.0 — Relevado del sistema de clases `.btn-*` de `global.css`.
 - 2026-10-02 v2.0.0 — **Breaking.** Especificado como componente del rediseño de REQ-003: variants primary / secondary / tertiary / onBand / icon, sizes sm/md/lg, estado loading.
+- 2026-11-06 v2.1.0 — REQ-004: el EventHero deja `bg.band`; sus acciones usan `secondary` en lugar de `onBand`.

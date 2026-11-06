@@ -4,7 +4,7 @@ This document lists the reusable code documented so far for this service (increm
 
 ## Components
 
-**Total: 46**
+**Total: 47**
 
 - **Button** (`src/components/ui/button/Button.tsx`) - Variants primary / secondary / tertiary / onBand / icon, sizes sm / md / lg, loading state; `icon` requires `aria-label`
 - **TextField** (`src/components/ui/text-field/TextField.tsx`) - Text, multiline with counter and search variants; label, help, error, password toggle
@@ -17,12 +17,13 @@ This document lists the reusable code documented so far for this service (increm
 - **EmptyState** (`src/components/ui/empty-state/EmptyState.tsx`) - Inline or page empty state with a single action
 - **Card** (`src/components/ui/card/Card.tsx`) - Surface with variants default / subtle / raised / feature / interactive
 - **ProgressBar** (`src/components/ui/progress-bar/ProgressBar.tsx`) - `role="progressbar"` with tone and size
+- **ColorSwatchPicker** (`src/components/ui/color-swatch-picker/ColorSwatchPicker.tsx`) - Closed 16-color cover palette as a `radiogroup` (roving tabindex, arrows move and choose, no wrap); 8 × 2 on desktop and 4 × 4 on mobile; receives `names` already translated and an optional `selectedRef` for initial focus
 - **NumberStepper** (`src/components/ui/number-stepper/NumberStepper.tsx`) - Bounded number with − / +, recommended mark and range error; a decimal `step` snaps to the step grid in hundredths and accepts decimal input
 - **DateQuickPicker** (`src/components/ui/date-quick-picker/DateQuickPicker.tsx`) - Date with duration presets (from today or postpone) and native calendar; `base` overrides the date the presets are added to
 - **FileDropzone** (`src/components/ui/file-dropzone/FileDropzone.tsx`) - File picker / drop zone validated with `domain/files`, includes the FileChip; `onReplace` tells the page a replacement started and `submitted` resets it
 - **Menu** (`src/components/ui/menu/Menu.tsx`) - Dropdown menu (actions / select) with roving focus
 - **Icons** (`src/components/ui/icons/Icons.tsx`) - Inline SVG icons on `BaseIcon` / `BrandIcon`; S-016 adds `EditIcon` (pencil) and `BellIcon` (reminder); S-017 adds `ArrowUpIcon` / `ArrowDownIcon`; S-018 adds `UsersIcon`, `TrophyIcon`, `ArrowRightIcon`
-- **AppHeader / AppLayout** (`src/components/layout/app-header/AppHeader.tsx`, `src/components/layout/app-layout/AppLayout.tsx`) - Global band (logo, links, notifications slot, language and user menus) and layout route with header, `<main>` and footer
+- **AppHeader / AppFooter / AppLayout** (`src/components/layout/app-header/AppHeader.tsx`, `src/components/layout/app-footer/AppFooter.tsx`, `src/components/layout/app-layout/AppLayout.tsx`) - Global band (logo, links, notifications slot, language and user menus), footer on the same `--bg-band` (brand, Home / Events links, tagline) and layout route with header, `<main>` and footer
 - **UserMenu / LanguageSelect** (`src/components/layout/user-menu/UserMenu.tsx`, `src/components/layout/language-select/LanguageSelect.tsx`) - User menu with avatar initials and language radio items; ES / EN selector for visitors
 - **RequireAuth** (`src/components/layout/require-auth/RequireAuth.tsx`) - Route guard: waits for `loading`, then redirects to `/login?next=<route>`
 - **AuthLayout / RedirectIfAuthenticated** (`src/components/layout/auth-layout/AuthLayout.tsx`, `src/components/layout/redirect-if-authenticated/RedirectIfAuthenticated.tsx`) - Split brand / form layout for the auth pages (no global chrome) and the inverse guard that sends signed-in users to `next`
@@ -59,13 +60,15 @@ See full details in [components.md](./components.md)
 
 - **useT / I18nProvider** (`src/i18n/I18nProvider.tsx`) - Own i18n over `Intl` (ADR-010): `t(key, params)`, `locale`, `setLocale`, `fmt` formatters; typed `es` / `en` catalogs, `messageKeyForError(err)` for API errors
 
+- **useCoverColorNames** (`src/hooks/useCoverColorNames.ts`) - Name of every cover color in the active language (`Record<CoverColorId, string>`), the `names` prop of `ColorSwatchPicker`
+
 - **useGoogleSignIn** (`src/hooks/useGoogleSignIn.ts`) - Two-step Google flow shared by login and register: existing user signs in and goes to `next`; new user goes to `/complete-profile` with the credential in router state only
 
 See full details in [hooks.md](./hooks.md)
 
 ## Utils
 
-**Total: 17**
+**Total: 18**
 
 - **ApiError / getErrorCode** (`src/config/api.ts`) - Error thrown by `apiRequest`, `uploadFile` and `downloadFile` with `status`, `code` and `details`
 - **domain/stages** (`src/domain/stages.ts`) - Stage order, next stage, status, i18n key, `MIN_PROPOSALS_TO_VOTE` and `transitionDialog` (which dialog runs the next step of each stage)
@@ -76,7 +79,8 @@ See full details in [hooks.md](./hooks.md)
 - **domain/auth** (`src/domain/auth.ts`) - `isValidEmail`, `validateLogin`, `validateRegister`, `validateNewPassword`, `validateDisplayName` returning field errors as translation keys
 - **domain/events** (`src/domain/events.ts`) - `pendingTasks`, `rowAction`, `stagePill`, `myStatusLabel`, `currentDeadline`, `openEvents`, `parseStageFilter` and constants (`SEARCH_DEBOUNCE_MS`, `PENDING_LIMIT`, `EVENTS_PAGE_SIZE`)
 - **i18n helpers** (`src/i18n/`) - `translate`, `detectLocale`, `messageKeyForError`, `scopedMessageKeyForError`, `findVoseo` / `findGenderMarks` (neutral Spanish guard)
-- **domain/eventForm** (`src/domain/eventForm.ts`) - Event form rules shared by create and edit: `validateEventForm`, `toEventInput`, `changedEventFields`, `hasEventFormData`, `automaticEventDates`, `canEditEvent`, `minCapacityFor`, range constants
+- **domain/coverColors** (`src/domain/coverColors.ts`) - The closed cover palette: `COVER_COLORS` (canonical order, same as the api enum), `CoverColorId`, `DEFAULT_COVER_COLOR`, `isCoverColor`, `coverColorVar`
+- **domain/eventForm** (`src/domain/eventForm.ts`) - Event form rules shared by create and edit: `validateEventForm`, `toEventInput`, `changedEventFields`, `hasEventFormData`, `automaticEventDates`, `canEditEvent`, `isColorOnlyEdit`, `minCapacityFor`, range constants
 - **domain/voting** (`src/domain/voting.ts`) - `validateThresholds` (in hundredths), `recommendedMinEvaluations`, `VotingConfigPreview`, voting-config draft (`initialVotingDraft`, `validateVotingDraft`, `isRecommendedConfig`) and range constants (`ADJUSTMENT_MIN/MAX`, `MIN_EVALUATIONS_MAX`, `THRESHOLD_STEP`)
 - **domain/eventDetail** (`src/domain/eventDetail.ts`) - Event detail rules: `nextStepState` (11 states with priority cancelled > results > paused), `detailPill`, `progressSteps`, `splitResults` (podium + rest), `shareUrl` / `shareLinks`, `shareAudienceKey`, `afterKey`, `capacityOf` / `isRegistered` / `isFull` and constants
 - **domain/manage** (`src/domain/manage.ts`) - Organizer management rules: `manageStage`, `canPause`, `pendingFiles`, `pendingVotes`, `voteCell`, `votingProgress`, `managePill`, `reminderType`, `REMINDER_PREVIEW_LIMIT`

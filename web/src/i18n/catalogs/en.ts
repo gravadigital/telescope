@@ -132,7 +132,30 @@ export const en: Catalog = {
     backHome: 'Back to home',
     documentTitle: 'Page not found · Telescopio',
   },
+  coverColor: {
+    label: 'Cover color',
+    help: "It's the background of your event's header. You can change it later.",
+    names: {
+      lavender: 'Lavender',
+      periwinkle: 'Periwinkle',
+      sky: 'Sky',
+      ice: 'Ice',
+      aqua: 'Aqua',
+      mint: 'Mint',
+      pistachio: 'Pistachio',
+      lemon: 'Lemon',
+      butter: 'Butter',
+      peach: 'Peach',
+      coral: 'Coral',
+      rose: 'Rose',
+      pink: 'Bubblegum',
+      lilac: 'Lilac',
+      sand: 'Sand',
+      mist: 'Mist',
+    },
+  },
   footer: {
+    nav: 'Footer navigation',
     tagline: 'Telescopio · distributed peer review',
   },
   auth: {
@@ -431,6 +454,7 @@ export const en: Catalog = {
       capacity: 'Limit',
       capacityValue: plural({ one: '{count} participant', other: '{count} participants' }),
       organizerFallback: '{name} (your name)',
+      coverColor: 'Cover color',
       edit: 'Edit',
       editField: 'Edit {field}',
     },
@@ -473,6 +497,15 @@ export const en: Catalog = {
     cancel: 'Cancel',
     save: 'Save changes',
     saving: 'Saving…',
+    colorOnly: {
+      title: 'Change cover color',
+      save: 'Save color',
+      notice: {
+        voting: 'The event is already in voting: you can only change the cover color.',
+        results: 'The event is already in results: you can only change the cover color.',
+        cancelled: 'The event is cancelled: you can only change the cover color.',
+      },
+    },
     errors: {
       generic: 'We couldn\'t save the changes. Please try again.',
       stageLocked: 'The event has moved to voting and its details can no longer be edited.',
@@ -486,6 +519,7 @@ export const en: Catalog = {
   manageEvent: {
     created: 'Event created. When it\'s ready, open registration.',
     updated: 'Details updated.',
+    colorUpdated: 'Color updated.',
   },
   manage: {
     back: '← My events',
@@ -493,6 +527,7 @@ export const en: Catalog = {
     role: 'You organize this event',
     meta: '{organizer} · created on {date}',
     editData: 'Edit details',
+    changeColor: 'Change color',
     copyInvite: 'Copy invitation link',
     copied: '✓ Copied',
     share: 'Share',
@@ -1042,6 +1077,7 @@ export const en: Catalog = {
     INTERNAL_ERROR: "We couldn't complete the action on the server. Please try again in a few minutes.",
     INVALID_ATTACHMENT_ID: 'The proposal identifier is not valid.',
     INVALID_CREDENTIALS: 'The email or password is incorrect.',
+    INVALID_COVER_COLOR: 'The cover color is not valid.',
     INVALID_DATE_FORMAT: 'The date format is not valid.',
     INVALID_DATE_RANGE: 'The end date must be after the start date.',
     INVALID_END_DATE: 'The end date is not valid.',

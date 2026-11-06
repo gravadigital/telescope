@@ -23,12 +23,12 @@ import {
   MIN_PROPOSALS_TO_VOTE,
   STAGE_ORDER,
   SUCCESS_NOTICE_MS,
-  canEditEvent,
   canPause,
   capacityOf,
   currentDeadline,
   daysUntilClose,
   endOfDay,
+  isColorOnlyEdit,
   isRecommendedConfig,
   managePill,
   manageStage,
@@ -435,33 +435,31 @@ const ManageEventPage: React.FC = () => {
 
   // ---------- Encabezado ----------
   const pill = managePill(event);
-  const showEdit = !cancelled && canEditEvent(event.stage);
+  // El color de portada se puede cambiar siempre; el resto de los datos, solo en creación y participación.
+  const editColorOnly = isColorOnlyEdit(event);
   const shareAction = ((): React.ReactNode => {
     if (cancelled || event.stage === 'creation') return null;
     if (event.stage === 'participation') {
       return (
-        <Button variant="onBand" iconStart={<LinkIcon />} onClick={handleCopy}>
+        <Button variant="secondary" iconStart={<LinkIcon />} onClick={handleCopy}>
           {copied ? t('manage.copied') : t('manage.copyInvite')}
         </Button>
       );
     }
     return (
-      <Button variant="onBand" iconStart={<ShareIcon />} onClick={() => setOpenDialog('share')}>
+      <Button variant="secondary" iconStart={<ShareIcon />} onClick={() => setOpenDialog('share')}>
         {t('manage.share')}
       </Button>
     );
   })();
-  const heroActions =
-    showEdit || shareAction ? (
-      <div className="mep-hero-buttons">
-        {showEdit && (
-          <Button variant="onBand" iconStart={<EditIcon />} onClick={() => setOpenDialog('edit')}>
-            {t('manage.editData')}
-          </Button>
-        )}
-        {shareAction}
-      </div>
-    ) : undefined;
+  const heroActions = (
+    <div className="mep-hero-buttons">
+      <Button variant="secondary" iconStart={<EditIcon />} onClick={() => setOpenDialog('edit')}>
+        {t(editColorOnly ? 'manage.changeColor' : 'manage.editData')}
+      </Button>
+      {shareAction}
+    </div>
+  );
 
   const countdown =
     state === 'participation' && deadline ? (
@@ -476,6 +474,7 @@ const ManageEventPage: React.FC = () => {
         }}
         target={endOfDay(deadline)}
         footer={t('manage.countdown.registration.footer', { date: fmt.date(deadline) })}
+        tone="light"
       />
     ) : undefined;
 
@@ -750,10 +749,11 @@ const ManageEventPage: React.FC = () => {
     <div className="mep-page" ref={pageRef}>
       <EventHero
         back={{ label: t('manage.back'), to: '/my-events' }}
+        coverColor={event.cover_color}
         pills={
           <>
-            <StatusPill tone="onBand">{t(pill.key, pill.params)}</StatusPill>
-            <StatusPill tone="onBand">{t('manage.role')}</StatusPill>
+            <StatusPill tone="neutral">{t(pill.key, pill.params)}</StatusPill>
+            <StatusPill tone="neutral">{t('manage.role')}</StatusPill>
           </>
         }
         title={event.title}
@@ -879,7 +879,7 @@ const ManageEventPage: React.FC = () => {
         open={openDialog === 'edit'}
         event={event}
         onClose={closeDialog}
-        onSaved={() => finishDialog('manageEvent.updated')}
+        onSaved={() => finishDialog(editColorOnly ? 'manageEvent.colorUpdated' : 'manageEvent.updated')}
       />
       <ShareDialog
         open={openDialog === 'share'}

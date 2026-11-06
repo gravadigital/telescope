@@ -39,6 +39,23 @@
   --ref-color-amber-500: #e9a227;
   --ref-color-amber-100: #f7edd6;
   --ref-color-red-700: #b8381f;
+  /* Portada del evento (REQ-004): 16 pasteles, misma luminancia. foundations/color.md */
+  --ref-color-cover-lavender: #D9D4FA;
+  --ref-color-cover-periwinkle: #CDD8F9;
+  --ref-color-cover-sky: #B6DEF7;
+  --ref-color-cover-ice: #A8E3E9;
+  --ref-color-cover-aqua: #ADE4D7;
+  --ref-color-cover-mint: #B0E5C2;
+  --ref-color-cover-pistachio: #C5E2A8;
+  --ref-color-cover-lemon: #E3DB90;
+  --ref-color-cover-butter: #F4D49E;
+  --ref-color-cover-peach: #F9D0B9;
+  --ref-color-cover-coral: #F9CFCA;
+  --ref-color-cover-rose: #F8CEDA;
+  --ref-color-cover-pink: #F4CDE9;
+  --ref-color-cover-lilac: #EECEF5;
+  --ref-color-cover-sand: #E2D7CA;
+  --ref-color-cover-mist: #D2D9E4;
 
   /* Tipografía (tamaños en rem, base 16px) */
   --ref-font-family-base: 'Plus Jakarta Sans', system-ui, sans-serif;
@@ -124,6 +141,23 @@
   --bg-warning-subtle: var(--ref-color-amber-100);
   --bg-neutral-subtle: var(--ref-color-gray-150);
   --bg-disabled: var(--ref-color-gray-200);
+  --bg-cover-lavender: var(--ref-color-cover-lavender);
+  --bg-cover-periwinkle: var(--ref-color-cover-periwinkle);
+  --bg-cover-sky: var(--ref-color-cover-sky);
+  --bg-cover-ice: var(--ref-color-cover-ice);
+  --bg-cover-aqua: var(--ref-color-cover-aqua);
+  --bg-cover-mint: var(--ref-color-cover-mint);
+  --bg-cover-pistachio: var(--ref-color-cover-pistachio);
+  --bg-cover-lemon: var(--ref-color-cover-lemon);
+  --bg-cover-butter: var(--ref-color-cover-butter);
+  --bg-cover-peach: var(--ref-color-cover-peach);
+  --bg-cover-coral: var(--ref-color-cover-coral);
+  --bg-cover-rose: var(--ref-color-cover-rose);
+  --bg-cover-pink: var(--ref-color-cover-pink);
+  --bg-cover-lilac: var(--ref-color-cover-lilac);
+  --bg-cover-sand: var(--ref-color-cover-sand);
+  --bg-cover-mist: var(--ref-color-cover-mist);
+  --bg-cover-default: var(--bg-cover-lavender);
   --bg-backdrop: rgba(11, 16, 32, 0.55);
   --countdown-box-bg: #ffffff14;
   --countdown-box-border: #ffffff29;

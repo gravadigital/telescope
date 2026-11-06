@@ -17,7 +17,9 @@ status: diseñada
 | `bg.canvas` | `color.gray.100` | Fondo de página |
 | `bg.surface` | `color.white` | Tarjetas, diálogos, tablas, inputs |
 | `bg.surface.subtle` | `color.gray.50` | Superficie secundaria, filas alternas |
-| `bg.band` | `color.black` | Header, EventHero, panel de marca |
+| `bg.band` | `color.black` | Header, footer, panel de marca |
+| `bg.cover.{id}` | `color.cover.{id}` | EventHero según `cover_color` (REQ-004) |
+| `bg.cover.default` | `color.cover.lavender` | EventHero sin elección explícita |
 | `bg.band.raised` | `color.ink.800` | Superficie dentro de una banda |
 | `bg.action.primary` | `color.violet.700` | Botón primario |
 | `bg.action.primary.hover` | **Pendiente** — el diseño no define hover | Hover de botón primario |
@@ -98,3 +100,4 @@ Ver [`typography.md`](../foundations/typography.md) → Tokens semánticos (`tex
 - 2026-09-18 v0.1.0 — Placeholder inicial.
 - 2026-10-02 v2.0.0 — **Breaking.** Mapeo al rediseño de REQ-003; nuevos roles `bg.band`,
   `bg.accent`, `bg.unread`, `text.inverse.secondary`, `text.signal`, `radius.*`, `shadow.*`.
+- 2026-11-06 v2.1.0 — REQ-004: `bg.cover.{id}` y `bg.cover.default`; `bg.band` documentado para header + footer (el EventHero deja la banda).

@@ -200,7 +200,8 @@
 .edp-skeleton--hero {
   min-height: 12rem;
   border-radius: 0;
-  background: var(--bg-band);
+  /* Mismo color que el hero sin elección: evita el salto de negro a pastel al cargar. */
+  background: var(--bg-cover-default);
 }
 
 .edp-skeleton--block {

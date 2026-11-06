@@ -125,7 +125,22 @@ menu.shadow                    : shadow.popover
 menu.item.hover                : bg.surface.subtle
 ```
 
+## ColorSwatchPicker (REQ-004)
+```
+swatchPicker.swatch.size        : 32px                   # desktop
+swatchPicker.swatch.size.mobile : 40px                   # área táctil 44px
+swatchPicker.swatch.radius      : radius.full
+swatchPicker.swatch.border      : border.default
+swatchPicker.gap                : space.sm
+swatchPicker.columns            : 8                      # mobile: 4
+swatchPicker.selected.ring      : 2px bg.action.primary, offset 2px
+swatchPicker.selected.check     : text.primary
+swatchPicker.focus              : focus.ring + border.focus
+swatchPicker.disabled.opacity   : 0.4
+```
+
 ## Historial
 
 - 2026-09-18 v0.1.0 — Placeholder inicial.
 - 2026-10-02 v2.0.0 — Tokens de los 15 componentes del rediseño de REQ-003.
+- 2026-11-06 v2.1.0 — REQ-004: tokens de `ColorSwatchPicker`.

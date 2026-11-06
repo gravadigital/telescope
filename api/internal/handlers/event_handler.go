@@ -230,13 +230,14 @@ func (h *EventHandler) participantIDs(eventID string) ([]uuid.UUID, bool) {
 }
 
 type CreateEventRequest struct {
-	Name            string `json:"name" binding:"required,min=3,max=200"`
-	Description     string `json:"description" binding:"required,min=10,max=2000"`
-	StartDate       string `json:"start_date" binding:"required"`
-	EndDate         string `json:"end_date" binding:"required"`
-	Organizer       string `json:"organizer"`
-	AuthorID        string `json:"author_id"`        // Optional: if provided, use this as author_id
-	MaxParticipants *int   `json:"max_participants"` // Optional: if provided, use this limit (default: 20)
+	Name            string  `json:"name" binding:"required,min=3,max=200"`
+	Description     string  `json:"description" binding:"required,min=10,max=2000"`
+	StartDate       string  `json:"start_date" binding:"required"`
+	EndDate         string  `json:"end_date" binding:"required"`
+	Organizer       string  `json:"organizer"`
+	AuthorID        string  `json:"author_id"`        // Optional: if provided, use this as author_id
+	MaxParticipants *int    `json:"max_participants"` // Optional: if provided, use this limit (default: 20)
+	CoverColor      *string `json:"cover_color"`      // Optional: one of the cover palette (default: lavender)
 }
 
 // CreateEvent handles POST /api/events
@@ -397,7 +398,19 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 		}
 		newEvent.MaxParticipants = req.MaxParticipants
 		h.log.Debug("using custom max_participants", "value", *req.MaxParticipants)
-	} // Validate the event domain entity
+	}
+
+	if req.CoverColor != nil && *req.CoverColor != "" {
+		color := event.CoverColor(*req.CoverColor)
+		if !color.IsValid() {
+			h.log.Warn("invalid cover_color", "value", *req.CoverColor)
+			respondInvalidCoverColor(c)
+			return
+		}
+		newEvent.CoverColor = color
+	}
+
+	// Validate the event domain entity
 	if err := newEvent.Validate(); err != nil {
 		h.log.Error("event validation failed", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -436,6 +449,7 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 			"organizer":        newEvent.Organizer,
 			"shareable_link":   newEvent.ShareableLink,
 			"max_participants": newEvent.MaxParticipants,
+			"cover_color":      string(newEvent.CoverColor),
 			"stage":            newEvent.Stage.String(),
 			"author_id":        newEvent.AuthorID.String(),
 			"created_at":       newEvent.CreatedAt,
@@ -1389,6 +1403,7 @@ func (h *EventHandler) GetAllEvents(c *gin.Context) {
 			"participants_count":               len(participantIDs),
 			"is_cancelled":                     evt.IsCancelled,
 			"is_paused":                        evt.IsPaused,
+			"cover_color":                      string(evt.CoverColor),
 			"created_at":                       evt.CreatedAt,
 			"updated_at":                       evt.UpdatedAt,
 		}
@@ -1544,6 +1559,7 @@ func (h *EventHandler) buildEventDetail(evt *event.Event) (gin.H, int) {
 		"attachment_count":                 attachmentCount,
 		"is_cancelled":                     evt.IsCancelled,
 		"is_paused":                        evt.IsPaused,
+		"cover_color":                      string(evt.CoverColor),
 		"created_at":                       evt.CreatedAt,
 		"updated_at":                       evt.UpdatedAt,
 	}, len(participantIDs)
@@ -1557,13 +1573,34 @@ type UpdateEventRequest struct {
 	Description     *string `json:"description"`
 	Organizer       *string `json:"organizer"`
 	MaxParticipants *int    `json:"max_participants"`
+	CoverColor      *string `json:"cover_color"`
+}
+
+// editsEventData reports whether the request changes any field other than the cover color.
+// Only those fields are subject to the creation/participation stage rule.
+func (r UpdateEventRequest) editsEventData() bool {
+	return r.Name != nil || r.Description != nil || r.Organizer != nil || r.MaxParticipants != nil
+}
+
+// respondInvalidCoverColor answers 400 INVALID_COVER_COLOR listing the accepted identifiers.
+func respondInvalidCoverColor(c *gin.Context) {
+	palette := event.CoverColors()
+	valid := make([]string, 0, len(palette))
+	for _, color := range palette {
+		valid = append(valid, string(color))
+	}
+	c.JSON(http.StatusBadRequest, gin.H{
+		"error":   "Invalid cover color",
+		"code":    "INVALID_COVER_COLOR",
+		"details": "cover_color must be one of: " + strings.Join(valid, ", "),
+	})
 }
 
 // validateUpdateEventRequest returns a description of the first invalid field,
 // or "" when the request is valid. Lengths are counted in characters.
 func validateUpdateEventRequest(req UpdateEventRequest) string {
-	if req.Name == nil && req.Description == nil && req.Organizer == nil && req.MaxParticipants == nil {
-		return "at least one of name, description, organizer, max_participants is required"
+	if !req.editsEventData() && req.CoverColor == nil {
+		return "at least one of name, description, organizer, max_participants, cover_color is required"
 	}
 	if req.Name != nil {
 		if n := utf8.RuneCountInString(*req.Name); n < 3 || n > 200 {
@@ -1630,6 +1667,12 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 		return
 	}
 
+	if req.CoverColor != nil && !event.CoverColor(*req.CoverColor).IsValid() {
+		h.log.Warn("invalid cover_color on event update", "event_id", eventID, "value", *req.CoverColor)
+		respondInvalidCoverColor(c)
+		return
+	}
+
 	existingEvent, err := h.eventRepo.GetByID(eventID)
 	if err != nil {
 		h.log.Error("event not found", "event_id", eventID, "error", err)
@@ -1637,7 +1680,9 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 		return
 	}
 
-	if existingEvent.Stage != event.StageCreation && existingEvent.Stage != event.StageParticipation {
+	// The cover color is presentation only: it can change in any stage and state. Every other
+	// field keeps the creation/participation rule.
+	if req.editsEventData() && existingEvent.Stage != event.StageCreation && existingEvent.Stage != event.StageParticipation {
 		h.log.Warn("update attempt outside creation/participation stage", "event_id", eventID, "current_stage", existingEvent.Stage)
 		c.JSON(http.StatusConflict, gin.H{
 			"error":         "Event can only be updated during creation or participation stage",
@@ -1696,6 +1741,9 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 	}
 	if req.MaxParticipants != nil {
 		existingEvent.MaxParticipants = req.MaxParticipants
+	}
+	if req.CoverColor != nil {
+		existingEvent.CoverColor = event.CoverColor(*req.CoverColor)
 	}
 
 	if err := h.eventRepo.Update(existingEvent); err != nil {

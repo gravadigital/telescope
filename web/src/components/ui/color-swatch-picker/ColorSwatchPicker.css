@@ -1,0 +1,88 @@
+.ui-swatch-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ref-space-sm);
+  font: var(--type-body);
+}
+.ui-swatch-picker__label {
+  font: var(--type-ui);
+  color: var(--text-primary);
+}
+
+/* Mobile (base): 4 × 4, muestra de 40px dentro de un área táctil de 44px. */
+.ui-swatch-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 44px);
+  gap: var(--ref-space-sm);
+}
+.ui-swatch-picker__swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.ui-swatch-picker__swatch:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.ui-swatch-picker__swatch:focus-visible {
+  outline: none;
+}
+.ui-swatch-picker__dot {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border-default);
+  background-color: var(--swatch-color, transparent);
+  border-radius: var(--radius-pill);
+  transition: transform 150ms ease;
+}
+.ui-swatch-picker__swatch:hover:not(:disabled) .ui-swatch-picker__dot {
+  transform: scale(1.08);
+}
+/* Elegida: anillo de 2px con 2px de separación. Se acompaña del ✓ y del nombre. */
+.ui-swatch-picker__swatch[aria-checked="true"] .ui-swatch-picker__dot {
+  box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--bg-action-primary);
+}
+.ui-swatch-picker__swatch:focus-visible .ui-swatch-picker__dot {
+  box-shadow: var(--focus-ring);
+  border-color: var(--border-focus);
+}
+.ui-swatch-picker__swatch[aria-checked="true"]:focus-visible .ui-swatch-picker__dot {
+  box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--bg-action-primary), 0 0 0 7px var(--bg-action-subtle);
+}
+.ui-swatch-picker__check {
+  color: var(--text-primary);
+}
+.ui-swatch-picker__name {
+  margin: 0;
+  font: var(--type-ui);
+  color: var(--text-primary);
+}
+.ui-swatch-picker__help {
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--text-secondary);
+}
+
+@media (min-width: 768px) {
+  .ui-swatch-picker__grid {
+    grid-template-columns: repeat(8, 32px);
+  }
+  .ui-swatch-picker__swatch {
+    min-width: 32px;
+    min-height: 32px;
+  }
+  .ui-swatch-picker__dot {
+    width: 32px;
+    height: 32px;
+  }
+}

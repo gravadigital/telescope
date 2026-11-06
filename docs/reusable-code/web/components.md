@@ -85,10 +85,10 @@ All text reaches the components through props (no embedded copy); CSS uses only 
 
 ---
 
-## Global layout (AppHeader, AppLayout, UserMenu, LanguageSelect, RequireAuth)
+## Global layout (AppHeader, AppFooter, AppLayout, UserMenu, LanguageSelect, RequireAuth)
 
-**Location:** `src/components/layout/{app-header,app-layout,user-menu,language-select,require-auth}/`
-**Description:** Global chrome. `AppLayout` is the parent route (`<Outlet />` inside `<main id="main">`, footer from `footer.tagline`). `AppHeader` shows nothing while `loading`; visitors get `LanguageSelect` plus links to `/login` and `/register`; signed-in users get a reserved `[data-slot="notifications"]` and `UserMenu`. On mobile the links move into a `Menu`. `RequireAuth` wraps protected routes.
+**Location:** `src/components/layout/{app-header,app-footer,app-layout,user-menu,language-select,require-auth}/`
+**Description:** Global chrome. `AppLayout` is the parent route (`<Outlet />` inside `<main id="main">`, then `AppFooter`). `AppFooter` shares the header's `--bg-band` background (REQ-004): the `TELESCOPIO` brand, a `footer.nav` navigation with Home and Events, and `footer.tagline`; stacked on mobile, one row from 768px. `AppHeader` shows nothing while `loading`; visitors get `LanguageSelect` plus links to `/login` and `/register`; signed-in users get a reserved `[data-slot="notifications"]` and `UserMenu`. On mobile the links move into a `Menu`. `RequireAuth` wraps protected routes.
 
 **Usage:**
 ```tsx
@@ -96,6 +96,27 @@ All text reaches the components through props (no embedded copy); CSS uses only 
   <Route path="/events/create" element={<RequireAuth><CreateEventPage /></RequireAuth>} />
 </Route>
 ```
+
+---
+
+## ColorSwatchPicker (REQ-004)
+
+**Location:** `src/components/ui/color-swatch-picker/`
+**Description:** Picks one of the 16 cover colors (`COVER_COLORS`). It is a `role="radiogroup"` with one `role="radio"` per swatch and a roving tabindex (only the chosen one is tabbable). Arrow keys move the focus and choose, one swatch left/right and one row up/down (8 columns from 768px, 4 below), and do not wrap at the edges; Space and Enter choose the focused one. The chosen swatch shows a check, a ring and its name under the grid. The kit does not translate, so the names come in `names` (see `useCoverColorNames`); `selectedRef` points to the chosen swatch so a dialog can focus it first. The color reaches the dot through the `--swatch-color` custom property, set to the `--bg-cover-{id}` token.
+
+**Usage:**
+```tsx
+const names = useCoverColorNames();
+<ColorSwatchPicker value={values.coverColor} names={names} label={t('coverColor.label')}
+  help={t('coverColor.help')} selectedRef={pickerRef} disabled={saving} onChange={setCoverColor} />
+```
+
+---
+
+## Countdown (tone="light")
+
+**Location:** `src/components/events/countdown/Countdown.tsx`
+**Description:** `tone="band"` (default) is the dark-band design. `tone="light"` adds `ev-countdown--light` for light backgrounds: white boxes with a border and `--text-primary` / `--text-secondary`. The event hero uses it, because the hero now takes the event's cover color. `EventHero` takes `coverColor` and sets `--ev-hero-bg`; its content uses the default `StatusPill` tone and `Button variant="secondary"`.
 
 ---
 

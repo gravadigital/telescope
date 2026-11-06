@@ -2,6 +2,8 @@ import type { EventCreateInput, EventStage, EventUpdate } from '../types';
 import type { TranslationKey } from '../i18n/types';
 import type { FieldErrors } from './auth';
 import { addDays, todayISO } from './dates';
+import { DEFAULT_COVER_COLOR } from './coverColors';
+import type { CoverColorId } from './coverColors';
 
 export const EVENT_NAME_MIN = 3;
 export const EVENT_NAME_MAX = 200;
@@ -17,6 +19,7 @@ export interface EventFormValues {
   description: string;
   organizer: string;
   maxParticipants: number;
+  coverColor: CoverColorId;
 }
 
 export type EventFormField = keyof EventFormValues;
@@ -26,6 +29,7 @@ export const EVENT_FORM_FIELDS: readonly EventFormField[] = [
   'description',
   'organizer',
   'maxParticipants',
+  'coverColor',
 ];
 
 export const EMPTY_EVENT_FORM: EventFormValues = {
@@ -33,6 +37,7 @@ export const EMPTY_EVENT_FORM: EventFormValues = {
   description: '',
   organizer: '',
   maxParticipants: EVENT_CAPACITY_DEFAULT,
+  coverColor: DEFAULT_COVER_COLOR,
 };
 
 /** El backend cuenta runas: se cuentan code points, no unidades UTF-16. */
@@ -43,6 +48,13 @@ export const minCapacityFor = (registered: number): number =>
 
 export const canEditEvent = (stage: EventStage): boolean =>
   stage === 'creation' || stage === 'participation';
+
+/**
+ * En votación, resultados o con el evento cancelado solo se edita el color de portada (REQ-004):
+ * es presentación y no toca el ciclo de vida. El resto de los datos sigue la regla de `canEditEvent`.
+ */
+export const isColorOnlyEdit = (event: { stage: EventStage; is_cancelled?: boolean }): boolean =>
+  Boolean(event.is_cancelled) || !canEditEvent(event.stage);
 
 const compact = <K extends string>(errors: FieldErrors<K>): FieldErrors<K> =>
   Object.fromEntries(Object.entries(errors).filter(([, v]) => v !== undefined)) as FieldErrors<K>;
@@ -97,6 +109,7 @@ export const toEventInput = (values: EventFormValues): EventCreateInput => ({
   description: values.description.trim(),
   organizer: values.organizer.trim(),
   max_participants: values.maxParticipants,
+  cover_color: values.coverColor,
 });
 
 export const changedEventFields = (
@@ -114,6 +127,7 @@ export const changedEventFields = (
   if (values.maxParticipants !== initial.maxParticipants) {
     changes.max_participants = values.maxParticipants;
   }
+  if (values.coverColor !== initial.coverColor) changes.cover_color = values.coverColor;
   return changes;
 };
 
@@ -121,7 +135,8 @@ export const hasEventFormData = (values: EventFormValues): boolean =>
   values.name.trim() !== '' ||
   values.description.trim() !== '' ||
   values.organizer.trim() !== '' ||
-  values.maxParticipants !== EVENT_CAPACITY_DEFAULT;
+  values.maxParticipants !== EVENT_CAPACITY_DEFAULT ||
+  values.coverColor !== DEFAULT_COVER_COLOR;
 
 /** Fecha automática: inicio mañana y cierre pasado mañana, en calendario local. */
 export const automaticEventDates = (

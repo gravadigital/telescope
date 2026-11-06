@@ -51,3 +51,20 @@
   font: var(--type-ui);
   color: var(--ref-color-white);
 }
+
+/* Variante clara: el contador sobre el color de portada del evento. */
+.ev-countdown--light .ev-countdown__title {
+  color: var(--text-secondary);
+}
+.ev-countdown--light .ev-countdown__box {
+  background: var(--bg-surface);
+  border-color: var(--border-default);
+}
+.ev-countdown--light .ev-countdown__value,
+.ev-countdown--light .ev-countdown__expired {
+  color: var(--text-primary);
+}
+.ev-countdown--light .ev-countdown__unit,
+.ev-countdown--light .ev-countdown__footer {
+  color: var(--text-secondary);
+}

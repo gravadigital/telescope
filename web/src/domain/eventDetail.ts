@@ -68,7 +68,7 @@ export const detailPill = (
   event: Pick<Event, 'stage' | 'participation_estimated_end_date' | 'voting_estimated_end_date'>,
   now: Date = new Date()
 ): { key: TranslationKey; params?: Params; tone: PillTone } => {
-  const tone: PillTone = 'onBand';
+  const tone: PillTone = 'neutral';
   const withClose = (
     deadline: string | null,
     base: 'open' | 'vote',

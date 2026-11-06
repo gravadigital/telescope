@@ -1,5 +1,5 @@
 import React from 'react';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AppRoutes } from './App';
 import { renderWithProviders, sampleUser } from './test-utils/renderWithProviders';
@@ -138,6 +138,27 @@ describe('rutas', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Iniciar sesión' })).toBeInTheDocument();
     expect(screen.queryByRole('banner')).toBeNull();
     expect(screen.queryByText('Telescopio · evaluación distribuida entre pares')).toBeNull();
+  });
+
+  it('TS-7 (S-020): el pie aparece en las rutas con chrome, con y sin sesión', () => {
+    const signedIn = { user: sampleUser, isAuthenticated: true, loading: false };
+    for (const auth of [guest, signedIn]) {
+      for (const route of ['/', '/events']) {
+        const view = renderWithProviders(<AppRoutes />, { route, auth });
+        const footers = screen.getAllByRole('contentinfo');
+        expect(footers).toHaveLength(1);
+        expect(within(footers[0]).getByRole('link', { name: 'TELESCOPIO' })).toHaveAttribute('href', '/');
+        view.unmount();
+      }
+    }
+  });
+
+  it('TS-8 (S-020): las páginas de auth no tienen pie', () => {
+    for (const route of ['/login', '/register']) {
+      const view = renderWithProviders(<AppRoutes />, { route, auth: guest });
+      expect(screen.queryByRole('contentinfo')).toBeNull();
+      view.unmount();
+    }
   });
 
   it('TS-56: con sesión no se ven login ni registro', () => {

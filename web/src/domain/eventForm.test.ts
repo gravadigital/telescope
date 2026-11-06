@@ -6,6 +6,7 @@ import {
   changedEventFields,
   charCount,
   hasEventFormData,
+  isColorOnlyEdit,
   minCapacityFor,
   toEventInput,
   validateEventForm,
@@ -16,6 +17,7 @@ const valid: EventFormValues = {
   description: 'Diseña el afiche del festival',
   organizer: '',
   maxParticipants: 20,
+  coverColor: 'lavender',
 };
 
 describe('validateEventForm', () => {
@@ -72,7 +74,7 @@ describe('validateEventForm', () => {
   it('valida solo los campos pedidos (TS-7)', () => {
     expect(
       validateEventForm(
-        { name: 'a', description: '', organizer: '', maxParticipants: 0 },
+        { name: 'a', description: '', organizer: '', maxParticipants: 0, coverColor: 'lavender' },
         { fields: ['maxParticipants'] }
       )
     ).toEqual({ maxParticipants: 'eventForm.validation.capacityRange' });
@@ -85,6 +87,7 @@ describe('changedEventFields / hasEventFormData', () => {
     description: 'Diseña el afiche',
     organizer: 'Club',
     maxParticipants: 20,
+    coverColor: 'lavender',
   };
 
   it('devuelve solo lo cambiado, recortado (TS-8)', () => {
@@ -94,8 +97,16 @@ describe('changedEventFields / hasEventFormData', () => {
         description: 'Diseña el afiche',
         organizer: 'Club de Diseño',
         maxParticipants: 15,
+        coverColor: 'lavender',
       })
     ).toEqual({ organizer: 'Club de Diseño', max_participants: 15 });
+  });
+
+  it('TS-6 (S-021): incluye el color solo si cambió', () => {
+    expect(changedEventFields(initial, { ...initial, coverColor: 'sky' })).toEqual({ cover_color: 'sky' });
+    expect(
+      changedEventFields(initial, { ...initial, name: 'Otro', coverColor: 'mint' })
+    ).toEqual({ name: 'Otro', cover_color: 'mint' });
   });
 
   it('sin cambios devuelve {} (TS-9)', () => {
@@ -108,13 +119,23 @@ describe('changedEventFields / hasEventFormData', () => {
     expect(hasEventFormData({ ...EMPTY_EVENT_FORM, organizer: 'x' })).toBe(true);
     expect(hasEventFormData({ ...EMPTY_EVENT_FORM, maxParticipants: 21 })).toBe(true);
   });
+
+  it('TS-15 (S-021): el color por defecto no cuenta como dato cargado', () => {
+    expect(EMPTY_EVENT_FORM.coverColor).toBe('lavender');
+    expect(hasEventFormData({ ...EMPTY_EVENT_FORM, coverColor: 'lavender' })).toBe(false);
+    expect(hasEventFormData({ ...EMPTY_EVENT_FORM, coverColor: 'mint' })).toBe(true);
+  });
 });
 
 describe('toEventInput / automaticEventDates / etapas', () => {
   it('arma la entrada para crear (TS-11)', () => {
     expect(
-      toEventInput({ name: ' Afiches ', description: ' Diseña el afiche ', organizer: '  ', maxParticipants: 30 })
-    ).toEqual({ name: 'Afiches', description: 'Diseña el afiche', organizer: '', max_participants: 30 });
+      toEventInput({ name: ' Afiches ', description: ' Diseña el afiche ', organizer: '  ', maxParticipants: 30, coverColor: 'lavender' })
+    ).toEqual({ name: 'Afiches', description: 'Diseña el afiche', organizer: '', max_participants: 30, cover_color: 'lavender' });
+  });
+
+  it('TS-14 (S-021): la entrada para crear lleva el color elegido', () => {
+    expect(toEventInput({ ...EMPTY_EVENT_FORM, name: 'Afiches', coverColor: 'mint' }).cover_color).toBe('mint');
   });
 
   it('la fecha automática usa el calendario local (TS-12)', () => {
@@ -131,5 +152,17 @@ describe('toEventInput / automaticEventDates / etapas', () => {
     expect(canEditEvent('results')).toBe(false);
     expect(minCapacityFor(0)).toBe(1);
     expect(minCapacityFor(12)).toBe(12);
+  });
+});
+
+describe('isColorOnlyEdit (S-021)', () => {
+  it('TS-18/19: solo el color se edita en votación, resultados o con el evento cancelado', () => {
+    expect(isColorOnlyEdit({ stage: 'creation' })).toBe(false);
+    expect(isColorOnlyEdit({ stage: 'participation' })).toBe(false);
+    expect(isColorOnlyEdit({ stage: 'participation', is_cancelled: false })).toBe(false);
+    expect(isColorOnlyEdit({ stage: 'voting' })).toBe(true);
+    expect(isColorOnlyEdit({ stage: 'results' })).toBe(true);
+    expect(isColorOnlyEdit({ stage: 'creation', is_cancelled: true })).toBe(true);
+    expect(isColorOnlyEdit({ stage: 'participation', is_cancelled: true })).toBe(true);
   });
 });

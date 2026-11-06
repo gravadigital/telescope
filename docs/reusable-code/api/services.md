@@ -234,3 +234,43 @@ if !eventVisibleTo(c, evt) {
     return
 }
 ```
+
+---
+
+## event.CoverColor
+
+**Location:** `internal/domain/event/cover_color.go`
+**Description:** Identifier of an event's cover color, from a closed palette of 16 pastels in a fixed canonical order (`lavender`, `periwinkle`, `sky`, `ice`, `aqua`, `mint`, `pistachio`, `lemon`, `butter`, `peach`, `coral`, `rose`, `pink`, `lilac`, `sand`, `mist`). `DefaultCoverColor` is `lavender`. The list is a contract: the `events.valid_cover_color` CHECK (migration 025) and the `web` design tokens repeat it, so renaming or removing a value needs a data migration. Stored as the identifier, never as a hex.
+
+**Signature:**
+```go
+type CoverColor string
+
+const DefaultCoverColor = CoverColorLavender
+
+func CoverColors() []CoverColor        // copy, canonical order
+func (c CoverColor) IsValid() bool
+```
+
+**Usage:**
+```go
+color := event.CoverColor(*req.CoverColor)
+if !color.IsValid() {
+    respondInvalidCoverColor(c)
+    return
+}
+evt.CoverColor = color
+```
+
+---
+
+## respondInvalidCoverColor
+
+**Location:** `internal/handlers/event_handler.go`
+**Description:** Writes `400 {"error":"Invalid cover color","code":"INVALID_COVER_COLOR","details":"cover_color must be one of: lavender, …, mist"}`. Shared by `CreateEvent` and `UpdateEvent` so both endpoints reject the same values with the same body.
+
+**Signature:**
+```go
+func respondInvalidCoverColor(c *gin.Context)
+```
+

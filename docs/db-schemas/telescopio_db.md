@@ -6,7 +6,7 @@
 | **Extensiones** | `uuid-ossp` |
 | **Acceso** | GORM 1.30.2 (`gorm.io/driver/postgres`) |
 | **Servicio propietario** | [`api`](../architectures/api/index.md) |
-| **Migraciones** | 24 aplicadas (024 — S-009), versionadas en Go (`internal/storage/migrations/`) |
+| **Migraciones** | 25 aplicadas (025 — S-019), versionadas en Go (`internal/storage/migrations/`) |
 
 Todo el estado del producto vive acá. Las claves primarias son UUID generadas por
 `uuid_generate_v4()` o por la aplicación en el hook `BeforeCreate`.
@@ -223,11 +223,18 @@ Password con bcrypt (`DefaultCost`), mínimo 8 caracteres, validado en el domini
 | `shareable_link` | `varchar(255)` | `/events/{id}` |
 | `is_cancelled` | `boolean` | NOT NULL, default `false` |
 | `is_paused` | `boolean` | NOT NULL, default `false` |
+| `cover_color` | `varchar(32)` | NOT NULL, default `'lavender'`, CHECK `valid_cover_color` (16 identificadores de la paleta; S-019) |
 
-CHECK `future_start_date` (`start_date >= now() - 1 día`) declarado `NOT VALID`: no se valida
-contra las filas existentes al crearse, pero PostgreSQL lo reevalúa en **todo** `UPDATE` de la fila,
-toque o no `start_date`. Un evento con `start_date` anterior a ayer no se puede editar, cambiar de
-etapa, pausar ni cancelar (error `future_start_date`, `500` en la API).
+`cover_color` guarda el **identificador** del color de portada (uno de `lavender`, `periwinkle`,
+`sky`, `ice`, `aqua`, `mint`, `pistachio`, `lemon`, `butter`, `peach`, `coral`, `rose`, `pink`,
+`lilac`, `sand`, `mist`), nunca el hex. El CHECK `valid_cover_color` repite la lista de
+`event.CoverColors()`; los eventos anteriores a la migración 025 quedan con `lavender`.
+
+La regla "un evento no se crea con fecha de inicio pasada" la impone el trigger
+`enforce_future_start_date` (ver [Triggers y reglas de negocio](#triggers-y-reglas-de-negocio)). Antes
+era el CHECK `future_start_date`, que PostgreSQL reevaluaba en **todo** `UPDATE` aunque fuera
+`NOT VALID` y bloqueaba editar, cambiar de etapa, pausar y cancelar los eventos con `start_date`
+anterior a ayer. La migración 025 lo reemplazó.
 
 `is_cancelled` e `is_paused` son independientes de `stage`: un evento puede estar pausado
 en cualquier etapa.
@@ -476,6 +483,14 @@ Incrementa o decrementa `attachments.vote_count`.
 Verifica que `participantes × m ≥ attachments × min_evaluations_per_file`. La usa la vista
 `system_validation`.
 
+### `enforce_future_start_date` — BEFORE INSERT OR UPDATE OF `start_date` ON `events`
+
+Definido en `internal/storage/migrations/025_add_cover_color_and_start_date_trigger.go` (S-019).
+Rechaza con `RAISE EXCEPTION 'start_date cannot be in the past'` un `start_date` anterior a
+`CURRENT_TIMESTAMP - 1 día`, pero **solo** si el evento se está insertando o si `start_date` cambia
+(`NEW.start_date IS DISTINCT FROM OLD.start_date`). Un `UPDATE` que deja la fecha igual pasa: es lo
+que hace un `Save` de GORM, que manda todas las columnas en cada update.
+
 ### Implicancias
 
 - **El conflicto de interés se valida dos veces**: en Go (`VotingService.hasConflictOfInterest`)
@@ -552,6 +567,7 @@ Migraciones en Go, no en SQL, con `Up` y `Down` registradas en orden en
 | 022 | `fix_uuid_comparison_in_triggers` | Recrea las funciones de validación comparando `uuid` con `uuid` (la 004 comparaba `text` contra `uuid[]` y fallaba todo insert en `assignments` y `votes`) |
 | 023 | `relax_voting_results_vote_count` | CHECK `valid_participant_counts` pasa a `total_participants > 0 AND total_votes >= 0`. `Down` restaura `total_votes >= total_participants` |
 | 024 | `add_notifications` | Enum `notification_type`, tabla `notifications` e índices |
+| 025 | `add_cover_color_and_start_date_trigger` | `events.cover_color` (default `lavender`) + CHECK `valid_cover_color`; reemplaza el CHECK `future_start_date` por el trigger `enforce_future_start_date` |
 
 Notas:
 

@@ -21,6 +21,7 @@ import {
   Attachment,
   NotificationPage
 } from "../types";
+import { DEFAULT_COVER_COLOR, isCoverColor } from "../domain/coverColors";
 import { automaticEventDates } from "../domain/eventForm";
 import { VotingConfigPreview } from "../domain/voting";
 
@@ -79,7 +80,8 @@ const toEvent = (raw: any): Event => ({
   participation_estimated_end_date: raw.participation_estimated_end_date || null,
   voting_estimated_end_date: raw.voting_estimated_end_date || null,
   is_paused: raw.is_paused || false,
-  is_cancelled: raw.is_cancelled || false
+  is_cancelled: raw.is_cancelled || false,
+  cover_color: isCoverColor(raw.cover_color) ? raw.cover_color : DEFAULT_COVER_COLOR,
 });
 
 export const EventService = {

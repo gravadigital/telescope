@@ -451,6 +451,7 @@ func (h *UserHandler) getAllUserEvents(c *gin.Context, authenticatedUserID, requ
 			"voting_estimated_end_date":        formatDatePtr(evt.VotingEstimatedEndDate),
 			"is_paused":                        evt.IsPaused,
 			"is_cancelled":                     evt.IsCancelled,
+			"cover_color":                      string(evt.CoverColor),
 			"my_status":                        myStatus,
 		})
 	}

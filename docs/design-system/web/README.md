@@ -1,7 +1,7 @@
 ---
 design_system: web
-version: 2.0.0
-last_updated: 2026-10-02
+version: 2.1.1
+last_updated: 2026-11-06
 status: diseñado
 platform: web
 ---
@@ -53,6 +53,7 @@ arman con estos y los especifican los screen.md.
 | [number-stepper](./components/number-stepper.md) | Entero con − / + | Crear evento, O-16, O-18 |
 | [file-dropzone](./components/file-dropzone.md) | Carga de propuesta + FileChip | Detalle |
 | [menu](./components/menu.md) | Menú de usuario, idioma | Header |
+| [color-swatch-picker](./components/color-swatch-picker.md) | Color de portada de paleta cerrada (REQ-004) | Crear evento, O-18 |
 
 ## Pendientes conocidos
 

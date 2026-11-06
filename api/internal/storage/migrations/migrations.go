@@ -162,6 +162,12 @@ func GetMigrations() []Migration {
 			Up:   migration024Up,
 			Down: migration024Down,
 		},
+		{
+			ID:   "025",
+			Name: "add_cover_color_and_start_date_trigger",
+			Up:   migration025Up,
+			Down: migration025Down,
+		},
 	}
 }
 

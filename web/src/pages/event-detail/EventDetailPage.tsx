@@ -655,6 +655,7 @@ const EventDetailPage: React.FC = () => {
       }}
       target={endOfDay(deadline)}
       footer={t(`manage.countdown.${countdownScope}.footer` as TranslationKey, { date: fmt.date(deadline) })}
+      tone="light"
     />
   ) : undefined;
 
@@ -662,6 +663,7 @@ const EventDetailPage: React.FC = () => {
     <div className="edp-page">
       <EventHero
         back={{ label: t('eventDetail.back'), to: '/events' }}
+        coverColor={event.cover_color}
         pills={
           <StatusPill tone={pill.tone}>{t(pill.key, pill.params)}</StatusPill>
         }
@@ -669,7 +671,7 @@ const EventDetailPage: React.FC = () => {
         meta={meta}
         actions={
           <div className="edp-hero-actions">
-            <Button variant="onBand" iconStart={<ShareIcon />} onClick={() => setShareOpen(true)}>
+            <Button variant="secondary" iconStart={<ShareIcon />} onClick={() => setShareOpen(true)}>
               {t('eventDetail.share')}
             </Button>
             {countdown}

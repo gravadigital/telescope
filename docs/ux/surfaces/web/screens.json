@@ -1052,6 +1052,34 @@
           ]
         },
         {
+          "name": "Color de portada",
+          "type": "chips",
+          "category": "input",
+          "items": [
+            "● Lavanda",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○"
+          ],
+          "annotation": "«Color de portada» · ayuda: «Es el fondo del encabezado de tu evento. Puedes cambiarlo después.» Default «Lavanda» preseleccionado, nunca queda sin color. Tipo `color-swatch-picker` (REQ-004): no existe en el diccionario de bloques ni en el DS; se dibuja como `chips`. 16 muestras con el nombre del color como etiqueta accesible (ES/EN). Colores definidos en el DS, no acá.",
+          "visible_only_in_states": [
+            "default",
+            "error de validación"
+          ]
+        },
+        {
           "name": "Selector de cupo",
           "type": "text-input",
           "category": "input",
@@ -1090,6 +1118,10 @@
               "subtitle": "Club de Fotografía · Editar"
             },
             {
+              "title": "Color de portada",
+              "subtitle": "● Lavanda · Editar"
+            },
+            {
               "title": "Cupo",
               "subtitle": "30 participantes · Editar"
             }
@@ -1098,7 +1130,8 @@
             "paso revisar",
             "loading",
             "error de sistema"
-          ]
+          ],
+          "annotation": "El color se muestra como muestra + nombre."
         },
         {
           "name": "Aviso visibilidad",
@@ -1215,6 +1248,7 @@
                   "Campo nombre",
                   "Campo descripción",
                   "Campo organizador",
+                  "Color de portada",
                   "Selector de cupo",
                   "Ayuda cupo",
                   "Resumen revisión",
@@ -1265,6 +1299,7 @@
           "Campo nombre",
           "Campo descripción",
           "Campo organizador",
+          "Color de portada",
           "Selector de cupo",
           "Ayuda cupo",
           "Resumen revisión",
@@ -1408,7 +1443,8 @@
             "loading": {
               "content": "Cargando evento…"
             }
-          }
+          },
+          "annotation": "Portada (REQ-004): el hero (estado, título, meta, compartir) usa como fondo el color de portada del evento (bg.cover.{id}) en lugar de la banda negra, con borde inferior. Wireframe en grises: sin cambio de layout."
         },
         {
           "name": "Meta del evento",
@@ -2414,7 +2450,8 @@
             "permiso denegado": {
               "content": "No tenés permiso para gestionar este evento"
             }
-          }
+          },
+          "annotation": "Portada (REQ-004): el hero (estado, título, meta, compartir) usa como fondo el color de portada del evento (bg.cover.{id}) en lugar de la banda negra, con borde inferior. Wireframe en grises: sin cambio de layout."
         },
         {
           "name": "Meta del evento",
@@ -2431,7 +2468,7 @@
           "category": "content",
           "content": "Inscripción abierta. Compartí el enlace para sumar participantes.",
           "kind": "success",
-          "annotation": "Se cierra solo a los 5 s. Otros: «Votación abierta. Se asignaron las propuestas.» · «Resultados publicados.» · «Recordatorio enviado a {n} participantes.» · «Datos actualizados.» · «Cierre actualizado.»",
+          "annotation": "Se cierra solo a los 5 s. Otros: «Votación abierta. Se asignaron las propuestas.» · «Resultados publicados.» · «Recordatorio enviado a {n} participantes.» · «Datos actualizados.» · «Color actualizado.» · «Cierre actualizado.»",
           "visible_only_in_states": [
             "success"
           ]
@@ -2443,9 +2480,25 @@
           "content": "Editar datos",
           "variant": "secondary",
           "icon": "edit",
+          "state_overrides": {
+            "votación": {
+              "content": "Cambiar color"
+            },
+            "resultados": {
+              "content": "Cambiar color"
+            },
+            "terminal": {
+              "content": "Cambiar color"
+            }
+          },
+          "annotation": "Visible en todas las etapas (REQ-004). Votación, resultados y cancelado: «Cambiar color», abre O-18 en modo solo color. Al guardar: «Datos actualizados.» / «Color actualizado.»",
           "visible_only_in_states": [
             "default",
-            "participación"
+            "participación",
+            "votación",
+            "resultados",
+            "pausado",
+            "terminal"
           ]
         },
         {
@@ -6392,7 +6445,12 @@
           "type": "heading",
           "category": "content",
           "content": "Editar datos del evento",
-          "level": "h2"
+          "level": "h2",
+          "state_overrides": {
+            "solo color": {
+              "content": "Cambiar color de portada"
+            }
+          }
         },
         {
           "name": "Botón cerrar",
@@ -6410,14 +6468,20 @@
           "content": "",
           "label": "Nombre del evento *",
           "value": "Concurso de fotografía primavera 2026",
-          "annotation": "«El nombre tiene que tener entre 3 y 200 caracteres.» · duplicado: «Ya existe un evento con ese nombre.»"
+          "annotation": "«El nombre tiene que tener entre 3 y 200 caracteres.» · duplicado: «Ya existe un evento con ese nombre.»",
+          "hidden_in_states": [
+            "solo color"
+          ]
         },
         {
           "name": "Campo descripción",
           "type": "textarea",
           "category": "input",
           "content": "Fotos de paisajes urbanos tomadas en primavera. Una foto por participante, en JPG o PNG.",
-          "label": "Descripción *  ·  92 / 2000"
+          "label": "Descripción *  ·  92 / 2000",
+          "hidden_in_states": [
+            "solo color"
+          ]
         },
         {
           "name": "Campo organizador",
@@ -6425,7 +6489,10 @@
           "category": "input",
           "content": "",
           "label": "Organizador (opcional)",
-          "value": "Club de Fotografía"
+          "value": "Club de Fotografía",
+          "hidden_in_states": [
+            "solo color"
+          ]
         },
         {
           "name": "Selector de cupo",
@@ -6441,14 +6508,56 @@
               "value": "−  15  +",
               "error_msg": "El cupo no puede ser menor a los 18 inscriptos."
             }
-          }
+          },
+          "hidden_in_states": [
+            "solo color"
+          ]
         },
         {
           "name": "Ayuda cupo",
           "type": "paragraph",
           "category": "content",
           "content": "Mínimo 18: ya hay 18 inscriptos.",
-          "level": "caption"
+          "level": "caption",
+          "hidden_in_states": [
+            "solo color"
+          ]
+        },
+        {
+          "name": "Color de portada",
+          "type": "chips",
+          "category": "input",
+          "items": [
+            "● Lavanda",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○",
+            "○"
+          ],
+          "annotation": "«Color de portada» · seleccionada la del evento. Tipo `color-swatch-picker` (REQ-004): no existe en el diccionario de bloques ni en el DS; se dibuja como `chips`. 16 muestras con el nombre del color como etiqueta accesible (ES/EN). Colores definidos en el DS, no acá."
+        },
+        {
+          "name": "Aviso solo color",
+          "type": "alert",
+          "category": "feedback",
+          "kind": "info",
+          "icon": "info",
+          "content": "El evento ya está en votación: solo puedes cambiar el color de portada.",
+          "annotation": "Texto: «El evento ya está en {etapa}: …». Cancelado: «El evento está cancelado: solo puedes cambiar el color de portada.»",
+          "visible_only_in_states": [
+            "solo color"
+          ]
         },
         {
           "name": "Error de guardado",
@@ -6483,8 +6592,12 @@
             "loading": {
               "variant": "disabled",
               "content": "Guardando…"
+            },
+            "solo color": {
+              "content": "Guardar color"
             }
-          }
+          },
+          "annotation": "Al guardar S-05 muestra «Datos actualizados.» · modo solo color: «Color actualizado.» (solo envía cover_color)."
         }
       ],
       "layouts": {
@@ -6526,6 +6639,8 @@
               }
             ]
           },
+          "Color de portada",
+          "Aviso solo color",
           "Error de guardado",
           {
             "row": "acciones",
@@ -6568,6 +6683,8 @@
           "Campo organizador",
           "Selector de cupo",
           "Ayuda cupo",
+          "Color de portada",
+          "Aviso solo color",
           "Error de guardado",
           {
             "row": "acciones",
@@ -6592,6 +6709,11 @@
         {
           "name": "default",
           "applies": true
+        },
+        {
+          "name": "solo color",
+          "applies": true,
+          "message": "El evento ya está en {etapa}: solo puedes cambiar el color de portada."
         },
         {
           "name": "loading",
@@ -8116,6 +8238,14 @@
       "srcBlock": "Link ver todas",
       "dst": "notifications",
       "trigger": "Ver todas",
+      "automatic": false
+    },
+    {
+      "src": "manage-event",
+      "srcState": "votación",
+      "srcBlock": "Botón editar datos",
+      "dst": "edit-event-dialog",
+      "trigger": "Cambiar color (solo color)",
       "automatic": false
     }
   ]

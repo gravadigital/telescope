@@ -44,7 +44,7 @@ date: 2026-10-02
 | 4 | Rol | badge | — | content | ambos | hidden_in_states: permiso denegado | "Organizás este evento" |
 | 5 | Título del evento | heading | h1 | content | ambos | — | Nombre (en permiso denegado: título del aviso) |
 | 6 | Meta del evento | label | — | content | ambos | hidden_in_states: permiso denegado | Organizador · creado el |
-| 7 | Botón editar datos | button | secondary | input | ambos | visible_only_in_states: default, participación | Abre O-18 |
+| 7 | Botón editar datos | button | secondary | input | ambos | visible_only_in_states: default, participación, votación, resultados, pausado, estado terminal / readonly | Abre O-18; en votación, resultados y cancelado abre O-18 en modo "solo color" (REQ-004) |
 | 8 | Botón compartir | button | secondary | input | ambos | hidden_in_states: default, permiso denegado | Abre O-14 |
 | 9 | Línea de etapas | progress-bar | — | feedback | ambos | hidden_in_states: permiso denegado · viewport_overrides: mobile→solo etapa actual | StageTimeline con cierre editable |
 | 10 | Métrica inscriptos | card | — | content | ambos | hidden_in_states: default, permiso denegado | StatTile "Inscriptos" |
@@ -72,6 +72,8 @@ date: 2026-10-02
 | 31 | Aviso pausado | alert | warning | feedback | ambos | visible_only_in_states: pausado | El evento está pausado |
 | 32 | Aviso sin permiso | empty-state | — | feedback | ambos | visible_only_in_states: permiso denegado | No es el autor |
 | 33 | footer | footer | — | layout | ambos | — | Pie |
+
+**Portada (REQ-004).** El hero (Estado del evento, Título, Meta y Botón compartir) usa como fondo el color de portada del evento (`bg.cover.{id}`) en lugar de `bg.band`, con un borde inferior `border.default`. Su contenido usa las variantes para fondo claro: `StatusPill` por defecto, `Button` secondary, `text.primary` / `text.secondary` (nunca `text.muted`, que no llega a AA sobre todos los pasteles).
 
 ## Layout por viewport
 
@@ -151,8 +153,9 @@ date: 2026-10-02
 - Texto/label: "{organizador} · creado el {fecha}"
 
 ### Botón editar datos
-- Texto/label: "Editar datos"
+- Texto/label: "Editar datos" (creación y participación) · "Cambiar color" (votación, resultados, cancelado)
 - Icono: edit
+- Al guardar: "Datos actualizados." · en modo solo color: "Color actualizado."
 
 ### Botón compartir
 - Texto/label: participación "Copiar enlace de invitación" · votación y resultados "Compartir"
@@ -261,7 +264,7 @@ date: 2026-10-02
 - parent_state: default
 - Aplica: Sí (2e)
 - Mensaje: —
-- Cambios: Métrica rankings y Configuración aplicada visibles; Botón próximo paso variant=secondary mientras falten rankings, primary cuando están todos; Botón editar datos oculto (AC 46).
+- Cambios: Métrica rankings y Configuración aplicada visibles; Botón próximo paso variant=secondary mientras falten rankings, primary cuando están todos; Botón editar datos con el label "Cambiar color", abre O-18 en modo solo color (REQ-004; reemplaza el oculto de AC 46).
 
 ### resultados
 - parent_state: default
@@ -333,6 +336,8 @@ date: 2026-10-02
 - **Propio de esta composición:** en desktop el próximo paso está a la derecha pero en el DOM va antes de la tabla, para que el orden de lectura coincida con la importancia. Los avisos de success se anuncian en región live.
 
 ## Decisiones y descartes
+
+- **REQ-004 (2026-11-06):** el hero toma el color de portada, como en S-04. "Editar datos" deja de ocultarse fuera de creación y participación: pasa a "Cambiar color" y abre O-18 en modo solo color, porque el color de portada se puede cambiar en cualquier etapa y estado `[fuente: input-cliente — REQ-004]`. Se descartó un control de color en el hero mismo: el usuario eligió el diálogo de edición.
 
 **Decisiones tomadas:**
 - Reescrita por REQ-003 sobre 2a, 2c y 2e: el título es el nombre del evento y el avance es el paso destacado, no un botón más (2a).
