@@ -25,7 +25,7 @@ date: 2026-10-02
 
 ## Entrada y salida
 
-**Entradas:** S-05 en Creación o Participación · "Editar datos".
+**Entradas:** S-05 en Creación o Participación · "Editar datos" (modo completo). S-05 en Votación, Resultados o cancelado · "Cambiar color" (modo solo color, REQ-004).
 
 **Salidas user-driven:** a S-05 · "Cancelar", × o Escape.
 
@@ -42,6 +42,8 @@ date: 2026-10-02
 | 5 | Campo organizador | text-input | default | input | ambos | — | Organizador |
 | 6 | Selector de cupo | text-input | default | input | ambos | — | NumberStepper con mínimo = inscriptos |
 | 7 | Ayuda cupo | paragraph | caption | content | ambos | — | Límite inferior |
+| 7b | Color de portada | color-swatch-picker | form | input | ambos | — | Color de portada del evento (REQ-004) |
+| 7c | Aviso solo color | alert | info | feedback | ambos | visible_only_in_states: solo color | Por qué solo se edita el color |
 | 8 | Error de guardado | alert | error | feedback | ambos | visible_only_in_states: error de sistema / sin conexión | Falla |
 | 9 | Botón cancelar | button | secondary | input | ambos | — | Cerrar |
 | 10 | Botón guardar | button | primary | input | ambos | state_overrides: loading→disabled | Guardar |
@@ -57,6 +59,8 @@ date: 2026-10-02
 - row `datos`
   - col 8/12: Campo organizador
   - col 4/12: Selector de cupo, Ayuda cupo
+- Color de portada
+- Aviso solo color
 - Error de guardado
 - row `acciones`
   - col 6/12: Botón cancelar
@@ -71,6 +75,8 @@ date: 2026-10-02
 - Campo organizador
 - Selector de cupo
 - Ayuda cupo
+- Color de portada
+- Aviso solo color
 - Error de guardado
 - row `acciones`
   - col 5/12: Botón cancelar
@@ -99,6 +105,12 @@ date: 2026-10-02
 
 ### Ayuda cupo
 - Texto/label: "Mínimo {inscriptos}: ya hay {inscriptos} inscriptos."
+
+### Color de portada
+- Texto/label: "Color de portada" · 16 muestras; seleccionada la del evento
+
+### Aviso solo color
+- Texto/label: "El evento ya está en {etapa}: solo podés cambiar el color de portada." · con el evento cancelado: "El evento está cancelado: solo podés cambiar el color de portada."
 
 ### Error de guardado
 - Texto/label: "No pudimos guardar los cambios. Probá de nuevo."
@@ -134,8 +146,13 @@ date: 2026-10-02
 - Mensaje: "No pudimos guardar los cambios. Probá de nuevo."
 - Cambios: Error de guardado visible. Si el evento ya pasó a Votación: "El evento ya está en votación y sus datos no se pueden editar." y Botón guardar disabled.
 
+### solo color
+- Aplica: Sí (REQ-004)
+- Mensaje: "El evento ya está en {etapa}: solo podés cambiar el color de portada."
+- Cambios: Título "Cambiar color de portada"; se ocultan Campo nombre, Campo descripción, Campo organizador, Selector de cupo y Ayuda cupo; se ven Color de portada y Aviso solo color; Botón guardar "Guardar color".
+
 ### success
-- Aplica: No — cierra y S-05 muestra "Datos actualizados."
+- Aplica: No — cierra y S-05 muestra "Datos actualizados." (en modo solo color: "Color actualizado.")
 
 ### not found
 - Aplica: No.
@@ -166,6 +183,8 @@ date: 2026-10-02
 - **Propio de esta composición:** ninguno.
 
 ## Decisiones y descartes
+
+- **REQ-004 (2026-11-06):** se suma el campo "Color de portada" y un modo "solo color" para Votación, Resultados y eventos cancelados: el color se puede cambiar en cualquier etapa, el resto de los datos no `[fuente: input-cliente — REQ-004]`. En modo solo color el diálogo solo envía `cover_color`, que es lo que la API acepta fuera de Creación/Participación. El mensaje "El evento ya está en votación y sus datos no se pueden editar." sigue aplicando al modo completo si la etapa cambió mientras el diálogo estaba abierto.
 
 **Decisiones tomadas:**
 - Nuevo por REQ-003 (RF 17): diálogo en vez de pantalla, porque edita cuatro campos y vuelve a la gestión.

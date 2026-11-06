@@ -71,6 +71,12 @@ barra de navegación.
 En `mobile` las entradas de navegación (`Inicio`, `Eventos`, `Cómo funciona`) pasan a un menú
 desplegable; la campana y el avatar quedan visibles en la barra. `[fuente: REQ-003 RF 9, AC 6]`
 
+
+**Footer (REQ-004).** Presente en las mismas pantallas que el header. Comparte su fondo `bg.band`
+(negro) con texto inverso: header y footer enmarcan la plataforma, y el evento se distingue por su
+portada de color (hero de S-04 y S-05). Contenido: marca `TELESCOPIO`, links `Inicio` (`/`) y
+`Eventos` (`/events`) y el tagline actual ("Telescopio · evaluación distribuida entre pares"), en
+ES y EN. En `mobile` se apila. `[fuente: input-cliente — REQ-004]`
 ---
 
 ## Arquitectura de Información
@@ -207,7 +213,7 @@ En S-02 y S-11 cada fila muestra **una sola acción**, resuelta por rol y etapa:
 | O-15 | Abrir inscripción | modal | S-05 · próximo paso en Creación | Fecha de cierre de inscripción con atajos (2b) |
 | O-16 | Abrir votación | modal | S-05 · próximo paso en Participación | Resumen del reparto, cierre, propuestas por evaluador y ajustes avanzados en un solo paso (2d) |
 | O-17 | Publicar resultados | modal | S-05 · "Cerrar votación y publicar" | Aviso de rankings faltantes e irreversibilidad (2f) |
-| O-18 | Editar datos del evento | modal | S-05 · "Editar datos" | Nombre, descripción, organizador y cupo en Creación y Participación (RF 17) |
+| O-18 | Editar datos del evento | modal | S-05 · "Editar datos" | Nombre, descripción, organizador, cupo y color de portada en Creación y Participación (RF 17); **solo el color de portada** en Votación, Resultados y con el evento cancelado (REQ-004) |
 | O-19 | Confirmar recordatorio | modal | S-05 · "Recordar (N)" / "Enviar recordatorio a N pendientes" | Confirmar el envío de email + notificación a los pendientes (RF 27) |
 
 **En mobile** los modales ocupan el ancho completo con las acciones fijas abajo (comportamiento del

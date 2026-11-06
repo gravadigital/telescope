@@ -75,6 +75,8 @@ date: 2026-10-02
 | 32 | CTA ver eventos | button | primary | input | ambos | visible_only_in_states: resultados | Ir a S-02 |
 | 33 | footer | footer | — | layout | ambos | — | Pie |
 
+**Portada (REQ-004).** El hero (Estado del evento, Título, Meta y Botón compartir) usa como fondo el color de portada del evento (`bg.cover.{id}`) en lugar de `bg.band`, con un borde inferior `border.default`. Su contenido usa las variantes para fondo claro: `StatusPill` por defecto, `Button` secondary, `text.primary` / `text.secondary` (nunca `text.muted`, que no llega a AA sobre todos los pasteles).
+
 ## Layout por viewport
 
 ### desktop · 1200px
@@ -139,6 +141,7 @@ date: 2026-10-02
 
 ### Meta del evento
 - Texto/label: "Organiza {organizador} · {n} de {cupo} participantes" (en resultados: "· finalizó el {fecha}")
+- Color: `text.secondary` sobre la portada (REQ-004)
 
 ### Botón compartir
 - Texto/label: "Compartir"
@@ -358,6 +361,8 @@ date: 2026-10-02
 - **Propio de esta composición:** el cambio de posición se anuncia en una región live ("{nombre} pasó a la posición {n}"); el rechazo de archivo y el guardado del borrador también.
 
 ## Decisiones y descartes
+
+- **REQ-004 (2026-11-06):** el hero pasa del negro de banda al color de portada del evento, para que plataforma (header y footer negros) y evento no compartan tratamiento `[fuente: input-cliente — REQ-004]`. Se reemplazan las variantes `onBand` por las de fondo claro, que el DS ya cubre. La disposición no cambia en ningún viewport.
 
 **Decisiones tomadas:**
 - Reescrita por REQ-003 sobre 1e, 1f, 1i y 2g: una sola pantalla con un bloque "Tu próximo paso" que cambia según etapa y rol; el resto de la pantalla es estable.

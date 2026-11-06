@@ -46,6 +46,7 @@ date: 2026-10-02
 | 7 | Campo nombre | text-input | default | input | ambos | visible_only_in_states: default, error de validación | Paso 1 |
 | 8 | Campo descripción | textarea | default | input | ambos | visible_only_in_states: default, error de validación | Paso 1, con contador |
 | 9 | Campo organizador | text-input | default | input | ambos | visible_only_in_states: default, error de validación | Paso 1, opcional |
+| 9b | Color de portada | color-swatch-picker | form | input | ambos | visible_only_in_states: default, error de validación | Paso 1, opcional; default preseleccionado (REQ-004) |
 | 10 | Selector de cupo | text-input | default | input | ambos | visible_only_in_states: paso cupo | Paso 2, NumberStepper |
 | 11 | Ayuda cupo | paragraph | caption | content | ambos | visible_only_in_states: paso cupo | Qué significa el cupo |
 | 12 | Resumen revisión | list | — | content | ambos | visible_only_in_states: paso revisar | Paso 3: datos a confirmar |
@@ -65,7 +66,7 @@ date: 2026-10-02
 - Título
 - Pasos del wizard
 - row `wizard`
-  - col 7/12: Eyebrow paso, Pregunta del paso, Campo nombre, Campo descripción, Campo organizador, Selector de cupo, Ayuda cupo, Resumen revisión, Aviso visibilidad, Error del formulario
+  - col 7/12: Eyebrow paso, Pregunta del paso, Campo nombre, Campo descripción, Campo organizador, Color de portada, Selector de cupo, Ayuda cupo, Resumen revisión, Aviso visibilidad, Error del formulario
   - col 5/12: Título vista previa, Vista previa, Consejo
 - row `acciones`
   - col 6/12: Botón cancelar
@@ -81,6 +82,7 @@ date: 2026-10-02
 - Campo nombre
 - Campo descripción
 - Campo organizador
+- Color de portada
 - Selector de cupo
 - Ayuda cupo
 - Resumen revisión
@@ -124,6 +126,10 @@ date: 2026-10-02
 ### Campo organizador
 - Texto/label: "Organizador (opcional)" · placeholder "Ej. Club de Fotografía" · ayuda "Si lo dejás vacío se muestra tu nombre."
 
+### Color de portada
+- Texto/label: "Color de portada" · ayuda "Es el fondo del encabezado de tu evento. Podés cambiarlo después."
+- 16 muestras con el nombre del color como etiqueta accesible (ES/EN); seleccionada: "Lavanda" por defecto
+
 ### Selector de cupo
 - Texto/label: "Cupo de participantes *" · selector "− {n} +" · "Entre 1 y 100"
 
@@ -131,7 +137,7 @@ date: 2026-10-02
 - Texto/label: "Cuando se completa el cupo nadie más puede inscribirse. Podés cambiarlo mientras la inscripción esté abierta."
 
 ### Resumen revisión
-- Texto/label: "Nombre · Descripción · Organizador · Cupo" con "Editar" junto a cada dato
+- Texto/label: "Nombre · Descripción · Organizador · Color de portada · Cupo" con "Editar" junto a cada dato; el color se muestra como muestra + nombre ("Lavanda")
 
 ### Aviso visibilidad
 - Texto/label: "El evento se crea en etapa Creación: nadie más puede verlo hasta que abras la inscripción. La fecha de cierre la definís en ese momento."
@@ -232,6 +238,8 @@ date: 2026-10-02
 - **Propio de esta composición:** el paso actual se anuncia como "Paso N de 3, {nombre}" (aria-current en el stepper); la vista previa es `aria-hidden` porque repite los datos del formulario.
 
 ## Decisiones y descartes
+
+- **REQ-004 (2026-11-06):** campo "Color de portada" en el paso 1, junto a los datos de identidad del evento, con el default preseleccionado: nunca queda "sin color" `[fuente: input-cliente — REQ-004]`. Se suma al resumen del paso 3. La vista previa de la fila del listado no muestra el color (las tarjetas del listado están fuera de alcance).
 
 **Decisiones tomadas:**
 - Wizard de 3 pasos y no de 5: REQ-003 L-4 — solo lo que existe hoy; fechas y reglas se definen al avanzar de etapa (O-15, O-16).
