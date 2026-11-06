@@ -133,6 +133,7 @@ export const en: Catalog = {
     documentTitle: 'Page not found · Telescopio',
   },
   footer: {
+    nav: 'Footer navigation',
     tagline: 'Telescopio · distributed peer review',
   },
   auth: {
@@ -1042,6 +1043,7 @@ export const en: Catalog = {
     INTERNAL_ERROR: "We couldn't complete the action on the server. Please try again in a few minutes.",
     INVALID_ATTACHMENT_ID: 'The proposal identifier is not valid.',
     INVALID_CREDENTIALS: 'The email or password is incorrect.',
+    INVALID_COVER_COLOR: 'The cover color is not valid.',
     INVALID_DATE_FORMAT: 'The date format is not valid.',
     INVALID_DATE_RANGE: 'The end date must be after the start date.',
     INVALID_END_DATE: 'The end date is not valid.',

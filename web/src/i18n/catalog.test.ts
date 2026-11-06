@@ -54,7 +54,7 @@ const collectApiCodes = (): Set<string> => {
 describe('catálogo', () => {
   it('TS-23: cubre todos los códigos de api.yaml', () => {
     const codes = collectApiCodes();
-    expect(codes.size).toBe(105);
+    expect(codes.size).toBe(106);
     ['EVENT_NOT_FOUND', 'UNAUTHORIZED', 'FORBIDDEN', 'INSUFFICIENT_ATTACHMENTS'].forEach((c) =>
       expect(codes.has(c)).toBe(true)
     );

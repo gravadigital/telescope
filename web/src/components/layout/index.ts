@@ -1,4 +1,5 @@
 export { default as AppHeader } from './app-header/AppHeader';
+export { default as AppFooter } from './app-footer/AppFooter';
 export { default as AppLayout } from './app-layout/AppLayout';
 export { default as UserMenu } from './user-menu/UserMenu';
 export { default as LanguageSelect } from './language-select/LanguageSelect';
