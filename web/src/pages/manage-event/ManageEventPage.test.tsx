@@ -41,6 +41,7 @@ const now = new Date(2026, 9, 5, 10, 0);
 const organizer: User = { ...sampleUser, id: 'u-9', name: 'Club de Diseño' };
 
 const base: Event = {
+  cover_color: 'lavender',
   id: 'e-1',
   title: 'Concurso de logos',
   description: 'Diseña el logo del club.',
@@ -197,6 +198,19 @@ describe('ManageEventPage', () => {
   afterEach(() => {
     jest.useRealTimers();
     jest.restoreAllMocks();
+  });
+
+  it('TS-11: el hero de la gestión toma el color del evento y usa variantes claras', async () => {
+    getEvent.mockResolvedValue({ ...base, cover_color: 'sky' });
+    renderPage();
+    await loaded();
+
+    const hero = document.querySelector('header.ev-hero') as HTMLElement;
+    expect(hero.style.getPropertyValue('--ev-hero-bg')).toBe('var(--bg-cover-sky)');
+    expect(hero.querySelectorAll('.ui-status-pill').length).toBeGreaterThan(0);
+    expect(hero.querySelector('.ui-status-pill--on-band')).toBeNull();
+    expect(hero.querySelector('.ui-button--on-band')).toBeNull();
+    expect(hero.querySelector('.ev-countdown--light')).not.toBeNull();
   });
 
   describe('estructura por etapa', () => {
@@ -735,6 +749,77 @@ describe('ManageEventPage', () => {
       expect(await screen.findByText('Cierre actualizado.')).toBeInTheDocument();
       expect(updateDeadline).toHaveBeenCalledWith('e-1', 'participation', '2026-10-17');
       await waitFor(() => expect(tile('Cierre')).toHaveTextContent('12 días'));
+    });
+
+    it('TS-17 (S-021): editar datos incluye el color y repinta el hero', async () => {
+      updateEvent.mockResolvedValue({ ...base, title: 'Otro nombre', cover_color: 'sky' });
+      getEvent.mockResolvedValueOnce(base).mockResolvedValue({ ...base, title: 'Otro nombre', cover_color: 'sky' });
+      renderPage();
+      await loaded();
+      userEvent.click(screen.getByRole('button', { name: 'Editar datos' }));
+      const dialog = screen.getByRole('dialog', { name: 'Editar datos del evento' });
+      const field = within(dialog).getByLabelText(/^Nombre del evento/);
+      userEvent.clear(field);
+      userEvent.type(field, 'Otro nombre');
+      userEvent.click(within(dialog).getByRole('radio', { name: 'Cielo' }));
+      userEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }));
+
+      expect(await screen.findByText('Datos actualizados.')).toBeInTheDocument();
+      expect(updateEvent).toHaveBeenCalledWith('e-1', { name: 'Otro nombre', cover_color: 'sky' });
+      await waitFor(() =>
+        expect(
+          (document.querySelector('header.ev-hero') as HTMLElement).style.getPropertyValue('--ev-hero-bg')
+        ).toBe('var(--bg-cover-sky)')
+      );
+    });
+
+    it('TS-18 (S-021): en votación el botón es "Cambiar color" y guarda solo el color', async () => {
+      getEvent.mockResolvedValueOnce(voting).mockResolvedValue({ ...voting, cover_color: 'mint' });
+      updateEvent.mockResolvedValue({ ...voting, cover_color: 'mint' });
+      renderPage();
+      await loaded();
+      expect(screen.queryByRole('button', { name: 'Editar datos' })).toBeNull();
+
+      userEvent.click(screen.getByRole('button', { name: 'Cambiar color' }));
+      const dialog = screen.getByRole('dialog', { name: 'Cambiar color de portada' });
+      expect(within(dialog).getByText(/solo puedes cambiar el color de portada/)).toBeInTheDocument();
+      userEvent.click(within(dialog).getByRole('radio', { name: 'Menta' }));
+      userEvent.click(within(dialog).getByRole('button', { name: 'Guardar color' }));
+
+      expect(await screen.findByText('Color actualizado.')).toBeInTheDocument();
+      expect(updateEvent).toHaveBeenCalledWith('e-1', { cover_color: 'mint' });
+      expect(screen.queryByRole('dialog')).toBeNull();
+      await waitFor(() =>
+        expect(
+          (document.querySelector('header.ev-hero') as HTMLElement).style.getPropertyValue('--ev-hero-bg')
+        ).toBe('var(--bg-cover-mint)')
+      );
+    });
+
+    it('TS-19 (S-021): en resultados y cancelado también se puede cambiar el color', async () => {
+      getEvent.mockResolvedValue({ ...voting, stage: 'results' });
+      const view = renderPage();
+      await loaded();
+      expect(screen.getByRole('button', { name: 'Cambiar color' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Editar datos' })).toBeNull();
+      view.unmount();
+
+      getEvent.mockResolvedValue({ ...base, is_cancelled: true });
+      renderPage();
+      await loaded();
+      expect(screen.getByText('Cancelado')).toBeInTheDocument();
+      userEvent.click(screen.getByRole('button', { name: 'Cambiar color' }));
+      expect(
+        screen.getByText('El evento está cancelado: solo puedes cambiar el color de portada.')
+      ).toBeInTheDocument();
+    });
+
+    it('TS-19 (S-021): en pausa, en participación, sigue siendo "Editar datos"', async () => {
+      getEvent.mockResolvedValue({ ...base, is_paused: true });
+      renderPage();
+      await loaded();
+      expect(screen.getByRole('button', { name: 'Editar datos' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Cambiar color' })).toBeNull();
     });
 
     it('TS-71: editar datos', async () => {

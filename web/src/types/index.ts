@@ -1,3 +1,4 @@
+import type { CoverColorId } from '../domain/coverColors';
 
 export interface User {
   id: string;
@@ -30,6 +31,8 @@ export interface Event {
   created_at?: string;
   updated_at?: string;
   creator_id?: string;
+  /** Color de portada del evento (REQ-004). `toEvent` lo normaliza al default si falta. */
+  cover_color: CoverColorId;
   
   // Fechas estimativas de cierre de etapas (S-003)
   participation_estimated_end_date?: string | null;
@@ -289,6 +292,7 @@ export interface EventCreateInput {
   description: string;
   organizer: string;
   max_participants: number;
+  cover_color: CoverColorId;
 }
 
 /** Body del PATCH /events/{id}: solo lo que cambió. */

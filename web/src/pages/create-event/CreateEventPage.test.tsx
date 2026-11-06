@@ -172,6 +172,7 @@ describe('CreateEventPage — crear', () => {
       description: 'Diseña el afiche del festival',
       organizer: 'Club de Diseño',
       max_participants: 22,
+      cover_color: 'lavender',
     });
     expect(JSON.parse(screen.getByTestId('location-state').textContent ?? 'null')).toEqual({
       notice: 'eventCreated',
@@ -391,5 +392,117 @@ describe('CreateEventPage — borrador', () => {
     next('Crear evento');
     await waitFor(() => expect(createEvent).toHaveBeenCalled());
     await waitFor(() => expect(localStorage.getItem(DRAFT_KEY)).toBeNull());
+  });
+});
+
+describe('CreateEventPage — color de portada (S-021)', () => {
+  const DRAFT_KEY = 'telescopio_event_draft';
+  const group = () => screen.getByRole('radiogroup', { name: 'Color de portada' });
+  const radio = (name: string) => within(group()).getByRole('radio', { name });
+
+  afterEach(() => {
+    localStorage.removeItem(DRAFT_KEY);
+  });
+
+  it('TS-13: el paso 1 ofrece el selector después del organizador, con Lavanda elegida', () => {
+    renderPage();
+
+    expect(radio('Lavanda')).toHaveAttribute('aria-checked', 'true');
+    expect(within(group()).getAllByRole('radio')).toHaveLength(16);
+    expect(screen.getByText('Es el fondo del encabezado de tu evento. Puedes cambiarlo después.')).toBeInTheDocument();
+    expect(
+      organizerField().compareDocumentPosition(group()) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it('TS-14: elegir un color lo muestra en el resumen y lo envía al crear', async () => {
+    createEvent.mockResolvedValue({ id: 'e-9' });
+    renderPage();
+    fillStep1('Club de Diseño');
+    userEvent.click(radio('Menta'));
+    expect(radio('Menta')).toHaveAttribute('aria-checked', 'true');
+    next('Siguiente: Fechas y cupo →');
+    next('Siguiente: Revisar →');
+
+    const summary = document.querySelector('.cev-summary') as HTMLElement;
+    const row = within(summary).getByText('Color de portada').closest('.cev-summary__row') as HTMLElement;
+    expect(within(row).getByText('Menta')).toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: 'Editar color de portada' })).toBeInTheDocument();
+
+    next('Crear evento');
+    await waitFor(() => expect(createEvent).toHaveBeenCalled());
+    expect(createEvent).toHaveBeenCalledWith(expect.objectContaining({ cover_color: 'mint' }));
+  });
+
+  it('TS-14: "Editar" del resumen vuelve al paso 1 con el color elegido', () => {
+    renderPage();
+    fillStep1();
+    userEvent.click(radio('Cielo'));
+    next('Siguiente: Fechas y cupo →');
+    next('Siguiente: Revisar →');
+
+    userEvent.click(screen.getByRole('button', { name: 'Editar color de portada' }));
+
+    expect(radio('Cielo')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('TS-15: sin tocar el selector se crea con el color por defecto', async () => {
+    createEvent.mockResolvedValue({ id: 'e-9' });
+    renderPage();
+    goToStep3();
+    next('Crear evento');
+    await waitFor(() => expect(createEvent).toHaveBeenCalled());
+    expect(createEvent).toHaveBeenCalledWith(expect.objectContaining({ cover_color: 'lavender' }));
+  });
+
+  it('TS-16: un borrador viejo sin color se restaura con Lavanda', () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        step: 1,
+        values: { name: 'Repostería', description: 'Torta decorada para el concurso', organizer: '', maxParticipants: 30 },
+      })
+    );
+    renderPage();
+
+    expect(nameField()).toHaveValue('Repostería');
+    expect(radio('Lavanda')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('TS-16: un color inválido en el borrador cae a Lavanda', () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        step: 1,
+        values: { name: 'Repostería', description: 'Torta decorada', organizer: '', maxParticipants: 30, coverColor: 'red' },
+      })
+    );
+    renderPage();
+
+    expect(radio('Lavanda')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('TS-16: un borrador con color lo conserva', () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        step: 1,
+        values: { name: 'Repostería', description: 'Torta decorada', organizer: '', maxParticipants: 30, coverColor: 'coral' },
+      })
+    );
+    renderPage();
+
+    expect(radio('Coral')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('mientras se crea el evento no se puede volver a editar el color', async () => {
+    createEvent.mockReturnValue(new Promise(() => undefined));
+    renderPage();
+    goToStep3();
+    next('Crear evento');
+    await waitFor(() => expect(createEvent).toHaveBeenCalled());
+
+    userEvent.click(screen.getByRole('button', { name: 'Editar color de portada' }));
+    expect(screen.queryByRole('radiogroup', { name: 'Color de portada' })).toBeNull();
   });
 });

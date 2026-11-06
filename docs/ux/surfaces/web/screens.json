@@ -1073,7 +1073,7 @@
             "○",
             "○"
           ],
-          "annotation": "«Color de portada» · ayuda: «Es el fondo del encabezado de tu evento. Podés cambiarlo después.» Default «Lavanda» preseleccionado, nunca queda sin color. Tipo `color-swatch-picker` (REQ-004): no existe en el diccionario de bloques ni en el DS; se dibuja como `chips`. 16 muestras con el nombre del color como etiqueta accesible (ES/EN). Colores definidos en el DS, no acá.",
+          "annotation": "«Color de portada» · ayuda: «Es el fondo del encabezado de tu evento. Puedes cambiarlo después.» Default «Lavanda» preseleccionado, nunca queda sin color. Tipo `color-swatch-picker` (REQ-004): no existe en el diccionario de bloques ni en el DS; se dibuja como `chips`. 16 muestras con el nombre del color como etiqueta accesible (ES/EN). Colores definidos en el DS, no acá.",
           "visible_only_in_states": [
             "default",
             "error de validación"
@@ -6553,8 +6553,8 @@
           "category": "feedback",
           "kind": "info",
           "icon": "info",
-          "content": "El evento ya está en votación: solo podés cambiar el color de portada.",
-          "annotation": "Texto: «El evento ya está en {etapa}: …». Cancelado: «El evento está cancelado: solo podés cambiar el color de portada.»",
+          "content": "El evento ya está en votación: solo puedes cambiar el color de portada.",
+          "annotation": "Texto: «El evento ya está en {etapa}: …». Cancelado: «El evento está cancelado: solo puedes cambiar el color de portada.»",
           "visible_only_in_states": [
             "solo color"
           ]
@@ -6713,7 +6713,7 @@
         {
           "name": "solo color",
           "applies": true,
-          "message": "El evento ya está en {etapa}: solo podés cambiar el color de portada."
+          "message": "El evento ya está en {etapa}: solo puedes cambiar el color de portada."
         },
         {
           "name": "loading",

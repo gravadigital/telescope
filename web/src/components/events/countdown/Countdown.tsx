@@ -15,6 +15,8 @@ export interface CountdownProps {
   /** Cierre: fin del día de la fecha límite (hora local). */
   target: Date;
   footer?: string;
+  /** `light` es para fondos claros (el hero con color de portada); `band` es el de banda oscura. */
+  tone?: 'band' | 'light';
   /** Solo tests: "ahora" en ms. */
   now?: number;
 }
@@ -43,7 +45,15 @@ export const getCountdownParts = (targetMs: number, nowMs: number): CountdownPar
 const pad = (n: number): string => String(n).padStart(2, '0');
 
 /** Cuenta regresiva al cierre (inscripción, votación, ranking): mismo diseño, distinto plazo. */
-const Countdown: React.FC<CountdownProps> = ({ title, expiredText, units, target, footer, now }) => {
+const Countdown: React.FC<CountdownProps> = ({
+  title,
+  expiredText,
+  units,
+  target,
+  footer,
+  tone = 'band',
+  now,
+}) => {
   const targetMs = target.getTime();
   const [ticking, setTicking] = React.useState<number>(() => now ?? Date.now());
   const expired = ticking >= targetMs;
@@ -65,7 +75,7 @@ const Countdown: React.FC<CountdownProps> = ({ title, expiredText, units, target
   ];
 
   return (
-    <div className="ev-countdown">
+    <div className={`ev-countdown${tone === 'light' ? ' ev-countdown--light' : ''}`}>
       <p className="ev-countdown__title">{heading}</p>
       <div
         className="ev-countdown__boxes"

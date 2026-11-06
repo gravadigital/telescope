@@ -62,3 +62,14 @@ useNotifications(): {
 const { unreadCount, markAllRead } = useNotifications();
 await markAllRead().catch(() => setError(true));
 ```
+
+## useCoverColorNames
+
+**Location:** `src/hooks/useCoverColorNames.ts`
+**Description:** Name of every cover color in the active language, memoized on `t`. UI kit components do not translate, so screens pass this map to `ColorSwatchPicker` and reuse it for the review summary of the create wizard.
+
+**Signature:**
+```ts
+useCoverColorNames(): Record<CoverColorId, string>
+```
+

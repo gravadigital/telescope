@@ -7,6 +7,7 @@ export * from './redirect';
 export * from './auth';
 export * from './events';
 export * from './eventForm';
+export * from './coverColors';
 export * from './eventDetail';
 export * from './manage';
 export * from './ranking';

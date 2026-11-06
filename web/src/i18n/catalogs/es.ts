@@ -132,6 +132,28 @@ export const es = {
     backHome: 'Volver al inicio',
     documentTitle: 'Página no encontrada · Telescopio',
   },
+  coverColor: {
+    label: 'Color de portada',
+    help: 'Es el fondo del encabezado de tu evento. Puedes cambiarlo después.',
+    names: {
+      lavender: 'Lavanda',
+      periwinkle: 'Vincapervinca',
+      sky: 'Cielo',
+      ice: 'Hielo',
+      aqua: 'Agua',
+      mint: 'Menta',
+      pistachio: 'Pistacho',
+      lemon: 'Limón',
+      butter: 'Manteca',
+      peach: 'Durazno',
+      coral: 'Coral',
+      rose: 'Rosa',
+      pink: 'Chicle',
+      lilac: 'Lila',
+      sand: 'Arena',
+      mist: 'Bruma',
+    },
+  },
   footer: {
     nav: 'Navegación del pie',
     tagline: 'Telescopio · evaluación distribuida entre pares',
@@ -432,6 +454,7 @@ export const es = {
       capacity: 'Cupo',
       capacityValue: plural({ one: '{count} participante', other: '{count} participantes' }),
       organizerFallback: '{name} (tu nombre)',
+      coverColor: 'Color de portada',
       edit: 'Editar',
       editField: 'Editar {field}',
     },
@@ -474,6 +497,15 @@ export const es = {
     cancel: 'Cancelar',
     save: 'Guardar cambios',
     saving: 'Guardando…',
+    colorOnly: {
+      title: 'Cambiar color de portada',
+      save: 'Guardar color',
+      notice: {
+        voting: 'El evento ya está en votación: solo puedes cambiar el color de portada.',
+        results: 'El evento ya está en resultados: solo puedes cambiar el color de portada.',
+        cancelled: 'El evento está cancelado: solo puedes cambiar el color de portada.',
+      },
+    },
     errors: {
       generic: 'No pudimos guardar los cambios. Inténtalo de nuevo.',
       stageLocked: 'El evento ya pasó a votación y sus datos no se pueden editar.',
@@ -487,6 +519,7 @@ export const es = {
   manageEvent: {
     created: 'Evento creado. Cuando esté listo, abre la inscripción.',
     updated: 'Datos actualizados.',
+    colorUpdated: 'Color actualizado.',
   },
   manage: {
     back: '← Mis eventos',
@@ -494,6 +527,7 @@ export const es = {
     role: 'Organizas este evento',
     meta: '{organizer} · creado el {date}',
     editData: 'Editar datos',
+    changeColor: 'Cambiar color',
     copyInvite: 'Copiar enlace de invitación',
     copied: '✓ Copiado',
     share: 'Compartir',

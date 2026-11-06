@@ -36,6 +36,7 @@ const status = { 'u-2': true, 'u-3': false, 'u-4': false, 'u-5': false };
 const now = new Date(2026, 9, 5, 12, 0);
 
 const base: Event = {
+  cover_color: 'lavender',
   id: 'e-1',
   title: 'Concurso',
   description: 'd',

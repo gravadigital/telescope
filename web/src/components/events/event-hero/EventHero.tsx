@@ -1,19 +1,26 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { coverColorVar } from '../../../domain/coverColors';
+import type { CoverColorId } from '../../../domain/coverColors';
 import './EventHero.css';
 
 export interface EventHeroProps {
   back?: { label: string; to: string };
-  /** Típicamente `StatusPill tone="onBand"`. */
+  /** Color de portada del evento (REQ-004). Sin color, el CSS usa el default. */
+  coverColor?: CoverColorId;
+  /** Típicamente `StatusPill` con su tono por defecto: el hero ya no es una banda oscura. */
   pills?: React.ReactNode;
   title: string;
   meta?: React.ReactNode;
-  /** Típicamente `Button variant="onBand"`. */
+  /** Típicamente `Button variant="secondary"`. */
   actions?: React.ReactNode;
 }
 
-const EventHero: React.FC<EventHeroProps> = ({ back, pills, title, meta, actions }) => (
-  <header className="ev-hero">
+const EventHero: React.FC<EventHeroProps> = ({ back, coverColor, pills, title, meta, actions }) => (
+  <header
+    className="ev-hero"
+    style={coverColor ? ({ '--ev-hero-bg': coverColorVar(coverColor) } as React.CSSProperties) : undefined}
+  >
     <div className="ev-hero__inner">
       {back && (
         <Link to={back.to} className="ev-hero__back">

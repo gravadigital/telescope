@@ -1,6 +1,6 @@
 ---
 component: color-swatch-picker
-version: 2.1.0
+version: 2.1.1
 status: active
 last_updated: 2026-11-06
 related: [text-field, number-stepper, dialog]
@@ -71,8 +71,10 @@ formulario" de S-03).
   `aria-checked`.
 - **Nombre accesible = nombre del color en el idioma activo** (`Lavanda` / `Lavender`), nunca el hex
   ni el identificador.
-- Teclado: Tab entra en la muestra seleccionada (roving tabindex); las flechas mueven la selección
-  dentro de la grilla (izquierda/derecha y arriba/abajo por fila); Espacio confirma.
+- Teclado: Tab entra en la muestra seleccionada (roving tabindex); las flechas mueven el foco **y
+  eligen** (como un grupo de radios nativo): izquierda/derecha de a una muestra y arriba/abajo de a
+  una fila (8 columnas desde 768px, 4 en mobile). **No dan la vuelta en los bordes**: si no hay
+  muestra en esa dirección, no pasa nada. Espacio y Enter eligen la muestra enfocada.
 - La selección no depende solo del color: ✓, anillo y nombre visible.
 - Contraste no textual: anillo de selección y de foco ≥ 3:1 sobre `bg.surface`. Las muestras contra
   `bg.surface` quedan en ~1,4:1; su borde `border.default` las delimita y la selección no depende
@@ -100,6 +102,8 @@ el **identificador**.
 | label | string | — | Texto del label |
 | help | string | — | Ayuda opcional |
 | disabled | boolean | `false` | Deshabilita todo |
+| names | `Record<CoverColorId, string>` | — | Nombre de cada color en el idioma activo: es el nombre accesible de cada muestra y el texto visible del elegido. Los componentes del kit no traducen, así que lo recibe por props |
+| selectedRef | `React.Ref<HTMLButtonElement>` | — | Apunta a la muestra elegida; un diálogo lo usa como foco inicial |
 
 `CoverColorId` = `'lavender' | 'periwinkle' | 'sky' | 'ice' | 'aqua' | 'mint' | 'pistachio' |
 'lemon' | 'butter' | 'peach' | 'coral' | 'rose' | 'pink' | 'lilac' | 'sand' | 'mist'`, en ese
@@ -113,3 +117,4 @@ orden, que es el mismo del enum de la API.
 ## Historial
 
 - 2026-11-06 v2.1.0 — Creado para REQ-004 (color de portada en S-03 y O-18).
+- 2026-11-06 v2.1.1 — API: se documentan `names` (nombres por idioma) y `selectedRef` (foco inicial en diálogos), y se aclara que las flechas mueven el foco y eligen, sin dar la vuelta en los bordes (S-021).

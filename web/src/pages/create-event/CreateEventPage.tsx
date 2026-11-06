@@ -1,9 +1,10 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import EventPreview from '../../components/events/event-preview/EventPreview';
-import { Button, Callout, Dialog, NumberStepper, TextField } from '../../components/ui';
+import { Button, Callout, ColorSwatchPicker, Dialog, NumberStepper, TextField } from '../../components/ui';
 import { CheckIcon } from '../../components/ui/icons/Icons';
 import { useAuth } from '../../context/AuthContext';
+import { useCoverColorNames } from '../../hooks/useCoverColorNames';
 import { ApiError } from '../../config/api';
 import {
   EMPTY_EVENT_FORM,
@@ -16,7 +17,8 @@ import {
   toEventInput,
   validateEventForm,
 } from '../../domain';
-import type { EventFormField, EventFormValues, FieldErrors } from '../../domain';
+import { DEFAULT_COVER_COLOR, isCoverColor } from '../../domain';
+import type { CoverColorId, EventFormField, EventFormValues, FieldErrors } from '../../domain';
 import { scopedMessageKeyForError, useT } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
 import { EventService } from '../../services/api';
@@ -83,6 +85,7 @@ const CreateEventPage: React.FC = () => {
   const { t, locale } = useT();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const coverColorNames = useCoverColorNames();
 
   const [step, setStep] = useState<Step>(1);
   const [values, setValues] = useState<EventFormValues>(EMPTY_EVENT_FORM);
@@ -130,7 +133,10 @@ const CreateEventPage: React.FC = () => {
       if (raw) {
         const parsed: unknown = JSON.parse(raw);
         if (isValidDraft(parsed)) {
-          setValues({ ...EMPTY_EVENT_FORM, ...parsed.values });
+          const restored = { ...EMPTY_EVENT_FORM, ...parsed.values };
+          // Un borrador de antes del color, o con un valor que ya no es de la paleta, vuelve al default.
+          if (!isCoverColor(restored.coverColor)) restored.coverColor = DEFAULT_COVER_COLOR;
+          setValues(restored);
           setStep(parsed.step);
           lastSavedRef.current = JSON.stringify({ values: parsed.values, step: parsed.step });
           if (typeof parsed.savedAt === 'number') setDraftSavedAt(parsed.savedAt);
@@ -194,6 +200,9 @@ const CreateEventPage: React.FC = () => {
 
   const handleCapacity = (maxParticipants: number): void =>
     setValues((prev) => ({ ...prev, maxParticipants }));
+
+  const handleCoverColor = (coverColor: CoverColorId): void =>
+    setValues((prev) => ({ ...prev, coverColor }));
 
   const create = async (): Promise<void> => {
     if (creating) return;
@@ -273,6 +282,12 @@ const CreateEventPage: React.FC = () => {
       value:
         values.organizer.trim() ||
         t('createEvent.review.organizerFallback', { name: user?.name ?? '' }),
+      target: 1,
+    },
+    {
+      field: 'coverColor',
+      label: t('createEvent.review.coverColor'),
+      value: coverColorNames[values.coverColor],
       target: 1,
     },
     {
@@ -423,6 +438,14 @@ const CreateEventPage: React.FC = () => {
                   maxLength={EVENT_ORGANIZER_MAX}
                   value={values.organizer}
                   onChange={handleChange}
+                />
+                <ColorSwatchPicker
+                  value={values.coverColor}
+                  names={coverColorNames}
+                  label={t('coverColor.label')}
+                  help={t('coverColor.help')}
+                  disabled={creating}
+                  onChange={handleCoverColor}
                 />
               </div>
             )}

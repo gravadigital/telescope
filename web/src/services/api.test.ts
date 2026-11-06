@@ -323,7 +323,7 @@ describe("EventService.createEvent / updateEvent (S-014)", () => {
     const log = jest.spyOn(console, "log").mockImplementation(() => undefined);
     mockedApiRequest.mockResolvedValue({ event: { id: "e-9" }, code: "EVENT_CREATED" });
     const result = await EventService.createEvent(
-      { name: "Concurso de afiches", description: "Diseña el afiche del festival", organizer: "Club de Diseño", max_participants: 20 },
+      { name: "Concurso de afiches", description: "Diseña el afiche del festival", organizer: "Club de Diseño", max_participants: 20, cover_color: "lavender" },
       new Date(2026, 9, 5)
     );
     expect(mockedApiRequest).toHaveBeenCalledTimes(1);
@@ -331,7 +331,7 @@ describe("EventService.createEvent / updateEvent (S-014)", () => {
     expect(url).toBe("/api/v1/events");
     expect(options.method).toBe("POST");
     expect(options.body).toBe(
-      '{"name":"Concurso de afiches","description":"Diseña el afiche del festival","organizer":"Club de Diseño","max_participants":20,"start_date":"2026-10-06","end_date":"2026-10-07"}'
+      '{"name":"Concurso de afiches","description":"Diseña el afiche del festival","organizer":"Club de Diseño","max_participants":20,"cover_color":"lavender","start_date":"2026-10-06","end_date":"2026-10-07"}'
     );
     expect(result).toEqual({ id: "e-9" });
     expect(log).not.toHaveBeenCalled();
@@ -343,7 +343,7 @@ describe("EventService.createEvent / updateEvent (S-014)", () => {
     const error = new ApiError({ status: 409, body: { error: "An event with this name already exists", code: "DUPLICATE_EVENT_NAME" } });
     mockedApiRequest.mockRejectedValue(error);
     await expect(
-      EventService.createEvent({ name: "x", description: "y", organizer: "", max_participants: 20 })
+      EventService.createEvent({ name: "x", description: "y", organizer: "", max_participants: 20, cover_color: "lavender" })
     ).rejects.toMatchObject({ status: 409, code: "DUPLICATE_EVENT_NAME" });
   });
 
@@ -693,5 +693,43 @@ describe("NotificationService (S-018)", () => {
       status: 500,
       code: "RETRIEVAL_ERROR",
     });
+  });
+});
+
+describe("EventService: color de portada (S-021)", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("TS-3: toEvent normaliza cover_color", async () => {
+    const colorOf = async (raw: unknown) => {
+      mockedApiRequest.mockResolvedValueOnce({ data: { ...detail, cover_color: raw } });
+      return (await EventService.getEventById("e-1"))?.cover_color;
+    };
+    expect(await colorOf("mint")).toBe("mint");
+    expect(await colorOf(undefined)).toBe("lavender");
+    expect(await colorOf("red")).toBe("lavender");
+    expect(await colorOf("#ff0000")).toBe("lavender");
+  });
+
+  it("TS-4: createEvent envía cover_color en el POST", async () => {
+    jest.spyOn(console, "log").mockImplementation(() => undefined);
+    mockedApiRequest.mockResolvedValue({ event: { id: "e-9" }, code: "EVENT_CREATED" });
+    await EventService.createEvent(
+      { name: "Concurso de afiches", description: "Diseña el afiche del festival", organizer: "", max_participants: 20, cover_color: "mint" },
+      new Date(2026, 9, 5)
+    );
+    const [, options] = mockedApiRequest.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(options.body as string)).toMatchObject({ cover_color: "mint" });
+  });
+
+  it("TS-4: updateEvent envía solo el color cuando es lo único que cambió", async () => {
+    mockedApiRequest.mockResolvedValue({ data: { ...detail, cover_color: "sky" }, code: "EVENT_UPDATED" });
+    const event = await EventService.updateEvent("e-1", { cover_color: "sky" });
+    const [url, options] = mockedApiRequest.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/v1/events/e-1");
+    expect(options.method).toBe("PATCH");
+    expect(options.body).toBe('{"cover_color":"sky"}');
+    expect(event.cover_color).toBe("sky");
   });
 });

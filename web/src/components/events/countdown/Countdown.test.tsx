@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { act, render, screen } from '@testing-library/react';
 import Countdown, { getCountdownParts } from './Countdown';
 
@@ -72,5 +74,36 @@ describe('Countdown', () => {
       jest.advanceTimersByTime(2000);
     });
     expect(screen.getByRole('timer').textContent).not.toBe(first);
+  });
+});
+
+describe('Countdown: variante clara (S-021)', () => {
+  const target = new Date(2026, 9, 10, 23, 59, 59);
+  const now = new Date(2026, 9, 5, 12, 0, 0).getTime();
+
+  it('TS-12: por defecto conserva el diseño de banda', () => {
+    const { container } = render(<Countdown {...base} target={target} now={now} />);
+    expect(container.querySelector('.ev-countdown--light')).toBeNull();
+  });
+
+  it('TS-12: con tone="light" agrega la clase de la variante', () => {
+    const { container } = render(<Countdown {...base} target={target} now={now} tone="light" />);
+    expect(container.querySelector('.ev-countdown')).toHaveClass('ev-countdown--light');
+    expect(screen.getByRole('timer')).toBeInTheDocument();
+  });
+
+  it('TS-12: la variante clara usa tokens de fondo claro', () => {
+    const css = fs
+      .readFileSync(path.join(__dirname, 'Countdown.css'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+    const light = css
+      .split('}')
+      .filter((block) => block.includes('.ev-countdown--light'))
+      .join('}');
+    expect(light).toMatch(/--bg-surface/);
+    expect(light).toMatch(/--border-default/);
+    expect(light).toMatch(/--text-primary/);
+    expect(light).toMatch(/--text-secondary/);
+    expect(light).not.toMatch(/--ref-color-white|--ref-color-cyan-400|--countdown-/);
   });
 });

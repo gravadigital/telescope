@@ -159,10 +159,11 @@ const action = rowAction({ event: row, userId: user?.id ?? null, myEvent: byId[r
 ```ts
 validateEventForm(values: EventFormValues, options?: { minCapacity?: number; fields?: readonly EventFormField[] }): FieldErrors<EventFormField>
 toEventInput(values): EventCreateInput          // trims, snake_case
-changedEventFields(initial, values): EventUpdate // only what changed (PATCH body)
+changedEventFields(initial, values): EventUpdate // only what changed (PATCH body), cover_color included
 hasEventFormData(values): boolean
 automaticEventDates(now?: Date): { start_date: string; end_date: string }
 canEditEvent(stage): boolean                     // creation | participation
+isColorOnlyEdit(event: { stage; is_cancelled? }): boolean  // voting | results | cancelled: only the cover color is editable
 minCapacityFor(registered: number): number
 charCount(value: string): number
 // constants: EVENT_NAME_MIN/MAX, EVENT_DESCRIPTION_MIN/MAX, EVENT_ORGANIZER_MAX, EVENT_CAPACITY_MIN/MAX/DEFAULT, EMPTY_EVENT_FORM
@@ -335,3 +336,18 @@ NotificationService.markAllRead(): Promise<{ updated: number }>
 const d = describe(n, locale);
 if (d) t(d.titleKey, d.params); // and t(d.actionKey), navigate(d.route)
 ```
+
+## domain/coverColors
+
+**Location:** `src/domain/coverColors.ts`
+**Description:** The closed cover palette of an event. The identifiers and their order are a contract with the api (`CoverColor` enum in `docs/apis/api.yaml`, CHECK `valid_cover_color`) and with the design system (`foundations/color.md`); the api stores the identifier, never the hex. `toEvent` falls back to `DEFAULT_COVER_COLOR` when the api sends a missing or unknown value.
+
+**Signature:**
+```ts
+const COVER_COLORS: readonly ['lavender', 'periwinkle', ..., 'mist']  // canonical order
+type CoverColorId
+const DEFAULT_COVER_COLOR: CoverColorId                                // 'lavender'
+isCoverColor(value: unknown): value is CoverColorId
+coverColorVar(id: CoverColorId): string                                // 'var(--bg-cover-mint)'
+```
+

@@ -99,6 +99,27 @@ All text reaches the components through props (no embedded copy); CSS uses only 
 
 ---
 
+## ColorSwatchPicker (REQ-004)
+
+**Location:** `src/components/ui/color-swatch-picker/`
+**Description:** Picks one of the 16 cover colors (`COVER_COLORS`). It is a `role="radiogroup"` with one `role="radio"` per swatch and a roving tabindex (only the chosen one is tabbable). Arrow keys move the focus and choose, one swatch left/right and one row up/down (8 columns from 768px, 4 below), and do not wrap at the edges; Space and Enter choose the focused one. The chosen swatch shows a check, a ring and its name under the grid. The kit does not translate, so the names come in `names` (see `useCoverColorNames`); `selectedRef` points to the chosen swatch so a dialog can focus it first. The color reaches the dot through the `--swatch-color` custom property, set to the `--bg-cover-{id}` token.
+
+**Usage:**
+```tsx
+const names = useCoverColorNames();
+<ColorSwatchPicker value={values.coverColor} names={names} label={t('coverColor.label')}
+  help={t('coverColor.help')} selectedRef={pickerRef} disabled={saving} onChange={setCoverColor} />
+```
+
+---
+
+## Countdown (tone="light")
+
+**Location:** `src/components/events/countdown/Countdown.tsx`
+**Description:** `tone="band"` (default) is the dark-band design. `tone="light"` adds `ev-countdown--light` for light backgrounds: white boxes with a border and `--text-primary` / `--text-secondary`. The event hero uses it, because the hero now takes the event's cover color. `EventHero` takes `coverColor` and sets `--ev-hero-bg`; its content uses the default `StatusPill` tone and `Button variant="secondary"`.
+
+---
+
 ## Menu (selectable items in actions)
 
 An item with `selected` defined in `variant="actions"` renders as `menuitemradio` with `aria-checked` and a check mark; items without it stay `menuitem`.

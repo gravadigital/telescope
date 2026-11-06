@@ -110,7 +110,7 @@ date: 2026-10-02
 - Texto/label: "Color de portada" · 16 muestras; seleccionada la del evento
 
 ### Aviso solo color
-- Texto/label: "El evento ya está en {etapa}: solo podés cambiar el color de portada." · con el evento cancelado: "El evento está cancelado: solo podés cambiar el color de portada."
+- Texto/label: "El evento ya está en {etapa}: solo puedes cambiar el color de portada." · con el evento cancelado: "El evento está cancelado: solo puedes cambiar el color de portada."
 
 ### Error de guardado
 - Texto/label: "No pudimos guardar los cambios. Probá de nuevo."
@@ -148,7 +148,7 @@ date: 2026-10-02
 
 ### solo color
 - Aplica: Sí (REQ-004)
-- Mensaje: "El evento ya está en {etapa}: solo podés cambiar el color de portada."
+- Mensaje: "El evento ya está en {etapa}: solo puedes cambiar el color de portada."
 - Cambios: Título "Cambiar color de portada"; se ocultan Campo nombre, Campo descripción, Campo organizador, Selector de cupo y Ayuda cupo; se ven Color de portada y Aviso solo color; Botón guardar "Guardar color".
 
 ### success
@@ -195,3 +195,4 @@ date: 2026-10-02
 - Reutilizar el wizard de S-03 para editar: tres pasos para cambiar un dato.
 
 **Preguntas abiertas:** ninguna.
+- **S-021 (2026-11-06):** el microcopy del modo solo color y de la ayuda del color se escribe en español neutro ("puedes"), porque el catálogo `es` no admite voseo (TS-25 del catálogo). Es una corrección de redacción respecto de REQ-004, sin cambios de comportamiento.

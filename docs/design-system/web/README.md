@@ -1,6 +1,6 @@
 ---
 design_system: web
-version: 2.1.0
+version: 2.1.1
 last_updated: 2026-11-06
 status: diseñado
 platform: web

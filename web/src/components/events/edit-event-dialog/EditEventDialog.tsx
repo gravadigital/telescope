@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Callout, Dialog, NumberStepper, TextField } from '../../ui';
+import { Button, Callout, ColorSwatchPicker, Dialog, NumberStepper, TextField } from '../../ui';
 import { ApiError } from '../../../config/api';
 import {
   EVENT_CAPACITY_DEFAULT,
@@ -8,10 +8,12 @@ import {
   EVENT_NAME_MAX,
   EVENT_ORGANIZER_MAX,
   changedEventFields,
+  isColorOnlyEdit,
   minCapacityFor,
   validateEventForm,
 } from '../../../domain';
-import type { EventFormValues } from '../../../domain';
+import type { CoverColorId, EventFormValues } from '../../../domain';
+import { useCoverColorNames } from '../../../hooks/useCoverColorNames';
 import { messageKeyForError, useT } from '../../../i18n';
 import type { TranslationKey } from '../../../i18n';
 import { EventService } from '../../../services/api';
@@ -32,10 +34,14 @@ const initialValues = (event: Event): EventFormValues => ({
   description: event.description,
   organizer: event.organizer ?? '',
   maxParticipants: event.max_participants ?? EVENT_CAPACITY_DEFAULT,
+  coverColor: event.cover_color,
 });
 
 const EditEventDialog: React.FC<EditEventDialogProps> = ({ open, event, onClose, onSaved }) => {
   const { t } = useT();
+  const coverColorNames = useCoverColorNames();
+  // Votación, resultados o evento cancelado: solo se puede cambiar el color de portada.
+  const colorOnly = isColorOnlyEdit(event);
   const initial = useMemo(() => initialValues(event), [event]);
   const [values, setValues] = useState<EventFormValues>(initial);
   const [showErrors, setShowErrors] = useState(false);
@@ -49,6 +55,7 @@ const EditEventDialog: React.FC<EditEventDialogProps> = ({ open, event, onClose,
   const nameRef = useRef<InputRef>(null);
   const descriptionRef = useRef<InputRef>(null);
   const organizerRef = useRef<InputRef>(null);
+  const pickerRef = useRef<HTMLButtonElement>(null);
 
   // Cada vez que se abre, vuelve a los datos vigentes del evento.
   useEffect(() => {
@@ -91,7 +98,7 @@ const EditEventDialog: React.FC<EditEventDialogProps> = ({ open, event, onClose,
     e?.preventDefault();
     if (saving || locked) return;
     setSaveError(null);
-    const found = validateEventForm(values, { minCapacity });
+    const found = colorOnly ? {} : validateEventForm(values, { minCapacity });
     if (Object.keys(found).length > 0) {
       setShowErrors(true);
       const first = (['name', 'description', 'organizer'] as const).find((f) => found[f]);
@@ -131,6 +138,15 @@ const EditEventDialog: React.FC<EditEventDialogProps> = ({ open, event, onClose,
     }
   };
 
+  const handleCoverColor = (coverColor: CoverColorId): void =>
+    setValues((prev) => ({ ...prev, coverColor }));
+
+  const colorOnlyNoticeKey: TranslationKey = event.is_cancelled
+    ? 'editEvent.colorOnly.notice.cancelled'
+    : event.stage === 'voting'
+      ? 'editEvent.colorOnly.notice.voting'
+      : 'editEvent.colorOnly.notice.results';
+
   const capacityHelp = minCapacity > 1
     ? t('eventForm.capacityMin', { count: minCapacity })
     : t('eventForm.capacityRange');
@@ -153,7 +169,7 @@ const EditEventDialog: React.FC<EditEventDialogProps> = ({ open, event, onClose,
         loadingLabel={t('editEvent.saving')}
         onClick={() => void handleSave()}
       >
-        {t('editEvent.save')}
+        {t(colorOnly ? 'editEvent.colorOnly.save' : 'editEvent.save')}
       </Button>
     </>
   );
@@ -162,9 +178,10 @@ const EditEventDialog: React.FC<EditEventDialogProps> = ({ open, event, onClose,
     <Dialog
       open={open}
       size="md"
-      title={t('editEvent.title')}
+      title={t(colorOnly ? 'editEvent.colorOnly.title' : 'editEvent.title')}
       closeLabel={t('editEvent.close')}
       busy={saving}
+      initialFocusRef={colorOnly ? pickerRef : undefined}
       onClose={requestClose}
       actions={actions}
     >
@@ -172,56 +189,70 @@ const EditEventDialog: React.FC<EditEventDialogProps> = ({ open, event, onClose,
         <Callout tone="warning" title={t('editEvent.discard.title')} />
       ) : (
         <form className="ev-edit-event-dialog__form" onSubmit={handleSave} noValidate>
-          <TextField
-            ref={nameRef}
-            name="name"
-            required
-            label={t('eventForm.nameLabel')}
-            error={translate(nameError)}
-            maxLength={EVENT_NAME_MAX}
-            value={values.name}
-            onChange={handleChange}
-          />
-          <TextField
-            ref={descriptionRef}
-            variant="multiline"
-            name="description"
-            required
-            label={t('eventForm.descriptionLabel')}
-            error={translate(errorFor('description'))}
-            maxLength={EVENT_DESCRIPTION_MAX}
-            value={values.description}
-            onChange={handleChange}
-          />
-          <div className="ev-edit-event-dialog__row">
-            <div className="ev-edit-event-dialog__organizer">
+          {!colorOnly && (
+            <>
               <TextField
-                ref={organizerRef}
-                name="organizer"
-                optional
-                optionalLabel={t('eventForm.optional')}
-                label={t('eventForm.organizerLabel')}
-                error={translate(errorFor('organizer'))}
-                maxLength={EVENT_ORGANIZER_MAX}
-                value={values.organizer}
+                ref={nameRef}
+                name="name"
+                required
+                label={t('eventForm.nameLabel')}
+                error={translate(nameError)}
+                maxLength={EVENT_NAME_MAX}
+                value={values.name}
                 onChange={handleChange}
               />
-            </div>
-            <div className="ev-edit-event-dialog__capacity">
-              <NumberStepper
-                value={values.maxParticipants}
-                min={minCapacity}
-                max={EVENT_CAPACITY_MAX}
-                label={t('eventForm.capacityLabelShort')}
-                help={capacityHelp}
-                error={translate(capacityError)}
-                rangeError={t('eventForm.validation.capacityRange')}
-                decrementLabel={t('eventForm.capacityDecrement')}
-                incrementLabel={t('eventForm.capacityIncrement')}
-                onChange={(maxParticipants) => setValues((prev) => ({ ...prev, maxParticipants }))}
+              <TextField
+                ref={descriptionRef}
+                variant="multiline"
+                name="description"
+                required
+                label={t('eventForm.descriptionLabel')}
+                error={translate(errorFor('description'))}
+                maxLength={EVENT_DESCRIPTION_MAX}
+                value={values.description}
+                onChange={handleChange}
               />
-            </div>
-          </div>
+              <div className="ev-edit-event-dialog__row">
+                <div className="ev-edit-event-dialog__organizer">
+                  <TextField
+                    ref={organizerRef}
+                    name="organizer"
+                    optional
+                    optionalLabel={t('eventForm.optional')}
+                    label={t('eventForm.organizerLabel')}
+                    error={translate(errorFor('organizer'))}
+                    maxLength={EVENT_ORGANIZER_MAX}
+                    value={values.organizer}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div className="ev-edit-event-dialog__capacity">
+                  <NumberStepper
+                    value={values.maxParticipants}
+                    min={minCapacity}
+                    max={EVENT_CAPACITY_MAX}
+                    label={t('eventForm.capacityLabelShort')}
+                    help={capacityHelp}
+                    error={translate(capacityError)}
+                    rangeError={t('eventForm.validation.capacityRange')}
+                    decrementLabel={t('eventForm.capacityDecrement')}
+                    incrementLabel={t('eventForm.capacityIncrement')}
+                    onChange={(maxParticipants) => setValues((prev) => ({ ...prev, maxParticipants }))}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+          {colorOnly && <Callout tone="info">{t(colorOnlyNoticeKey)}</Callout>}
+          <ColorSwatchPicker
+            value={values.coverColor}
+            names={coverColorNames}
+            label={t('coverColor.label')}
+            help={t('coverColor.help')}
+            disabled={saving}
+            selectedRef={pickerRef}
+            onChange={handleCoverColor}
+          />
           {saveError && <Callout tone="error">{t(saveError)}</Callout>}
         </form>
       )}

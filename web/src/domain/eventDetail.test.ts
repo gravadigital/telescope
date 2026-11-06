@@ -15,6 +15,7 @@ import {
 const now = new Date(2026, 9, 5, 10, 0);
 
 const ev: Event = {
+  cover_color: 'lavender',
   id: 'e-1',
   title: 'Concurso de afiches',
   description: 'Diseña el afiche del festival de primavera.',
@@ -91,7 +92,7 @@ describe('detailPill', () => {
     expect(detailPill('default', ev, now)).toEqual({
       key: 'eventDetail.pill.openCloses',
       params: { count: 5 },
-      tone: 'onBand',
+      tone: 'neutral',
     });
     expect(detailPill('default', { ...ev, participation_estimated_end_date: '2026-10-05' }, now).key).toBe(
       'eventDetail.pill.openClosesToday'
@@ -99,7 +100,7 @@ describe('detailPill', () => {
     expect(detailPill('default', { ...ev, participation_estimated_end_date: '2026-10-06' }, now)).toEqual({
       key: 'eventDetail.pill.openCloses',
       params: { count: 1 },
-      tone: 'onBand',
+      tone: 'neutral',
     });
     expect(detailPill('default', { ...ev, participation_estimated_end_date: null }, now).key).toBe(
       'eventDetail.pill.open'
@@ -125,7 +126,7 @@ describe('detailPill', () => {
     });
     expect(
       detailPill('vote', { stage: 'voting', participation_estimated_end_date: null, voting_estimated_end_date: '2026-10-12' }, now)
-    ).toEqual({ key: 'eventDetail.pill.voteCloses', params: { count: 7 }, tone: 'onBand' });
+    ).toEqual({ key: 'eventDetail.pill.voteCloses', params: { count: 7 }, tone: 'neutral' });
   });
 });
 

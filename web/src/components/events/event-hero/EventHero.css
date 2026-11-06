@@ -1,6 +1,8 @@
+/* Fondo: el color de portada del evento. `--ev-hero-bg` la fija el componente en línea. */
 .ev-hero {
-  background: var(--bg-band);
-  color: var(--text-inverse);
+  background: var(--ev-hero-bg, var(--bg-cover-default));
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-default);
 }
 .ev-hero__inner {
   box-sizing: border-box;
@@ -13,12 +15,12 @@
 }
 .ev-hero__back {
   align-self: flex-start;
-  color: var(--text-inverse-secondary);
+  color: var(--text-secondary);
   font: var(--type-ui);
   text-decoration: none;
 }
 .ev-hero__back:hover {
-  color: var(--text-inverse);
+  color: var(--text-primary);
 }
 .ev-hero__back:focus-visible {
   outline: none;
@@ -51,7 +53,7 @@
 .ev-hero__meta {
   margin: 0;
   font: var(--type-body);
-  color: var(--text-inverse-secondary);
+  color: var(--text-secondary);
 }
 /* Mobile: las acciones ocupan el ancho completo */
 .ev-hero__actions {

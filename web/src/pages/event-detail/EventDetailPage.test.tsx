@@ -35,6 +35,7 @@ const openAttachment = AttachmentService.openAssignedAttachment as jest.Mock;
 const now = new Date(2026, 9, 5, 10, 0);
 
 const ev: Event = {
+  cover_color: 'lavender',
   id: 'e-1',
   title: 'Concurso de afiches',
   description: 'Diseña el afiche del festival de primavera.',
@@ -146,6 +147,21 @@ describe('EventDetailPage', () => {
   afterEach(() => {
     jest.useRealTimers();
     jest.restoreAllMocks();
+  });
+
+  describe('portada (S-021)', () => {
+    it('TS-11: el hero toma el color del evento y su contenido usa variantes claras', async () => {
+      getEvent.mockResolvedValue({ ...ev, cover_color: 'mint' });
+      renderPage();
+      await screen.findByRole('heading', { level: 1, name: 'Concurso de afiches' });
+
+      const hero = document.querySelector('header.ev-hero') as HTMLElement;
+      expect(hero.style.getPropertyValue('--ev-hero-bg')).toBe('var(--bg-cover-mint)');
+      expect(within(hero).getByRole('button', { name: 'Compartir' })).not.toHaveClass('ui-button--on-band');
+      expect(hero.querySelector('.ui-status-pill')).not.toBeNull();
+      expect(hero.querySelector('.ui-status-pill--on-band')).toBeNull();
+      expect(hero.querySelector('.ev-countdown--light')).not.toBeNull();
+    });
   });
 
   describe('estructura y carga', () => {

@@ -127,7 +127,7 @@ date: 2026-10-02
 - Texto/label: "Organizador (opcional)" · placeholder "Ej. Club de Fotografía" · ayuda "Si lo dejás vacío se muestra tu nombre."
 
 ### Color de portada
-- Texto/label: "Color de portada" · ayuda "Es el fondo del encabezado de tu evento. Podés cambiarlo después."
+- Texto/label: "Color de portada" · ayuda "Es el fondo del encabezado de tu evento. Puedes cambiarlo después."
 - 16 muestras con el nombre del color como etiqueta accesible (ES/EN); seleccionada: "Lavanda" por defecto
 
 ### Selector de cupo
@@ -255,3 +255,4 @@ date: 2026-10-02
 - "Guardar borrador" y autoguardado: fuera de alcance; el wizard es corto.
 
 **Preguntas abiertas:** ninguna.
+- **S-021 (2026-11-06):** la ayuda del color se escribe en español neutro ("Puedes cambiarlo después."): el catálogo `es` no admite voseo.

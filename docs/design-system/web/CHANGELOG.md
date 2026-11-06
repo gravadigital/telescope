@@ -3,6 +3,16 @@
 Sigue el formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/)
 y el versionado [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.1.1] - 2026-11-06
+
+### Corregido
+- `components/color-swatch-picker.md`: la API suma `names` (nombre de cada color en el idioma activo; los
+  componentes del kit reciben los textos por props) y `selectedRef` (foco inicial en diálogos). Se
+  aclara el teclado: las flechas mueven el foco y eligen, y no dan la vuelta en los bordes. Surge de
+  implementar S-021; no cambia ningún valor ni token.
+
+---
+
 ## [2.1.0] - 2026-11-06
 
 > Origen: la sección `## Revisión UX` de REQ-004, que dejó estos cambios en `pendiente-DS`. Los

@@ -28,3 +28,5 @@ export { default as FileDropzone } from './file-dropzone/FileDropzone';
 export type { FileDropzoneProps, FileDropzoneLabels } from './file-dropzone/FileDropzone';
 export { default as Menu } from './menu/Menu';
 export type { MenuProps, MenuItem } from './menu/Menu';
+export { default as ColorSwatchPicker } from './color-swatch-picker/ColorSwatchPicker';
+export type { ColorSwatchPickerProps } from './color-swatch-picker/ColorSwatchPicker';
