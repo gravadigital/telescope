@@ -2,13 +2,12 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { NotificationsProvider } from '../../../context/NotificationsContext';
-import { useT } from '../../../i18n';
+import AppFooter from '../app-footer/AppFooter';
 import AppHeader from '../app-header/AppHeader';
 import './AppLayout.css';
 
 /** Chrome global: barra, contenido de la ruta y pie. */
 const AppLayout: React.FC = () => {
-  const { t } = useT();
   const { user } = useAuth();
 
   const layout = (
@@ -17,9 +16,7 @@ const AppLayout: React.FC = () => {
       <main id="main" className="ly-layout__main">
         <Outlet />
       </main>
-      <footer className="ly-footer">
-        <p className="ly-footer__text">{t('footer.tagline')}</p>
-      </footer>
+      <AppFooter />
     </div>
   );
 

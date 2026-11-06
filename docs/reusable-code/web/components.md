@@ -85,10 +85,10 @@ All text reaches the components through props (no embedded copy); CSS uses only 
 
 ---
 
-## Global layout (AppHeader, AppLayout, UserMenu, LanguageSelect, RequireAuth)
+## Global layout (AppHeader, AppFooter, AppLayout, UserMenu, LanguageSelect, RequireAuth)
 
-**Location:** `src/components/layout/{app-header,app-layout,user-menu,language-select,require-auth}/`
-**Description:** Global chrome. `AppLayout` is the parent route (`<Outlet />` inside `<main id="main">`, footer from `footer.tagline`). `AppHeader` shows nothing while `loading`; visitors get `LanguageSelect` plus links to `/login` and `/register`; signed-in users get a reserved `[data-slot="notifications"]` and `UserMenu`. On mobile the links move into a `Menu`. `RequireAuth` wraps protected routes.
+**Location:** `src/components/layout/{app-header,app-footer,app-layout,user-menu,language-select,require-auth}/`
+**Description:** Global chrome. `AppLayout` is the parent route (`<Outlet />` inside `<main id="main">`, then `AppFooter`). `AppFooter` shares the header's `--bg-band` background (REQ-004): the `TELESCOPIO` brand, a `footer.nav` navigation with Home and Events, and `footer.tagline`; stacked on mobile, one row from 768px. `AppHeader` shows nothing while `loading`; visitors get `LanguageSelect` plus links to `/login` and `/register`; signed-in users get a reserved `[data-slot="notifications"]` and `UserMenu`. On mobile the links move into a `Menu`. `RequireAuth` wraps protected routes.
 
 **Usage:**
 ```tsx

@@ -133,6 +133,7 @@ export const es = {
     documentTitle: 'Página no encontrada · Telescopio',
   },
   footer: {
+    nav: 'Navegación del pie',
     tagline: 'Telescopio · evaluación distribuida entre pares',
   },
   auth: {
@@ -1042,6 +1043,7 @@ export const es = {
     INTERNAL_ERROR: 'No pudimos completar la acción en el servidor. Inténtalo de nuevo en unos minutos.',
     INVALID_ATTACHMENT_ID: 'El identificador de la propuesta no es válido.',
     INVALID_CREDENTIALS: 'El correo o la contraseña no son correctos.',
+    INVALID_COVER_COLOR: 'El color de portada no es válido.',
     INVALID_DATE_FORMAT: 'El formato de la fecha no es válido.',
     INVALID_DATE_RANGE: 'La fecha de fin debe ser posterior a la de inicio.',
     INVALID_END_DATE: 'La fecha de fin no es válida.',
