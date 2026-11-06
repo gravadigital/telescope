@@ -214,7 +214,9 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
           onChange={handleInput}
         />
         <label htmlFor={inputId} className="ui-file-dropzone__label">
-          <UploadIcon className="ui-file-dropzone__icon" />
+          <span className="ui-file-dropzone__icon-frame" aria-hidden="true">
+            <UploadIcon className="ui-file-dropzone__icon" />
+          </span>
           <span className="ui-file-dropzone__prompt">
             {labels.prompt} <span className="ui-file-dropzone__action">{labels.promptAction}</span>
           </span>

@@ -147,7 +147,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ id, onClose, bell
         {!empty && !loading && !error && unreadCount > 0 && (
           <span className="nt-panel__count">{t('notifications.newCount', { count: unreadCount })}</span>
         )}
-        {!empty && !loading && !error && (
+        {!empty && !loading && !error && unreadCount > 0 && (
           <Button
             variant="tertiary"
             size="sm"

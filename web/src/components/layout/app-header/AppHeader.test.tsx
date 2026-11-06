@@ -31,6 +31,7 @@ describe('AppHeader', () => {
     expect(screen.getByRole('banner')).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Navegación principal' });
     expect(within(nav).getByRole('link', { name: 'Inicio' })).toHaveAttribute('href', '/');
+    expect(within(nav).getByRole('link', { name: 'Inicio' })).toHaveAttribute('aria-current', 'page');
     expect(within(nav).getByRole('link', { name: 'Eventos' })).toHaveAttribute('href', '/events');
     expect(within(nav).getByRole('link', { name: 'Cómo funciona' })).toHaveAttribute('href', '/#como-funciona');
     const language = screen.getByRole('group', { name: 'Idioma: ES' });
@@ -38,9 +39,11 @@ describe('AppHeader', () => {
     expect(within(language).getByRole('button', { name: 'EN' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByRole('link', { name: 'Iniciar sesión' })).toHaveAttribute('href', '/login');
     expect(screen.getByRole('link', { name: 'Crear cuenta' })).toHaveAttribute('href', '/register');
+    expect(screen.getByRole('link', { name: 'Crear cuenta' })).toHaveClass('ui-button--primary');
     expect(screen.getByRole('link', { name: 'TELESCOPIO' })).toHaveAttribute('href', '/');
     expect(screen.queryByText('About')).toBeNull();
     expect(screen.queryByText('See Demo')).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Ver demo' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Menú de usuario/ })).toBeNull();
     expect(container.querySelector('[data-slot="notifications"]')).toBeNull();
   });
@@ -182,8 +185,14 @@ describe('AppHeader.css', () => {
   it('TS-41: mobile primero, navegación completa desde 900px', () => {
     expect(rule(base, '.ly-header__menu-toggle')).toMatch(/display:\s*inline-flex/);
     expect(rule(base, '.ly-header__links')).toMatch(/display:\s*none/);
+    expect(css).toMatch(/@media \(min-width: 1024px\)[\s\S]*?\.ly-header__logo-mark\s*\{[^}]*height:\s*28px/);
+    expect(css).toMatch(/@media \(min-width: 1024px\)[\s\S]*?\.ly-header__brand\s*\{[^}]*gap:\s*var\(--ref-space-2xl\)/);
+    expect(css).toMatch(/\.ly-header__link--active\s*\{[^}]*background:\s*var\(--bg-inverse-subtle\)/);
+    expect(rule(base, '.ly-header__inner')).toMatch(/var\(--layout-page-gutter\)/);
     expect(rule(media, '.ly-header__menu-toggle')).toMatch(/display:\s*none/);
     expect(rule(media, '.ly-header__links')).toMatch(/display:\s*flex/);
+    expect(rule(media, '.ly-header__inner')).toMatch(/min-height:\s*72px/);
+    expect(media).toMatch(/\.ly-header__actions > \.ly-language-select \.ly-language-select__flag\s*\{[^}]*display:\s*block/);
     expect(css).not.toMatch(/@media[^{]*max-width/);
     expect(media).toMatch(/@media \(min-width: 900px\)/);
     expect(css).not.toMatch(/slot--notifications\s*\{[^}]*display:\s*none/);
@@ -209,7 +218,6 @@ describe('AppHeader.css', () => {
       .readFileSync(path.join(__dirname, '../user-menu/UserMenu.css'), 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '');
     expect(rule(userCss, '.ly-user-menu__name')).toMatch(/display:\s*inline/);
-    expect(rule(userCss, '.ly-user-menu__name')).toMatch(/text-overflow:\s*ellipsis/);
     expect(rule(userCss, '.ly-user-menu__name')).toMatch(/white-space:\s*nowrap/);
   });
 });

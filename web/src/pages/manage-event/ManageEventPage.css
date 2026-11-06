@@ -13,7 +13,7 @@
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: var(--space-padding-default) var(--space-padding-compact);
+  padding: var(--space-padding-default) var(--layout-page-gutter);
   min-width: 0;
 }
 
@@ -71,6 +71,10 @@
   order: 4;
 }
 
+.mep-item--voting-config {
+  order: 1;
+}
+
 .mep-item--summary {
   order: 5;
 }
@@ -96,6 +100,10 @@
   gap: var(--space-inline-md);
 }
 
+.mep-metrics--voting {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .mep-metric {
   display: flex;
   flex-direction: column;
@@ -106,6 +114,72 @@
 .mep-metric-error {
   grid-column: 1 / -1;
   min-width: 0;
+}
+
+.mep-rankings-card {
+  gap: var(--space-stack-sm);
+  min-width: 0;
+}
+
+.mep-rankings-card__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-inline-md);
+}
+
+.mep-rankings-card__stat {
+  min-width: 0;
+}
+
+.mep-rankings-card__label,
+.mep-rankings-card__value,
+.mep-rankings-card__help {
+  margin: 0;
+}
+
+.mep-rankings-card__label {
+  font-size: var(--ref-font-size-2xs);
+  font-weight: var(--ref-font-weight-medium);
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.mep-rankings-card__value {
+  font-size: var(--ref-font-size-2xl);
+  font-weight: var(--ref-font-weight-bold);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.mep-rankings-card__header .ui-button {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  font-size: var(--ref-font-size-2xs);
+  white-space: normal;
+  text-align: right;
+}
+
+.mep-rankings-card__header .ui-button__icon {
+  display: none;
+}
+
+.mep-rankings-card__help {
+  font-size: var(--ref-font-size-2xs);
+  font-weight: var(--ref-font-weight-regular);
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.mep-rankings-card__skeleton {
+  display: block;
+  width: 72px;
+  height: 28px;
+  border-radius: var(--ref-radius-xs);
+  background: var(--bg-disabled);
 }
 
 .mep-main {
@@ -177,6 +251,73 @@
   font-size: 14px;
   line-height: 1.55;
   color: var(--text-inverse-secondary);
+}
+
+.mep-item--voting-config .ui-callout--info {
+  gap: var(--ref-space-sm);
+  background: var(--ref-color-black);
+  border-color: transparent;
+  border-radius: var(--radius-surface);
+  color: var(--text-inverse);
+}
+
+.mep-item--voting-config .ui-callout__icon,
+.mep-item--voting-config .ui-callout__title {
+  color: var(--ref-color-cyan-400);
+}
+
+.mep-item--voting-config .ui-callout__title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.mep-item--voting-config .ui-callout__text {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-inverse-secondary);
+}
+
+.mep-body[data-stage='voting'] .ev-next-step__primary {
+  align-self: stretch;
+  width: 100%;
+  padding: var(--ref-space-md) var(--ref-space-lg);
+  border-radius: var(--ref-radius-lg);
+  font-size: 15px;
+  font-weight: var(--ref-font-weight-bold);
+  text-align: center;
+}
+
+.mep-body[data-stage='voting'] .ev-next-step__primary:not(:disabled) {
+  background: var(--ref-color-violet-500);
+  color: var(--ref-color-white);
+}
+
+.mep-body[data-stage='voting'] .ev-next-step.ui-card {
+  gap: 14px;
+  padding: var(--ref-space-lx);
+  background: var(--ref-color-white);
+  border: 2px solid var(--ref-color-violet-500);
+  border-radius: var(--ref-radius-2xl);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ref-color-violet-500) 35%, transparent);
+}
+
+.mep-body[data-stage='voting'] .ev-next-step .ui-card__eyebrow {
+  font-family: var(--ref-font-family-mono);
+  font-size: var(--ref-font-size-2xs);
+  letter-spacing: 0.12em;
+  color: var(--ref-color-violet-700);
+}
+
+.mep-body[data-stage='voting'] .ev-next-step .ui-card__title {
+  font-size: var(--ref-font-size-xl);
+  font-weight: var(--ref-font-weight-extrabold);
+  letter-spacing: 0;
+}
+
+.mep-body[data-stage='voting'] .ev-next-step__description {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ref-color-gray-600);
 }
 
 /* Pausar como texto discreto */
@@ -279,7 +420,7 @@
 
 @media (min-width: 768px) {
   .mep-container {
-    padding: var(--space-padding-default);
+    padding: var(--space-padding-default) var(--layout-page-gutter);
   }
 
   .mep-notice:not(:empty) + .ev-stage-timeline--full {
@@ -288,6 +429,10 @@
 
   .mep-metrics {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .mep-metrics--voting {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .mep-metric-error {

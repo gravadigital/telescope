@@ -4,9 +4,9 @@
 }
 .ev-hero__inner {
   box-sizing: border-box;
-  max-width: 1200px;
+  max-width: calc(1200px + var(--layout-page-gutter) + var(--layout-page-gutter));
   margin: 0 auto;
-  padding: var(--ref-space-lg) var(--ref-space-md);
+  padding: var(--ref-space-lg) var(--layout-page-gutter) 96px;
   display: flex;
   flex-direction: column;
   gap: var(--ref-space-md);
@@ -65,7 +65,7 @@
 
 @media (min-width: 768px) {
   .ev-hero__inner {
-    padding: var(--ref-space-xl);
+    padding: var(--ref-space-xl) var(--layout-page-gutter) 96px;
   }
   .ev-hero__title {
     font: var(--type-display);

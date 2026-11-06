@@ -22,6 +22,7 @@ const setup = (progress: VotingProgress = missing, unevaluated?: number) => {
       open
       eventId="e-1"
       progress={progress}
+      votingDeadline="2026-12-27"
       unevaluated={unevaluated}
       onClose={onClose}
       onDone={onDone}
@@ -43,7 +44,11 @@ describe('PublishResultsDialog', () => {
       within(dialog).getByText('Se calcula el ranking final y queda visible para todos. Nadie podrá votar después.')
     ).toBeInTheDocument();
     expect(within(dialog).getByText('Faltan 3 de 4 rankings')).toBeInTheDocument();
+    expect(within(dialog).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1');
+    expect(within(dialog).getByRole('progressbar')).toHaveAttribute('aria-valuemax', '4');
     expect(within(dialog).getByText(/^Con pocos votos el resultado es menos confiable/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('timer')).toHaveAccessibleName(/LA VOTACIÓN CIERRA EN/);
+    expect(within(dialog).getByText(/27 dic 2026/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Seguir esperando' })).toHaveFocus();
     expect(screen.getByRole('button', { name: 'Publicar igual' })).toBeInTheDocument();
     // describedby = explicación + aviso

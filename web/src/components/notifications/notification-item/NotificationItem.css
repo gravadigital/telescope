@@ -57,6 +57,78 @@
   flex: none;
   color: var(--text-action);
 }
+
+/* Cuadrado de fondo del ícono según el tipo de notificación (44×44px, radio 12px). */
+.nt-item__icon--registration {
+  background: var(--notification-icon-registration-bg);
+}
+.nt-item__icon--voting {
+  background: var(--notification-icon-voting-bg);
+}
+.nt-item__icon--results {
+  background: var(--notification-icon-results-bg);
+}
+.nt-item__icon--myEvents {
+  background: var(--notification-icon-myEvents-bg);
+}
+
+.nt-item__icon--registration,
+.nt-item__icon--voting,
+.nt-item__icon--results,
+.nt-item__icon--myEvents {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--ref-radius-xl);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-inverse);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* Colores de fondo por símbolo (según diseño de referencia). */
+.nt-item__icon--symbol-plus {
+  background: var(--notification-icon-myEvents-bg);
+}
+.nt-item__icon--symbol-exclamation {
+  background: var(--notification-icon-registration-bg);
+}
+.nt-item__icon--symbol-arrow {
+  background: var(--notification-icon-voting-bg);
+}
+.nt-item__icon--symbol-check {
+  background: var(--notification-icon-results-bg);
+}
+
+/* Tag tipo píldora con el tipo de notificación. */
+.nt-item__tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: var(--ref-radius-full);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.nt-item__tag--registration {
+  background: var(--notification-tag-registration-bg);
+  color: var(--notification-tag-registration-fg);
+}
+.nt-item__tag--voting {
+  background: var(--notification-tag-voting-bg);
+  color: var(--notification-tag-voting-fg);
+}
+.nt-item__tag--results {
+  background: var(--notification-tag-results-bg);
+  color: var(--notification-tag-results-fg);
+}
+.nt-item__tag--myEvents {
+  background: var(--notification-tag-myEvents-bg);
+  color: var(--notification-tag-myEvents-fg);
+}
 .nt-item__content {
   display: flex;
   flex-direction: column;

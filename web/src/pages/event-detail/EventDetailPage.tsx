@@ -7,7 +7,6 @@ import StageTimeline from '../../components/events/stage-timeline/StageTimeline'
 import NextStepCard from '../../components/events/next-step-card/NextStepCard';
 import ProgressChecklist from '../../components/events/progress-checklist/ProgressChecklist';
 import ShareDialog from '../../components/events/share-dialog/ShareDialog';
-import ParticipantsDialog from '../../components/events/participants-dialog/ParticipantsDialog';
 import EventResults from '../../components/voting/event-results/EventResults';
 import SortableRankList from '../../components/voting/sortable-rank-list/SortableRankList';
 import Countdown from '../../components/events/countdown/Countdown';
@@ -17,7 +16,6 @@ import { ApiError, getErrorCode } from '../../config/api';
 import {
   COMMENT_MAX,
   SUCCESS_NOTICE_MS,
-  afterKey,
   capacityOf,
   detailPill,
   isRegistered,
@@ -85,7 +83,6 @@ const EventDetailPage: React.FC = () => {
   const [results, setResults] = React.useState<VotingResults | null>(null);
   const [openEvents, setOpenEvents] = React.useState(0);
   const [shareOpen, setShareOpen] = React.useState(false);
-  const [participantsOpen, setParticipantsOpen] = React.useState(false);
 
   // Acciones del bloque "Tu próximo paso".
   const [registering, setRegistering] = React.useState(false);
@@ -391,8 +388,8 @@ const EventDetailPage: React.FC = () => {
   ) as Record<EventStage, string>;
 
   const steps = progressSteps(state, event);
-  const after = afterKey(state, event.stage);
-  const canViewParticipants = userId !== null;
+  const hasAside =
+    state === 'vote' || state === 'rankingSent' || Boolean(steps) || (isResultsStage && openEvents > 0);
 
   const uploadText = (kind: 'upload' | 'submitted'): string =>
     deadlineText
@@ -580,17 +577,7 @@ const EventDetailPage: React.FC = () => {
         );
       case 'results':
         return (
-          <NextStepCard
-            title={t('eventDetail.nextStep.results.title')}
-            description={
-              results
-                ? t('eventDetail.nextStep.results.text', {
-                    participants: t('common.participants', { count: results.total_participants }),
-                    evaluations: t('results.evaluations', { count: results.total_votes }),
-                  })
-                : undefined
-            }
-          >
+          <>
             {assignment && ranking.completed && (
               <section className="edp-ranking-readonly">
                 <h3 className="edp-ranking-readonly__title">{t('ranking.readonlyTitle')}</h3>
@@ -604,43 +591,10 @@ const EventDetailPage: React.FC = () => {
               </section>
             )}
             <EventResults eventId={event.id} currentUserId={userId} onLoaded={setResults} />
-          </NextStepCard>
+          </>
         );
     }
   };
-
-  const detailRows: Array<{ label: string; value: React.ReactNode }> = [
-    { label: t('eventDetail.details.organizer'), value: event.organizer || '—' },
-  ];
-  if (isResultsStage && results) {
-    detailRows.push(
-      { label: t('eventDetail.details.evaluations'), value: fmt.number(results.total_votes) },
-      { label: t('eventDetail.details.finished'), value: fmt.date(results.calculated_at.slice(0, 10)) }
-    );
-  } else if (deadlineText && (event.stage === 'participation' || event.stage === 'voting')) {
-    detailRows.push({
-      label: t('eventDetail.details.closes', { stage: stageLabels[event.stage] }),
-      value: deadlineText,
-    });
-  }
-  detailRows.push({
-    label: t('eventDetail.details.participants'),
-    value: (
-      <span className="edp-details__participants">
-        <span>{t('eventDetail.details.participantsValue', { count: participantCount, max: capacity })}</span>
-        {canViewParticipants && (
-          <Button
-            variant="tertiary"
-            size="sm"
-            aria-label={t('eventDetail.details.viewAccessible')}
-            onClick={() => setParticipantsOpen(true)}
-          >
-            {t('eventDetail.details.view')}
-          </Button>
-        )}
-      </span>
-    ),
-  });
 
   const countdownScope = event.stage === 'voting' ? 'voting' : 'registration';
   const countdown = deadline ? (
@@ -691,20 +645,24 @@ const EventDetailPage: React.FC = () => {
           summaryDetail={deadlineText ? t('eventDetail.timeline.closes', { date: deadlineText }) : undefined}
         />
 
-        <div className="edp-body">
+        <div className={`edp-body${event.stage === 'voting' ? ' edp-body--voting' : ''}`}>
           <div className="edp-main">
             <div className="edp-item edp-item--next">{nextStep()}</div>
-            <section className="edp-item edp-item--about edp-about">
-              <h2 className="edp-about__title">{t('eventDetail.about')}</h2>
-              <p className="edp-about__text">{event.description}</p>
-            </section>
           </div>
 
-          <aside className="edp-aside" aria-label={t('eventDetail.details.title')}>
+          {hasAside && <aside className="edp-aside" aria-label={t('eventDetail.progress.title')}>
+            {(state === 'vote' || state === 'rankingSent') && (
+              <div className="edp-item edp-item--how">
+                <Callout tone="info" title={t('eventDetail.howVoteCounts.title')}>
+                  {t('eventDetail.howVoteCounts.text')}
+                </Callout>
+              </div>
+            )}
             {steps && (
               <div className="edp-item edp-item--progress">
                 <ProgressChecklist
                   title={t('eventDetail.progress.title')}
+                  headingLevel={event.stage === 'voting' ? 4 : 2}
                   doneLabel={t('eventDetail.progress.done')}
                   steps={steps.map((step) => ({
                     label: t(step.labelKey),
@@ -714,53 +672,22 @@ const EventDetailPage: React.FC = () => {
                 />
               </div>
             )}
-            {(state === 'vote' || state === 'rankingSent') && (
-              <div className="edp-item edp-item--how">
-                <Callout tone="info" title={t('eventDetail.howVoteCounts.title')}>
-                  {t('eventDetail.howVoteCounts.text')}
-                </Callout>
-              </div>
-            )}
-            <div className="edp-item edp-item--details">
-              <Card title={t('eventDetail.details.title')}>
-                <dl className="edp-details">
-                  {detailRows.map((row) => (
-                    <div key={row.label} className="edp-details__row">
-                      <dt className="edp-details__label">{row.label}</dt>
-                      <dd className="edp-details__value">{row.value}</dd>
-                    </div>
-                  ))}
-                </dl>
+            {isResultsStage && openEvents > 0 && (
+              <Card variant="feature" padding="compact" className="edp-item edp-item--open-events edp-open-events">
+                <p className="edp-open-events__text">
+                  {t('eventDetail.openEvents.text', {
+                    count: openEvents,
+                    formattedCount: fmt.number(openEvents),
+                  })}
+                </p>
+                <Link to="/events" className="ui-button ui-button--secondary edp-open-events__link">
+                  {t('eventDetail.openEvents.cta')}
+                </Link>
               </Card>
-            </div>
-            {after && (
-              <div className="edp-item edp-item--after">
-                <Callout tone="info" title={t('eventDetail.after.title')}>
-                  {t(after)}
-                </Callout>
-              </div>
             )}
-          </aside>
+          </aside>}
         </div>
 
-        {isResultsStage && openEvents > 0 && (
-          <div className="edp-banner">
-            <Card variant="feature" eyebrow={t('eventDetail.banner.title')} className="edp-banner__card">
-              <p className="edp-banner__text">{t('eventDetail.banner.text', { count: openEvents })}</p>
-              {!user && <p className="edp-banner__text">{t('eventDetail.banner.guest')}</p>}
-            </Card>
-            <div className="edp-banner__actions">
-              <Link to="/events" className="ui-button ui-button--primary ui-button--md ui-button--full">
-                {t('eventDetail.banner.cta')}
-              </Link>
-              {!user && (
-                <Link to="/register" className="ui-button ui-button--secondary ui-button--md ui-button--full">
-                  {t('eventDetail.banner.createAccount')}
-                </Link>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       <ShareDialog
@@ -770,15 +697,6 @@ const EventDetailPage: React.FC = () => {
         stage={event.stage}
         onClose={() => setShareOpen(false)}
       />
-      {canViewParticipants && (
-        <ParticipantsDialog
-          open={participantsOpen}
-          eventId={event.id}
-          count={participantCount}
-          max={capacity}
-          onClose={() => setParticipantsOpen(false)}
-        />
-      )}
     </div>
   );
 };

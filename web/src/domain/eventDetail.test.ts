@@ -3,6 +3,8 @@ import {
   afterKey,
   capacityOf,
   detailPill,
+  INSTAGRAM_FALLBACK_MS,
+  instagramShareLinks,
   isRegistered,
   nextStepState,
   progressSteps,
@@ -143,8 +145,16 @@ describe('progressSteps', () => {
       { labelKey: 'eventDetail.progress.results', status: 'pending' },
     ]);
     expect(progressSteps('submitted', ev, now)?.[1]).toMatchObject({ detailKey: 'eventDetail.progress.sent', status: 'done' });
-    expect(progressSteps('vote', ev, now)?.[2]).toMatchObject({ detailKey: 'eventDetail.progress.pending', status: 'current' });
-    expect(progressSteps('rankingSent', ev, now)?.[2]).toMatchObject({ detailKey: 'eventDetail.progress.voteSent', status: 'done' });
+    expect(progressSteps('vote', ev, now)).toEqual([
+      { labelKey: 'eventDetail.progress.proposalSent', status: 'done' },
+      { labelKey: 'eventDetail.progress.sendRanking', status: 'current' },
+      { labelKey: 'eventDetail.progress.results', status: 'pending' },
+    ]);
+    expect(progressSteps('rankingSent', ev, now)).toEqual([
+      { labelKey: 'eventDetail.progress.proposalSent', status: 'done' },
+      { labelKey: 'eventDetail.progress.sendRanking', status: 'done' },
+      { labelKey: 'eventDetail.progress.results', status: 'pending' },
+    ]);
     expect(progressSteps('default', ev, now)).toBeNull();
     expect(progressSteps('results', ev, now)).toBeNull();
   });
@@ -187,14 +197,39 @@ describe('compartir', () => {
   it('TS-12 enlaces de redes', () => {
     expect(shareUrl('https://telescopio.app', 'e-1')).toBe('https://telescopio.app/events/e-1');
     const links = shareLinks('https://telescopio.app/events/e-1', 'Concurso de afiches');
-    expect(links.map(l => l.network)).toEqual(['whatsapp', 'x', 'linkedin', 'facebook', 'email']);
+    expect(links.map(l => l.network)).toEqual(['whatsapp', 'x', 'linkedin', 'facebook', 'instagram', 'email']);
     expect(links.map(l => l.href)).toEqual([
       'https://wa.me/?text=Concurso%20de%20afiches%0Ahttps%3A%2F%2Ftelescopio.app%2Fevents%2Fe-1',
       'https://twitter.com/intent/tweet?text=Concurso%20de%20afiches&url=https%3A%2F%2Ftelescopio.app%2Fevents%2Fe-1',
       'https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Ftelescopio.app%2Fevents%2Fe-1',
       'https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Ftelescopio.app%2Fevents%2Fe-1',
+      'https://www.instagram.com/direct/inbox/',
       'mailto:?subject=Concurso%20de%20afiches&body=https%3A%2F%2Ftelescopio.app%2Fevents%2Fe-1',
     ]);
+  });
+
+  it('TS-12 Instagram: intent en Android, sharesheet en iOS, web en desktop', () => {
+    const url = 'https://telescopio.app/events/e-1';
+    const android = instagramShareLinks('Mozilla/5.0 (Linux; Android 14)', url);
+    expect(android.primary).toBe(
+      'intent://#Intent;action=android.intent.action.SEND;type=text/plain;' +
+        `S.android.intent.extra.TEXT=${url};package=com.instagram.android;end`
+    );
+    expect(android.fallback).toBe('instagram://direct');
+    const iPhone = instagramShareLinks(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+      url
+    );
+    expect(iPhone.primary).toBe(`instagram://sharesheet?text=${encodeURIComponent(url)}`);
+    expect(iPhone.fallback).toBe('instagram://direct');
+    const desktop = instagramShareLinks(
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      url
+    );
+    expect(desktop.primary).toBe('https://www.instagram.com/direct/inbox/');
+    expect(desktop.fallback).toBe(desktop.primary);
+    expect(instagramShareLinks('', url).primary).toBe('https://www.instagram.com/direct/inbox/');
+    expect(INSTAGRAM_FALLBACK_MS).toBeGreaterThan(0);
   });
 
   it('TS-13 textos por etapa', () => {

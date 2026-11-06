@@ -12,9 +12,9 @@
   justify-content: center;
   gap: var(--ref-space-sm);
   min-height: 120px;
-  padding: var(--ref-space-md);
+  padding: var(--ref-space-2xl);
   background: var(--file-dropzone-bg);
-  border: 1px dashed var(--file-dropzone-border);
+  border: 2px dashed var(--file-dropzone-border);
   border-radius: var(--file-dropzone-radius);
   text-align: center;
 }
@@ -44,10 +44,20 @@
 .ui-file-dropzone__zone--disabled .ui-file-dropzone__label {
   cursor: not-allowed;
 }
+.ui-file-dropzone__icon-frame {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border: 1px solid var(--ref-color-violet-300);
+  border-radius: 50%;
+  background: var(--bg-surface);
+  color: var(--ref-color-violet-500);
+}
 .ui-file-dropzone__icon {
-  width: 32px;
-  height: 32px;
-  color: var(--text-muted);
+  width: 26px;
+  height: 26px;
+  stroke-width: 2.25;
 }
 .ui-file-dropzone__action {
   color: var(--text-action);

@@ -4,6 +4,83 @@
   color: var(--text-primary);
 }
 
+.ev-publish-results__countdown {
+  padding: var(--ref-space-sm);
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+}
+
+.ev-publish-results__countdown .ev-countdown {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'title boxes'
+    'footer boxes';
+  align-items: center;
+  gap: var(--ref-space-xs) var(--ref-space-sm);
+}
+
+.ev-publish-results__countdown .ev-countdown__title {
+  grid-area: title;
+  font-size: 10px;
+  line-height: 1.25;
+  letter-spacing: 0.08em;
+  color: var(--ref-color-violet-700);
+}
+
+.ev-publish-results__countdown .ev-countdown__boxes {
+  grid-area: boxes;
+  gap: var(--ref-space-xs);
+}
+
+.ev-publish-results__countdown .ev-countdown__box {
+  min-width: 36px;
+  gap: 2px;
+  padding: 5px 3px;
+  background: var(--bg-surface);
+  border-color: var(--border-default);
+  border-radius: var(--ref-radius-xs);
+}
+
+.ev-publish-results__countdown .ev-countdown__value {
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.ev-publish-results__countdown .ev-countdown__unit {
+  font-size: 8px;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+
+.ev-publish-results__countdown .ev-countdown__footer {
+  grid-area: footer;
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--text-secondary);
+}
+
+.ev-publish-results__countdown .ev-countdown__expired {
+  grid-area: title;
+  font-size: var(--ref-font-size-2xs);
+  color: var(--text-error);
+}
+
+.ev-publish-results__missing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ref-space-xs);
+}
+
+.ev-publish-results__missing .ui-progress-bar__track {
+  background: var(--border-warning-subtle);
+}
+
+.ev-publish-results__missing-text {
+  margin: 0;
+}
+
 /* Mobile: apiladas con la principal arriba (sin cambiar el orden del DOM ni el foco inicial). */
 .ev-publish-results__actions {
   display: flex;

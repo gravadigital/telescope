@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Button from '../../ui/button/Button';
 import Menu from '../../ui/menu/Menu';
 import { MenuIcon, TelescopeLogo } from '../../ui/icons/Icons';
@@ -18,12 +18,18 @@ const AppHeader: React.FC = () => {
   const { t, locale, setLocale } = useT();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const destinations = [
     { id: 'home', to: '/', label: t('nav.home') },
     { id: 'events', to: '/events', label: t('nav.events') },
     { id: 'how-it-works', to: HOW_IT_WORKS_PATH, label: t('nav.howItWorks') },
   ];
+  const isActive = (id: string): boolean => {
+    if (id === 'home') return location.pathname === '/' && !location.hash;
+    if (id === 'events') return location.pathname.startsWith('/events');
+    return location.pathname === '/' && location.hash === '#como-funciona';
+  };
 
   return (
     <header className="ly-header">
@@ -70,7 +76,12 @@ const AppHeader: React.FC = () => {
 
         <nav aria-label={t('nav.mainNav')} className="ly-header__links">
           {destinations.map((d) => (
-            <Link key={d.id} to={d.to} className="ly-header__link">
+            <Link
+              key={d.id}
+              to={d.to}
+              className={`ly-header__link${isActive(d.id) ? ' ly-header__link--active' : ''}`}
+              aria-current={isActive(d.id) ? 'page' : undefined}
+            >
               {d.label}
             </Link>
           ))}
@@ -88,15 +99,15 @@ const AppHeader: React.FC = () => {
               </>
             ) : (
               <>
-                <LanguageSelect />
                 <div className="ly-header__auth">
                   <Link to="/login" className="ui-button ui-button--sm ui-button--on-band ly-header__auth-link ly-header__auth-link--login">
                     {t('nav.login')}
                   </Link>
-                  <Link to="/register" className="ui-button ui-button--sm ui-button--on-band ly-header__auth-link ly-header__auth-link--register">
+                  <Link to="/register" className="ui-button ui-button--sm ui-button--primary ly-header__auth-link ly-header__auth-link--register">
                     {t('nav.register')}
                   </Link>
                 </div>
+                <LanguageSelect />
               </>
             )}
           </div>

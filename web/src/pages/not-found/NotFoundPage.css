@@ -1,7 +1,9 @@
 .nf-page {
+  box-sizing: border-box;
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: var(--space-padding-default) var(--space-padding-compact);
+  padding: var(--space-padding-default) var(--layout-page-gutter);
 }
 .nf-page__column {
   display: flex;

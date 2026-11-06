@@ -98,6 +98,28 @@ describe('EventsListPage', () => {
     expect(screen.getByRole('table')).toBeInTheDocument();
   });
 
+  it('ordena Todos por etapa y conserva el orden de cada etapa', async () => {
+    listEvents.mockResolvedValue(page([
+      listItem({ id: 'r1', name: 'Resultado 1', stage: 'results' }),
+      listItem({ id: 'v1', name: 'Votación 1', stage: 'voting' }),
+      listItem({ id: 'p1', name: 'Inscripción 1', stage: 'participation' }),
+      listItem({ id: 'r2', name: 'Resultado 2', stage: 'results' }),
+      listItem({ id: 'p2', name: 'Inscripción 2', stage: 'participation' }),
+    ]));
+    renderWithProviders(<EventsListPage />, { route: '/events', auth: guest });
+    await settle();
+
+    const table = screen.getByRole('table');
+    const eventRows = within(table).getAllByRole('row').slice(1);
+    expect(eventRows.map((row) => within(row).getAllByRole('cell')[0].textContent)).toEqual([
+      'Inscripción 1Diseña el afiche del festival',
+      'Inscripción 2Diseña el afiche del festival',
+      'Votación 1Diseña el afiche del festival',
+      'Resultado 1Diseña el afiche del festival',
+      'Resultado 2Diseña el afiche del festival',
+    ]);
+  });
+
   it('TS-37: filtro por etapa', async () => {
     renderWithProviders(<EventsListPage />, { route: '/events', auth: signedIn });
     await settle();
@@ -205,6 +227,7 @@ describe('EventsListPage', () => {
     expect(screen.queryByRole('heading', { name: /Tus pendientes/ })).toBeNull();
     expect(screen.getByRole('heading', { level: 2, name: 'Cómo participar' })).toBeInTheDocument();
     expect(screen.getByText('Elige un evento con inscripción abierta')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ver demo' })).toHaveAttribute('href', '/');
     const create = screen.getByRole('link', { name: 'Crear un evento' });
     expect(create).toHaveClass('ui-button--secondary');
     expect(create).toHaveAttribute('href', '/login?next=%2Fevents%2Fcreate');
@@ -283,6 +306,7 @@ describe('EventsListPage', () => {
     expect(media).toMatch(/\.evl-pending__list\s*\{[^}]*repeat\(2, 1fr\)/);
     expect(media).toMatch(/\.evl-header\s*\{[^}]*9fr 3fr/);
     expect(media).toMatch(/\.evl-banner[^{]*\{[^}]*9fr 3fr/);
+    expect(css).toMatch(/\.evl-banner\.ui-card\s*\{[^}]*background:\s*var\(--bg-action-primary\)/);
     expect(base).toMatch(/\.evl-results \.ui-data-table tbody\s*\{[^}]*display:\s*grid/);
     expect(base).toMatch(/\.evl-results \.ui-data-table__row\s*\{[^}]*border-radius:/);
     expect(media).toMatch(/\.evl-results \.ui-data-table tbody\s*\{[^}]*display:\s*table-row-group/);

@@ -41,23 +41,23 @@ const results: VotingResults = {
   calculated_at: '2026-10-04T18:00:00Z',
 };
 
-const NOTE =
-  'El puntaje combina los rankings de todos los participantes, en una escala de 0 a 10. La propuesta de quien ordenó parecido al ranking general sube posiciones; la de quien se alejó mucho o no envió su ranking, baja.';
-
 describe('EventResults', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
-  it('TS-46: podio, tabla, nota y onLoaded', async () => {
+  it('TS-46: ranking final lista, stats y onLoaded', async () => {
     getResults.mockResolvedValue(results);
     const onLoaded = jest.fn();
     renderWithProviders(<EventResults eventId="e-1" currentUserId="u-1" onLoaded={onLoaded} />);
     expect(screen.getByRole('status')).toHaveTextContent('Cargando resultados…');
-    expect(await screen.findByRole('list', { name: 'Podio' })).toBeInTheDocument();
-    expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(3);
-    expect(screen.getByText(NOTE)).toBeInTheDocument();
+    expect(await screen.findByText('Ranking final')).toBeInTheDocument();
+    expect(screen.getByText('5 participantes · 12 evaluaciones')).toBeInTheDocument();
+    const ranking = screen.getByRole('list', { name: 'Ranking final' });
+    const items = await within(ranking).findAllByRole('listitem');
+    expect(items).toHaveLength(5);
+    expect(screen.queryByText(/El puntaje combina/)).not.toBeInTheDocument();
     expect(onLoaded).toHaveBeenCalledWith(results);
   });
 
@@ -78,8 +78,6 @@ describe('EventResults', () => {
       screen.getByText('Esta propuesta no recibió ninguna evaluación, así que no tiene posición en el ranking.')
     ).toBeInTheDocument();
     expect(screen.getByText('Ana Pérez · nube.pdf (Tú)')).toBeInTheDocument();
-    expect(within(screen.getByRole('table')).queryByText('nube.pdf')).not.toBeInTheDocument();
-    expect(within(screen.getByRole('list', { name: 'Podio' })).queryByText(/nube\.pdf/)).not.toBeInTheDocument();
   });
 
   it('TS-47: sin resultados no es un error y nunca recalcula', async () => {
@@ -88,8 +86,7 @@ describe('EventResults', () => {
     );
     const { unmount } = renderWithProviders(<EventResults eventId="e-1" currentUserId={null} />);
     expect(await screen.findByText('Los resultados todavía no están disponibles.')).toBeInTheDocument();
-    expect(screen.queryByRole('list', { name: 'Podio' })).toBeNull();
-    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByRole('list')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
     unmount();
 
@@ -104,24 +101,25 @@ describe('EventResults', () => {
     renderWithProviders(<EventResults eventId="e-1" currentUserId={null} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cargar los resultados.');
     userEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
-    expect(await screen.findByRole('list', { name: 'Podio' })).toBeInTheDocument();
+    expect(await screen.findByText('Ranking final')).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/pesa|weight/i);
   });
 
-  it('solo podio cuando hay 3 o menos propuestas', async () => {
-    getResults.mockResolvedValue({ ...results, adjusted_ranking: results.adjusted_ranking.slice(1, 3) });
+  it('solo ranking cuando hay 3 o menos propuestas', async () => {
+    getResults.mockResolvedValue({ ...results, adjusted_ranking: results.adjusted_ranking.slice(0, 3) });
     renderWithProviders(<EventResults eventId="e-1" currentUserId={null} />);
-    expect(await screen.findByRole('list', { name: 'Podio' })).toBeInTheDocument();
-    expect(screen.queryByRole('table')).toBeNull();
+    expect(await screen.findByText('Ranking final')).toBeInTheDocument();
+    const items = await screen.findAllByRole('listitem');
+    expect(items).toHaveLength(3);
   });
 
-  it('TS-29: con recalculateIfMissing recalcula una vez y muestra el podio', async () => {
+  it('TS-29: con recalculateIfMissing recalcula una vez y muestra el ranking', async () => {
     getResults.mockRejectedValue(
       new ApiError({ status: 404, body: { error: 'RESULTS_NOT_CALCULATED', message: 'x' } })
     );
     recalculate.mockResolvedValue({ ...results, adjusted_ranking: results.adjusted_ranking.slice(0, 3) });
     renderWithProviders(<EventResults eventId="e-1" currentUserId={null} recalculateIfMissing />);
-    expect(await screen.findByRole('list', { name: 'Podio' })).toBeInTheDocument();
+    expect(await screen.findByText('Ranking final')).toBeInTheDocument();
     expect(recalculate).toHaveBeenCalledTimes(1);
     expect(recalculate).toHaveBeenCalledWith('e-1');
     expect(screen.queryByText('Los resultados todavía no están disponibles.')).toBeNull();

@@ -1,7 +1,5 @@
 import React from 'react';
-import { Callout } from '../../ui';
-import Podium from '../podium/Podium';
-import RankingList from '../ranking-list/RankingList';
+import { Callout, Card, StatusPill } from '../../ui';
 import { getErrorCode } from '../../../config/api';
 import { splitResults } from '../../../domain/eventDetail';
 import { useT } from '../../../i18n';
@@ -37,7 +35,7 @@ const EventResults: React.FC<EventResultsProps> = ({
   onLoaded,
   recalculateIfMissing = false,
 }) => {
-  const { t } = useT();
+  const { t, fmt } = useT();
   const [state, setState] = React.useState<State>({ status: 'loading' });
   const [attempt, setAttempt] = React.useState(0);
   const onLoadedRef = React.useRef(onLoaded);
@@ -108,10 +106,38 @@ const EventResults: React.FC<EventResultsProps> = ({
   }
 
   const { podium, rest, unevaluated } = splitResults(state.results.adjusted_ranking);
+  const allEntries = [...podium, ...rest];
   return (
-    <div className="vt-event-results">
-      <Podium entries={podium} currentUserId={currentUserId} />
-      {rest.length > 0 && <RankingList entries={rest} currentUserId={currentUserId} />}
+    <Card as="article" padding="compact" className="vt-event-results">
+      <div className="vt-event-results__header">
+        <h2 className="vt-event-results__title">{t('results.rankingFinal')}</h2>
+        <p className="vt-event-results__stats">
+          {t('results.stats', {
+            participants: state.results.total_participants,
+            evaluations: t('results.evaluations', { count: state.results.total_votes }),
+          })}
+        </p>
+      </div>
+      <ol className="vt-event-results__list" aria-label={t('results.rankingFinal')}>
+        {allEntries.map((entry, index) => {
+          const position = index + 1;
+          const isYou = currentUserId !== null && entry.participant_id === currentUserId;
+          return (
+            <li key={entry.attachment_id} className={`vt-event-results__item${isYou ? ' vt-event-results__item--you' : ''}`}>
+              <span className="vt-event-results__position">{position}</span>
+              <span className="vt-event-results__name">
+                {entry.participant_name || '—'}
+                {isYou && (
+                  <StatusPill tone="action" size="sm">
+                    {t('results.you')}
+                  </StatusPill>
+                )}
+              </span>
+              <span className="vt-event-results__score">{t('common.points', { score: fmt.score(entry.mbc_score) })}</span>
+            </li>
+          );
+        })}
+      </ol>
       {unevaluated.length > 0 && (
         <Callout tone="info" title={t('results.unevaluated.title')}>
           <p className="vt-event-results__unevaluated-text">
@@ -127,8 +153,7 @@ const EventResults: React.FC<EventResultsProps> = ({
           </ul>
         </Callout>
       )}
-      <p className="vt-event-results__note">{t('results.note')}</p>
-    </div>
+    </Card>
   );
 };
 

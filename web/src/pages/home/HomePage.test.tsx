@@ -174,6 +174,7 @@ describe('HomePage', () => {
     expect(media).toMatch(/\.hm-steps\s*\{[^}]*repeat\(4, 1fr\)/);
     expect(media).toMatch(/\.hm-open__list\s*\{[^}]*repeat\(3, minmax\(0, 1fr\)\)/);
     expect(media).toMatch(/\.hm-banner\s*\{[^}]*9fr 3fr/);
+    expect(media).toMatch(/\.hm-page > :not\(\.hm-hero\)\s*\{[^}]*2 \* var\(--layout-page-gutter\)/);
     expect(css).not.toMatch(/@media[^{]*max-width/);
   });
 

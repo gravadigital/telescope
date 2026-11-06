@@ -163,15 +163,9 @@ describe('EventDetailPage', () => {
       expect(screen.getByText('Imagen o documento')).toBeInTheDocument();
       expect(screen.getByText('Máx. 10 MB')).toBeInTheDocument();
       expect(screen.getByText('Cierre: 10 oct 2026')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { level: 2, name: 'Sobre el evento' })).toBeInTheDocument();
-      expect(screen.getByText('Diseña el afiche del festival de primavera.')).toBeInTheDocument();
-      const aside = screen.getByRole('complementary');
-      expect(within(aside).getByRole('heading', { level: 2, name: 'Detalles' })).toBeInTheDocument();
-      expect(within(aside).getByText('Club de Diseño')).toBeInTheDocument();
-      expect(within(aside).getByText('Cierre de Participación')).toBeInTheDocument();
-      expect(within(aside).getByText('4 / 20')).toBeInTheDocument();
-      expect(within(aside).getByText('Después')).toBeInTheDocument();
-      expect(within(aside).getByText(/Al cerrar la inscripción, el organizador abre la votación/)).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { level: 2, name: 'Sobre el evento' })).toBeNull();
+      expect(screen.queryByText('Diseña el afiche del festival de primavera.')).toBeNull();
+      expect(screen.queryByRole('complementary')).toBeNull();
       expect(screen.queryByText('Tu progreso')).toBeNull();
       expect(screen.queryByRole('button', { name: 'Ver participantes' })).toBeNull();
       const current = screen.getByRole('listitem', { current: 'step' });
@@ -224,21 +218,9 @@ describe('EventDetailPage', () => {
       expect(await screen.findByRole('heading', { level: 1, name: 'Concurso de afiches' })).toBeInTheDocument();
     });
 
-    it('TS-75: diálogos de participantes y de compartir', async () => {
-      getParticipants.mockResolvedValue([
-        { id: 'u-2', name: 'Bruno Ríos', email: 'b@x.com', role: 'participant', created_at: '2026-10-02T10:00:00Z' },
-      ]);
+    it('TS-75: diálogo de compartir', async () => {
       renderPage(signedIn());
       await loaded();
-      const view = screen.getByRole('button', { name: 'Ver participantes' });
-      userEvent.click(view);
-      const dialog = await screen.findByRole('dialog', { name: 'Participantes · 4 / 20' });
-      expect(await within(dialog).findByText('Bruno Ríos')).toBeInTheDocument();
-      expect(getParticipants).toHaveBeenCalledWith('e-1');
-      userEvent.keyboard('{esc}');
-      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-      expect(view).toHaveFocus();
-
       userEvent.click(screen.getByRole('button', { name: 'Compartir' }));
       const share = await screen.findByRole('dialog', { name: 'Concurso de afiches' });
       expect(within(share).getByRole('button', { name: 'Copiar' })).toHaveFocus();
@@ -258,7 +240,7 @@ describe('EventDetailPage', () => {
       expect(screen.getByRole('link', { name: '← Events' })).toBeInTheDocument();
       expect(screen.getByRole('heading', { level: 2, name: 'Sign up to take part' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Sign up for the event' })).toBeInTheDocument();
-      expect(screen.getByRole('heading', { level: 2, name: 'Details' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { level: 2, name: 'Details' })).toBeNull();
       expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
     });
 
@@ -266,7 +248,7 @@ describe('EventDetailPage', () => {
       getEvent.mockResolvedValue(registeredEv);
       renderPage(signedIn());
       const next = (await screen.findByRole('heading', { level: 2, name: 'Sube tu propuesta' })).closest('section')!;
-      ['Tu progreso', 'Sobre el evento', 'Detalles', 'Después'].forEach((name) => {
+      ['Tu progreso'].forEach((name) => {
         const other = screen.getByText(name);
         expect(next.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       });
@@ -525,7 +507,7 @@ describe('EventDetailPage', () => {
       expect(await screen.findByRole('heading', { level: 2, name: 'El cupo está completo' })).toBeInTheDocument();
       expect(screen.getByText('No quedan lugares en este evento.')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Inscribirme al evento' })).toBeNull();
-      expect(within(screen.getByRole('complementary')).getByText('20 / 20')).toBeInTheDocument();
+      expect(screen.getByText('Organiza Club de Diseño · 20 de 20 participantes')).toBeInTheDocument();
     });
   });
 
@@ -547,7 +529,7 @@ describe('EventDetailPage', () => {
       expect(screen.getByText(/No subiste una propuesta durante la inscripción/)).toBeInTheDocument();
       expect(screen.queryByRole('list', { name: 'Tu ranking de propuestas' })).toBeNull();
       expect(getDraft).not.toHaveBeenCalled();
-      expect(screen.getByText('Al cerrar la votación se publica el ranking final para todos.')).toBeInTheDocument();
+      expect(screen.queryByText('Al cerrar la votación se publica el ranking final para todos.')).toBeNull();
     });
 
     it('TS-65: sin inscripción', async () => {
@@ -557,7 +539,7 @@ describe('EventDetailPage', () => {
       expect(screen.getByText('LA VOTACIÓN CIERRA EN')).toBeInTheDocument();
       expect(screen.getByRole('timer')).toBeInTheDocument();
       expect(screen.getByText(/Los participantes están evaluando las propuestas/)).toBeInTheDocument();
-      expect(screen.getByText(/Al cerrar la votación se publica el ranking final/)).toBeInTheDocument();
+      expect(screen.queryByText(/Al cerrar la votación se publica el ranking final/)).toBeNull();
       first.unmount();
       renderPage(signedIn());
       expect(await screen.findByRole('heading', { level: 2, name: 'La votación está en curso' })).toBeInTheDocument();
@@ -586,9 +568,16 @@ describe('EventDetailPage', () => {
       expect(screen.getByRole('list', { name: 'Tu ranking de propuestas' })).toBeInTheDocument();
       const aside = screen.getByRole('complementary');
       expect(within(aside).getByText('¿Cómo cuenta tu voto?')).toBeInTheDocument();
-      expect(within(aside).getByText(/como lo haría un jurado imparcial/)).toBeInTheDocument();
-      const progress = within(aside).getByRole('heading', { level: 2, name: 'Tu progreso' }).closest('section')!;
-      expect(within(progress).getByText('Pendiente')).toBeInTheDocument();
+      expect(within(aside).getByText(/Cuanto más coherente y honesto, más influye en el resultado final/)).toBeInTheDocument();
+      const progress = within(aside).getByRole('heading', { level: 4, name: 'Tu progreso' }).closest('section')!;
+      expect(within(progress).getByText('Propuesta enviada')).toBeInTheDocument();
+      expect(within(progress).getByText('Enviar ranking')).toBeInTheDocument();
+      expect(within(progress).getByText('Ver resultados')).toBeInTheDocument();
+      expect(within(progress).queryByText('Inscripción')).toBeNull();
+      expect(within(progress).getByText('Enviar ranking').closest('li')).toHaveAttribute('aria-current', 'step');
+      expect(within(aside).queryByRole('heading', { level: 2, name: 'Detalles' })).toBeNull();
+      const how = within(aside).getByText('¿Cómo cuenta tu voto?').closest('.edp-item')!;
+      expect(how.compareDocumentPosition(progress) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       first.unmount();
 
       getAssignment.mockResolvedValue({ ...assignment, is_completed: true });
@@ -719,8 +708,8 @@ describe('EventDetailPage', () => {
       expect(screen.getByRole('heading', { level: 2, name: 'Tu ranking está enviado' })).toBeInTheDocument();
       expect(screen.getByText('Ranking enviado')).toBeInTheDocument();
       const aside = screen.getByRole('complementary');
-      const progress = within(aside).getByRole('heading', { level: 2, name: 'Tu progreso' }).closest('section')!;
-      expect(within(progress).getByText('Enviado')).toBeInTheDocument();
+      const progress = within(aside).getByRole('heading', { level: 4, name: 'Tu progreso' }).closest('section')!;
+      expect(within(progress).getByText('Enviar ranking')).toBeInTheDocument();
       const resend = screen.getByRole('button', { name: 'Reenviar mi ranking' });
       expect(resend).toHaveClass('ui-button--secondary');
       expect(resend).toBeDisabled();
@@ -858,8 +847,8 @@ describe('EventDetailPage', () => {
       expect(titles()).toEqual(['Propuesta 2', 'Propuesta 3', 'Propuesta 1']);
       expect(screen.queryByRole('button', { name: /^(Subir|Bajar)/ })).toBeNull();
       expect(screen.queryByRole('button', { name: /ranking$/ })).toBeNull();
-      const podium = await screen.findByRole('list', { name: 'Podio' });
-      expect(heading.compareDocumentPosition(podium) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      const ranking = await screen.findByRole('list', { name: 'Ranking final' });
+      expect(heading.compareDocumentPosition(ranking) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(saveDraft).not.toHaveBeenCalled();
     });
 
@@ -867,13 +856,13 @@ describe('EventDetailPage', () => {
       getEvent.mockResolvedValue(resultsEv);
       getAssignment.mockResolvedValue({ ...A, is_completed: false });
       const first = renderPage(signedIn());
-      await screen.findByRole('list', { name: 'Podio' });
+      await screen.findByRole('list', { name: 'Ranking final' });
       expect(screen.queryByRole('heading', { name: 'Tu ranking' })).toBeNull();
       first.unmount();
 
       getAssignment.mockResolvedValue(null);
       renderPage(signedIn());
-      await screen.findByRole('list', { name: 'Podio' });
+      await screen.findByRole('list', { name: 'Ranking final' });
       expect(screen.queryByRole('heading', { name: 'Tu ranking' })).toBeNull();
     });
 
@@ -881,7 +870,7 @@ describe('EventDetailPage', () => {
       getEvent.mockResolvedValue(resultsEv);
       getAssignment.mockRejectedValue(new TypeError('Failed to fetch'));
       renderPage(signedIn());
-      await screen.findByRole('list', { name: 'Podio' });
+      await screen.findByRole('list', { name: 'Ranking final' });
       expect(screen.queryByRole('heading', { name: 'Tu ranking' })).toBeNull();
       expect(screen.queryByRole('alert')).toBeNull();
     });
@@ -889,11 +878,11 @@ describe('EventDetailPage', () => {
     it('TS-42: visitante o no inscripto no piden la asignación', async () => {
       getEvent.mockResolvedValue(resultsEv);
       const first = renderPage(guest);
-      await screen.findByRole('list', { name: 'Podio' });
+      await screen.findByRole('list', { name: 'Ranking final' });
       first.unmount();
       getEvent.mockResolvedValue({ ...resultsEv, participant_ids: ['u-2'] });
       renderPage(signedIn());
-      await screen.findByRole('list', { name: 'Podio' });
+      await screen.findByRole('list', { name: 'Ranking final' });
       expect(getAssignment).not.toHaveBeenCalled();
     });
 
@@ -902,7 +891,7 @@ describe('EventDetailPage', () => {
       await ready();
       const aside = screen.getByRole('complementary');
       expect(within(aside).getByText('¿Cómo cuenta tu voto?')).toBeInTheDocument();
-      expect(within(aside).getByText(/como lo haría un jurado imparcial/)).toBeInTheDocument();
+      expect(within(aside).getByText(/Cuanto más coherente y honesto/)).toBeInTheDocument();
       expect(aside.textContent).not.toMatch(/pese más|pesa más/);
     });
 
@@ -936,34 +925,50 @@ describe('EventDetailPage', () => {
 
     it('TS-67: resultados públicos', async () => {
       renderPage(guest);
-      expect(await screen.findByRole('heading', { level: 2, name: 'Así votó la comunidad' })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { level: 2, name: 'Ranking final' })).toBeInTheDocument();
+      expect(screen.getAllByRole('heading', { level: 2, name: 'Ranking final' })).toHaveLength(1);
+      expect(screen.queryByRole('heading', { level: 2, name: 'Así votó la comunidad' })).toBeNull();
       expect(screen.getByText('Finalizado · resultados publicados')).toBeInTheDocument();
       expect(await screen.findByText('5 participantes · 12 evaluaciones')).toBeInTheDocument();
+      expect(screen.getAllByText('5 participantes · 12 evaluaciones')).toHaveLength(1);
       expect(screen.getByText(/Finalizó el 4 oct 2026/)).toBeInTheDocument();
-      const podium = screen.getByRole('list', { name: 'Podio' });
-      expect(within(podium).getAllByRole('listitem')).toHaveLength(3);
-      const table = screen.getByRole('table', { name: 'Ranking completo' });
-      expect(within(table).getAllByRole('row')).toHaveLength(3);
-      expect(within(table).getByText('4,0 pts')).toBeInTheDocument();
-      expect(screen.getByText(/El puntaje combina los rankings/)).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: 'Resumen' })).toBeNull();
+      const ranking = screen.getByRole('list', { name: 'Ranking final' });
+      expect(within(ranking).getAllByRole('listitem')).toHaveLength(5);
+      expect(within(ranking).getByText('4,0 pts')).toBeInTheDocument();
+      expect(screen.queryByText(/El puntaje combina los rankings/)).toBeNull();
       expect(screen.queryByText('Tú')).toBeNull();
       expect(screen.queryByText('Después')).toBeNull();
-      expect(await screen.findByText('¿Te gustó?')).toBeInTheDocument();
-      expect(screen.getByText('Hay 3 eventos con inscripción abierta ahora.')).toBeInTheDocument();
-      expect(screen.getByText('Crea tu cuenta para participar en el próximo.')).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'Ver eventos' })).toHaveAttribute('href', '/events');
-      expect(screen.getByRole('link', { name: 'Crear cuenta' })).toHaveAttribute('href', '/register');
+      const openEventsCard = screen
+        .getByText('Hay 3 eventos con inscripción abierta.')
+        .closest<HTMLElement>('.edp-open-events')!;
+      expect(openEventsCard).toBeInTheDocument();
+      expect(within(openEventsCard).getByRole('link', { name: 'Ver eventos abiertos' })).toHaveAttribute('href', '/events');
+      expect(screen.queryByText('¿Te gustó?')).toBeNull();
+      expect(screen.queryByRole('link', { name: 'Crear cuenta' })).toBeNull();
       expect(listEvents).toHaveBeenCalledWith({ stage: 'participation', limit: 1 });
     });
 
     it('TS-68: con sesión se resalta la fila propia', async () => {
       renderPage(signedIn());
-      const table = await screen.findByRole('table', { name: 'Ranking completo' });
-      const row = within(table).getByText('Ana Pérez').closest('tr')!;
-      expect(row).toHaveClass('ui-data-table__row--highlighted');
+      const ranking = await screen.findByRole('list', { name: 'Ranking final' });
+      const row = within(ranking).getByText('Ana Pérez').closest('li')!;
+      expect(row).toHaveClass('vt-event-results__item--you');
       expect(within(row).getByText('Tú')).toBeInTheDocument();
-      expect(await screen.findByText('¿Te gustó?')).toBeInTheDocument();
+      expect(await screen.findByRole('link', { name: 'Ver eventos abiertos' })).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: 'Crear cuenta' })).toBeNull();
+    });
+
+    it('mantiene el conteo completo de eventos cuando supera un dígito', async () => {
+      listEvents.mockResolvedValue({
+        items: [],
+        pagination: { page: 1, limit: 1, total: 27, totalPages: 27 },
+        stageCounts: { participation: 27, voting: 4, results: 2 },
+      });
+      renderPage(guest);
+      expect(await screen.findByText('Hay 27 eventos con inscripción abierta.')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Ver eventos abiertos' })).toHaveAttribute('href', '/events');
+      expect(listEvents).toHaveBeenCalledWith({ stage: 'participation', limit: 1 });
     });
 
     it('TS-69: sin eventos abiertos o con falla no hay banner', async () => {
@@ -973,16 +978,15 @@ describe('EventDetailPage', () => {
         stageCounts: { participation: 0, voting: 0, results: 2 },
       });
       const first = renderPage(guest);
-      await screen.findByRole('table', { name: 'Ranking completo' });
+      await screen.findByRole('list', { name: 'Ranking final' });
       await waitFor(() => expect(listEvents).toHaveBeenCalled());
-      expect(screen.queryByText('¿Te gustó?')).toBeNull();
-      expect(screen.queryByRole('link', { name: 'Ver eventos' })).toBeNull();
+      expect(screen.queryByRole('link', { name: 'Ver eventos abiertos' })).toBeNull();
       first.unmount();
 
       listEvents.mockRejectedValue(new TypeError('Failed to fetch'));
       renderPage(guest);
-      await screen.findByRole('table', { name: 'Ranking completo' });
-      expect(screen.queryByText('¿Te gustó?')).toBeNull();
+      await screen.findByRole('list', { name: 'Ranking final' });
+      expect(screen.queryByRole('link', { name: 'Ver eventos abiertos' })).toBeNull();
       expect(screen.queryByRole('alert')).toBeNull();
     });
 
@@ -992,9 +996,9 @@ describe('EventDetailPage', () => {
       );
       renderPage(guest);
       expect(await screen.findByText('Los resultados todavía no están disponibles.')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { level: 2, name: 'Así votó la comunidad' })).toBeInTheDocument();
-      expect(screen.queryByRole('list', { name: 'Podio' })).toBeNull();
-      expect(screen.queryByRole('table')).toBeNull();
+      expect(screen.queryByRole('heading', { level: 2, name: 'Así votó la comunidad' })).toBeNull();
+      expect(screen.queryByRole('heading', { level: 2, name: 'Ranking final' })).toBeNull();
+      expect(screen.queryByRole('list', { name: 'Ranking final' })).toBeNull();
       expect(screen.queryByText(/evaluaciones/)).toBeNull();
     });
 

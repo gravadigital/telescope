@@ -135,7 +135,7 @@ const HomePage: React.FC = () => {
               {t('home.how.title')}
             </h2>
           </div>
-          <Link to="/demo" className="hm-how__demo">{t('home.how.demo')}</Link>
+          <Link to="/" className="hm-how__demo">{t('home.how.demo')}</Link>
         </div>
         <ol className="hm-steps">
           {STEP_KEYS.map((key, index) => (

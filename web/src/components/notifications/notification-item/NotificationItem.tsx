@@ -1,7 +1,5 @@
 import React from 'react';
 import Button from '../../ui/button/Button';
-import { BellIcon, CheckIcon, TrophyIcon, UsersIcon } from '../../ui/icons/Icons';
-import type { IconProps } from '../../ui/icons/Icons';
 import { describe } from '../../../domain/notifications';
 import type { NotificationDescription, NotificationTag } from '../../../domain/notifications';
 import { useT } from '../../../i18n';
@@ -9,11 +7,36 @@ import type { AppNotification } from '../../../types';
 import '../../ui/visually-hidden.css';
 import './NotificationItem.css';
 
-const TAG_ICONS: Record<NotificationTag, React.FC<IconProps>> = {
-  registration: UsersIcon,
-  voting: CheckIcon,
-  results: TrophyIcon,
-  myEvents: BellIcon,
+const TAG_SYMBOLS: Record<NotificationTag, string> = {
+  registration: '!',
+  voting: '↑',
+  results: '✓',
+  myEvents: '+',
+};
+
+/** Símbolo específico por tipo de notificación y sub-tipo de etapa, más su clase de color. */
+type SymbolInfo = { symbol: string; symbolClass: string };
+
+const symbolFor = (notification: AppNotification, tag: NotificationTag): SymbolInfo => {
+  const type = notification.type;
+  const data = notification.data ?? {};
+  const stage = data.stage;
+
+  if (type === 'stage_changed') {
+    if (stage === 'results') return { symbol: '✓', symbolClass: 'check' };
+    if (stage === 'voting' && data.can_vote === true) return { symbol: '↑', symbolClass: 'arrow' };
+    if (stage === 'participation') return { symbol: '+', symbolClass: 'plus' };
+  }
+  if (type === 'participant_registered') return { symbol: '+', symbolClass: 'plus' };
+  if (type === 'registration_confirmed') return { symbol: '✓', symbolClass: 'check' };
+  if (type === 'ranking_submitted') return { symbol: '↑', symbolClass: 'arrow' };
+  if (type === 'file_reminder') return { symbol: '!', symbolClass: 'exclamation' };
+  if (type === 'vote_reminder') return { symbol: '↑', symbolClass: 'arrow' };
+  if (type === 'event_cancelled' || type === 'event_paused') return { symbol: '+', symbolClass: 'plus' };
+  if (type === 'deadline_changed') return { symbol: '+', symbolClass: 'plus' };
+
+  const fallback = TAG_SYMBOLS[tag];
+  return { symbol: fallback, symbolClass: fallback === '✓' ? 'check' : fallback === '↑' ? 'arrow' : fallback === '!' ? 'exclamation' : 'plus' };
 };
 
 export interface NotificationItemProps {
@@ -31,7 +54,6 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification, varia
   if (!description) return null;
 
   const unread = notification.read_at === null;
-  const Icon = TAG_ICONS[description.tag];
   const time = (
     <time dateTime={notification.created_at} className="nt-item__time">
       {fmt.relative(notification.created_at, now)}
@@ -41,8 +63,11 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification, varia
   const content = (
     <>
       {unread && <span className="nt-item__dot" aria-hidden="true" />}
-      <span className="nt-item__icon" aria-hidden="true">
-        <Icon width={20} height={20} />
+      <span
+        className={`nt-item__icon nt-item__icon--${description.tag} nt-item__icon--symbol-${symbolFor(notification, description.tag).symbolClass}`}
+        aria-hidden="true"
+      >
+        {symbolFor(notification, description.tag).symbol}
       </span>
       <span className="nt-item__content">
         {unread && <span className="ui-visually-hidden">{t('notifications.unread')}</span>}
@@ -58,7 +83,9 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification, varia
           </span>
         ) : (
           <span className="nt-item__meta">
-            <span className="nt-item__tag">{t(description.tagKey)}</span>
+            <span className={`nt-item__tag nt-item__tag--${description.tag}`}>
+              {t(description.tagKey)}
+            </span>
             <span aria-hidden="true">·</span>
             {time}
           </span>

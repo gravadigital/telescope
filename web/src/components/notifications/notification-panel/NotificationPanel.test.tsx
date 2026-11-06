@@ -85,6 +85,7 @@ describe('NotificationPanel', () => {
     const { dialog } = await openPanel();
     userEvent.click(await within(dialog).findByRole('button', { name: /Se canceló/ }));
     expect(markRead).not.toHaveBeenCalled();
+    expect(within(dialog).queryByRole('button', { name: 'Marcar todo como leído' })).toBeNull();
     expect(screen.getByTestId('location')).toHaveTextContent('/events/e-3');
   });
 

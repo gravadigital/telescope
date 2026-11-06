@@ -1,5 +1,7 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { Button, Callout, Dialog } from '../../ui';
+import { Button, Callout, Dialog, ProgressBar } from '../../ui';
+import Countdown from '../countdown/Countdown';
+import { endOfDay } from '../../../domain/dates';
 import type { VotingProgress } from '../../../domain';
 import { scopedMessageKeyForError, useT } from '../../../i18n';
 import type { TranslationKey } from '../../../i18n';
@@ -10,6 +12,7 @@ export interface PublishResultsDialogProps {
   open: boolean;
   eventId: string;
   progress: VotingProgress;
+  votingDeadline: string | null;
   /** Propuestas que todavía no tienen ningún voto: si se publica, quedan sin posición. */
   unevaluated?: number;
   onClose: () => void;
@@ -22,11 +25,12 @@ const PublishResultsDialog: React.FC<PublishResultsDialogProps> = ({
   open,
   eventId,
   progress,
+  votingDeadline,
   unevaluated = 0,
   onClose,
   onDone,
 }) => {
-  const { t } = useT();
+  const { t, fmt } = useT();
   const textId = useId();
   const missingId = useId();
   const unevaluatedId = useId();
@@ -85,13 +89,38 @@ const PublishResultsDialog: React.FC<PublishResultsDialogProps> = ({
       <p id={textId} className="ev-publish-results__text">
         {t('manage.publish.text')}
       </p>
+      {open && votingDeadline && (
+        <div className="ev-publish-results__countdown">
+          <Countdown
+            title={t('manage.countdown.voting.title')}
+            expiredText={t('manage.countdown.voting.expired')}
+            units={{
+              days: t('manage.countdown.voting.days'),
+              hours: t('manage.countdown.voting.hours'),
+              minutes: t('manage.countdown.voting.minutes'),
+              seconds: t('manage.countdown.voting.seconds'),
+            }}
+            target={endOfDay(votingDeadline)}
+            footer={t('manage.countdown.voting.footer', { date: fmt.date(votingDeadline) })}
+          />
+        </div>
+      )}
       {hasMissing && (
         <Callout
           tone="warning"
           id={missingId}
           title={t('manage.publish.missingTitle', { missing: progress.missing, total: progress.total })}
         >
-          {t('manage.publish.missingText')}
+          <div className="ev-publish-results__missing">
+            <ProgressBar
+              value={progress.sent}
+              max={progress.total}
+              size="sm"
+              tone="warning"
+              valueText={t('manage.metrics.rankingsA11y', { sent: progress.sent, total: progress.total })}
+            />
+            <p className="ev-publish-results__missing-text">{t('manage.publish.missingText')}</p>
+          </div>
         </Callout>
       )}
       {hasUnevaluated && (

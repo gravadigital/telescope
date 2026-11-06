@@ -8,6 +8,8 @@
    sombras solo vía tier 2/3. Nunca --ref-color-* desde un componente.
    ======================================================================== */
 :root {
+   --layout-page-gutter: clamp(24px, 8.333vw, 120px);
+
   /* ======================================================================
      Tier 1 — reference
      ====================================================================== */
@@ -40,6 +42,12 @@
   --ref-color-amber-500: #e9a227;
   --ref-color-amber-100: #f7edd6;
   --ref-color-red-700: #b8381f;
+  --ref-color-blue-50: #eff6ff;
+  --ref-color-blue-300: #93c5fd;
+  --ref-color-green-50: #f0fdf4;
+  --ref-color-green-300: #86efac;
+  --ref-color-orange-50: #fff7ed;
+  --ref-color-orange-300: #fdba74;
 
   /* Tipografía (tamaños en rem, base 16px) */
   --ref-font-family-base: 'Plus Jakarta Sans', system-ui, sans-serif;
@@ -130,6 +138,12 @@
   --countdown-box-bg: #ffffff14;
   --countdown-box-border: #ffffff29;
   --countdown-unit-fg: #9aa6bf;
+
+  /* Superficies y bordes sobre la banda negra */
+  --bg-inverse-subtle: rgba(255, 255, 255, 0.1);
+  --bg-inverse-hover: rgba(255, 255, 255, 0.08);
+  --border-inverse-strong: rgba(255, 255, 255, 0.3);
+  --text-inverse-muted: #9aa6bf;
 
   /* Text */
   --text-primary: var(--ref-color-ink-900);
@@ -295,15 +309,33 @@
   --empty-state-icon: var(--text-muted);
   --empty-state-text: var(--text-secondary);
 
+  /* Notification tags — color por tipo de notificación */
+  --notification-tag-registration-bg: #f7edd6;
+  --notification-tag-voting-bg: #eae7f9;
+  --notification-tag-results-bg: #e1f1e8;
+  --notification-tag-myEvents-bg: #e8ecf2;
+
+  /* Notification tag borders / text */
+  --notification-tag-registration-fg: #8a6212;
+  --notification-tag-voting-fg: #4B3FA8;
+  --notification-tag-results-fg: #16744a;
+  --notification-tag-myEvents-fg: #39414d;
+
+  /* Notification icon squares (saturated colors, white symbol) */
+  --notification-icon-registration-bg: #e9a227;
+  --notification-icon-voting-bg: #6e5bf2;
+  --notification-icon-results-bg: #16744a;
+  --notification-icon-myEvents-bg: #000000;
+
   /* DateQuickPicker / NumberStepper / FileDropzone / Menu */
   --date-picker-preset-selected-bg: var(--bg-action-subtle);
   --date-picker-preset-selected-fg: var(--text-action);
   --number-stepper-border: var(--border-strong);
-  --file-dropzone-bg: var(--bg-surface-subtle);
-  --file-dropzone-border: var(--border-strong);
+  --file-dropzone-bg: var(--ref-color-violet-50);
+  --file-dropzone-border: var(--ref-color-violet-300);
   --file-dropzone-border-dragover: var(--border-focus);
   --file-dropzone-bg-dragover: var(--bg-action-subtle);
-  --file-dropzone-radius: var(--radius-area);
+  --file-dropzone-radius: 16px;
   --menu-bg: var(--bg-surface);
   --menu-shadow: var(--shadow-popover);
   --menu-item-hover: var(--bg-surface-subtle);

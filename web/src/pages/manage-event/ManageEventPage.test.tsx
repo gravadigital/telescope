@@ -257,7 +257,7 @@ describe('ManageEventPage', () => {
       expect(screen.getByRole('button', { name: 'Configurar y abrir votación →' })).toBeEnabled();
       expect(screen.getByRole('button', { name: 'Recordar a quienes no subieron archivo (1)' })).toBeEnabled();
       expect(screen.getByRole('button', { name: 'Editar datos' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Copiar enlace de invitación' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Compartir' })).toBeInTheDocument();
       expect(getStats).not.toHaveBeenCalled();
       expect(getConfig).not.toHaveBeenCalled();
       expect(getParticipants).toHaveBeenCalledWith('e-1');
@@ -283,12 +283,22 @@ describe('ManageEventPage', () => {
       await loaded();
       expect(await screen.findByText('Fede Gil')).toBeInTheDocument();
       expect(screen.getByText('Votación en curso · cierra en 7 días')).toBeInTheDocument();
-      expect(tile('Rankings enviados')).toHaveTextContent('1 de 4');
+      const rankingsCard = screen
+        .getByText('Rankings enviados')
+        .closest<HTMLElement>('.mep-rankings-card')!;
+      expect(rankingsCard).toHaveTextContent('1 de 4');
+      expect(rankingsCard.closest('.mep-metrics')).toHaveClass('mep-metrics--voting');
+      expect(within(rankingsCard).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1');
+      expect(within(rankingsCard).getByRole('progressbar')).toHaveAttribute('aria-valuemax', '4');
+      expect(within(rankingsCard).getByText(/Cada participante ordena las propuestas/)).toBeInTheDocument();
+      expect(within(rankingsCard).getByRole('button', { name: 'Enviar recordatorio a 3 pendientes' })).toBeEnabled();
+      expect(screen.getByText('LA VOTACIÓN CIERRA EN')).toBeInTheDocument();
+      expect(screen.getByRole('timer')).toHaveAccessibleName(/LA VOTACIÓN CIERRA EN/);
       const bar = screen.getByRole('progressbar');
       expect(bar).toHaveAttribute('aria-valuenow', '1');
       expect(bar).toHaveAttribute('aria-valuemax', '4');
       expect(queryTile('Archivos recibidos')).toBeNull();
-      expect(tile('Cierre')).toHaveTextContent('7 días');
+      expect(queryTile('Cierre')).toBeNull();
 
       expect(within(screen.getByRole('table')).getByRole('columnheader', { name: 'Voto' })).toBeInTheDocument();
       expect(within(row('Bruno Ríos')).getByText('✓ Enviado')).toBeInTheDocument();
@@ -296,16 +306,15 @@ describe('ManageEventPage', () => {
       expect(within(row('Fede Gil')).getByText('No participa')).toBeInTheDocument();
 
       expect(await screen.findByText('Configuración aplicada')).toBeInTheDocument();
-      expect(
-        screen.getByText(
-          '2 propuestas por evaluador · mínimo 2 evaluaciones por archivo · ajustes de calidad recomendados'
-        )
-      ).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Cerrar votación y publicar' })).toHaveClass('ui-button--secondary');
-      expect(screen.getByText('Faltan 3 de 4 rankings.')).toBeInTheDocument();
+      const appliedConfig = screen.getByText('Configuración aplicada').closest<HTMLElement>('.mep-item--voting-config')!;
+      expect(appliedConfig.previousElementSibling).toHaveClass('mep-item--next');
+      expect(appliedConfig).toHaveTextContent(
+        '2 propuestas por evaluador · mínimo 2 evaluaciones por archivo · ajustes de calidad recomendados'
+      );
+      expect(screen.getByRole('button', { name: 'Cerrar votación y publicar' })).toHaveClass('ui-button--primary');
+      expect(screen.queryByText('Faltan 3 de 4 rankings.')).toBeNull();
       expect(screen.queryByRole('button', { name: 'Editar datos' })).toBeNull();
       expect(screen.queryByRole('button', { name: /Participación/ })).toBeNull();
-      expect(screen.getByRole('button', { name: 'Enviar recordatorio a 3 pendientes' })).toBeEnabled();
       expect(screen.getByRole('button', { name: 'Compartir' })).toBeInTheDocument();
       expect(getStats).toHaveBeenCalledWith('e-1');
       expect(getConfig).toHaveBeenCalledWith('e-1');
@@ -320,10 +329,15 @@ describe('ManageEventPage', () => {
       });
       renderPage();
       await screen.findByText('Bruno Ríos');
-      expect(tile('Rankings enviados')).toHaveTextContent('4 de 4');
+      const rankingsCard = screen
+        .getByText('Rankings enviados')
+        .closest<HTMLElement>('.mep-rankings-card')!;
+      expect(rankingsCard).toHaveTextContent('4 de 4');
+      expect(rankingsCard.querySelector('.ui-progress-bar__fill')).toHaveStyle({ width: '100%' });
       expect(screen.getByRole('button', { name: 'Cerrar votación y publicar' })).toHaveClass('ui-button--primary');
       expect(screen.queryByText(/rankings\.$/)).toBeNull();
       expect(screen.queryByRole('button', { name: /Enviar recordatorio/ })).toBeNull();
+      expect(queryTile('Cierre')).toBeNull();
     });
 
     it('TS-65: configuración personalizada, ausente y con error', async () => {
@@ -512,21 +526,12 @@ describe('ManageEventPage', () => {
       expect(screen.getByRole('dialog', { name: 'Concurso de logos' })).toBeInTheDocument();
     });
 
-    it('TS-82: copiar enlace en Participación', async () => {
-      const writeText = jest.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('denied'));
-      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    it('TS-82: compartir en Participación abre ShareDialog', async () => {
       renderPage();
       await loaded();
-      userEvent.click(screen.getByRole('button', { name: 'Copiar enlace de invitación' }));
-      expect(writeText).toHaveBeenCalledWith('http://localhost/events/e-1');
-      expect(await screen.findByRole('button', { name: '✓ Copiado' })).toBeInTheDocument();
-      act(() => {
-        jest.advanceTimersByTime(2000);
-      });
-      expect(screen.getByRole('button', { name: 'Copiar enlace de invitación' })).toBeInTheDocument();
-
-      userEvent.click(screen.getByRole('button', { name: 'Copiar enlace de invitación' }));
+      userEvent.click(screen.getByRole('button', { name: 'Compartir' }));
       expect(await screen.findByRole('dialog', { name: 'Concurso de logos' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Compartir' })).toBeInTheDocument();
     });
 
     it('D-8: descarga desde la tabla y error de descarga', async () => {
@@ -546,7 +551,7 @@ describe('ManageEventPage', () => {
       renderPage();
       expect(await screen.findByText('Todavía no hay inscriptos')).toBeInTheDocument();
       expect(screen.getByText('Comparte el enlace de invitación para sumar participantes.')).toBeInTheDocument();
-      expect(screen.getAllByRole('button', { name: 'Copiar enlace de invitación' })).toHaveLength(2);
+      expect(screen.getAllByRole('button', { name: 'Compartir' })).toHaveLength(2);
       expect(screen.queryByRole('table')).toBeNull();
     });
 
@@ -660,8 +665,9 @@ describe('ManageEventPage', () => {
     it('TS-66: publicar con faltantes de punta a punta; "Seguir esperando" no llama nada', async () => {
       getEvent.mockResolvedValue(voting);
       const view = renderPage();
-      await screen.findByText('Faltan 3 de 4 rankings.');
+      await screen.findByRole('button', { name: 'Cerrar votación y publicar' });
       userEvent.click(screen.getByRole('button', { name: 'Cerrar votación y publicar' }));
+      expect(within(screen.getByRole('alertdialog')).getByText('Faltan 3 de 4 rankings')).toBeInTheDocument();
       userEvent.click(screen.getByRole('button', { name: 'Seguir esperando' }));
       expect(screen.queryByRole('alertdialog')).toBeNull();
       expect(updateStage).not.toHaveBeenCalled();
@@ -670,8 +676,9 @@ describe('ManageEventPage', () => {
       getEvent.mockResolvedValueOnce(voting).mockResolvedValue(results);
       updateStage.mockResolvedValue({ stage: 'results' });
       renderPage();
-      await screen.findByText('Faltan 3 de 4 rankings.');
+      await screen.findByRole('button', { name: 'Cerrar votación y publicar' });
       userEvent.click(screen.getByRole('button', { name: 'Cerrar votación y publicar' }));
+      expect(within(screen.getByRole('alertdialog')).getByText('Faltan 3 de 4 rankings')).toBeInTheDocument();
       userEvent.click(screen.getByRole('button', { name: 'Publicar igual' }));
       expect(await screen.findByText('Resultados publicados.')).toBeInTheDocument();
       expect(updateStage).toHaveBeenCalledWith('e-1', 'results');
@@ -686,9 +693,10 @@ describe('ManageEventPage', () => {
       getEvent.mockResolvedValue(voting);
       getStats.mockResolvedValue({ ...stats, attachments_with_votes: 1 });
       renderPage();
-      await screen.findByText('Faltan 3 de 4 rankings.');
+      await screen.findByRole('button', { name: 'Cerrar votación y publicar' });
       userEvent.click(screen.getByRole('button', { name: 'Cerrar votación y publicar' }));
       const dialog = screen.getByRole('alertdialog', { name: '¿Cerrar votación y publicar?' });
+      expect(within(dialog).getByText('Faltan 3 de 4 rankings')).toBeInTheDocument();
       expect(within(dialog).getByText('2 propuestas todavía no tienen evaluaciones')).toBeInTheDocument();
       expect(within(dialog).getByText('Si publicas ahora, quedan sin posición en el ranking.')).toBeInTheDocument();
     });
@@ -806,8 +814,8 @@ describe('ManageEventPage', () => {
       renderPage();
       await loaded();
       expect(screen.getByText('Finalizado · resultados publicados')).toBeInTheDocument();
-      const podium = await screen.findByRole('list', { name: 'Podio' });
-      expect(within(podium).getAllByRole('listitem')).toHaveLength(3);
+      const ranking = await screen.findByRole('list', { name: 'Ranking final' });
+      expect(within(ranking).getAllByRole('listitem')).toHaveLength(3);
       expect(await screen.findAllByText('Bruno Ríos')).not.toHaveLength(0);
       expect(await screen.findByText(/2 propuestas por evaluador/)).toBeInTheDocument();
       expect(screen.queryByText('Próximo paso')).toBeNull();
@@ -843,7 +851,7 @@ describe('ManageEventPage', () => {
       await waitFor(() => expect(confirm).toBeEnabled());
       userEvent.click(confirm);
       expect(await screen.findByRole('heading', { level: 2, name: 'Publicar resultados' })).toBeInTheDocument();
-      await screen.findByText('Faltan 3 de 4 rankings.');
+      expect(screen.queryByText('Faltan 3 de 4 rankings.')).toBeNull();
 
       userEvent.click(screen.getByRole('button', { name: 'Cerrar votación y publicar' }));
       userEvent.click(screen.getByRole('button', { name: 'Publicar igual' }));

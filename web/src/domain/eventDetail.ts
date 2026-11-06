@@ -184,6 +184,13 @@ export const progressSteps = (
       status: 'pending',
     };
   }
+  if (state === 'vote' || state === 'rankingSent') {
+    return [
+      { labelKey: 'eventDetail.progress.proposalSent', status: 'done' },
+      { labelKey: 'eventDetail.progress.sendRanking', status: state === 'vote' ? 'current' : 'done' },
+      results,
+    ];
+  }
   return [registration, upload, vote, results];
 };
 
@@ -200,7 +207,42 @@ export const splitResults = (
 
 export const shareUrl = (origin: string, eventId: string): string => `${origin}/events/${eventId}`;
 
-export type ShareNetwork = 'whatsapp' | 'x' | 'linkedin' | 'facebook' | 'email';
+export type ShareNetwork = 'whatsapp' | 'x' | 'linkedin' | 'facebook' | 'instagram' | 'email';
+
+/** ms de espera antes de caer a la bandeja si el sharesheet de Instagram no abrió. */
+export const INSTAGRAM_FALLBACK_MS = 1200;
+
+/** ms que el aviso de copia queda a la vista antes de abrir Instagram. */
+export const INSTAGRAM_OPEN_DELAY_MS = 2500;
+
+/**
+ * Instagram no documenta cómo abrir el "Enviar a…" (el share sheet de un reel) con un link.
+ * En Android se usa el intent documentado de Chrome (`ACTION_SEND` con el link como texto,
+ * que Instagram recibe precargado); en iOS, `instagram://sharesheet?text=`. Si nada abre,
+ * se cae a la bandeja (`instagram://direct`). En desktop solo existe el web. El enlace
+ * siempre se copia aparte, para pegarlo en la conversación.
+ */
+export const instagramShareLinks = (
+  userAgent: string,
+  url: string
+): { primary: string; fallback: string } => {
+  if (/Android/i.test(userAgent)) {
+    return {
+      primary:
+        'intent://#Intent;action=android.intent.action.SEND;type=text/plain;' +
+        `S.android.intent.extra.TEXT=${url};package=com.instagram.android;end`,
+      fallback: 'instagram://direct',
+    };
+  }
+  if (/iPhone|iPad|iPod/i.test(userAgent)) {
+    return {
+      primary: `instagram://sharesheet?text=${encodeURIComponent(url)}`,
+      fallback: 'instagram://direct',
+    };
+  }
+  const web = 'https://www.instagram.com/direct/inbox/';
+  return { primary: web, fallback: web };
+};
 
 export const shareLinks = (
   url: string,
@@ -213,6 +255,7 @@ export const shareLinks = (
     { network: 'x', href: `https://twitter.com/intent/tweet?text=${n}&url=${u}` },
     { network: 'linkedin', href: `https://www.linkedin.com/sharing/share-offsite/?url=${u}` },
     { network: 'facebook', href: `https://www.facebook.com/sharer/sharer.php?u=${u}` },
+    { network: 'instagram', href: instagramShareLinks('', url).primary },
     { network: 'email', href: `mailto:?subject=${n}&body=${u}` },
   ];
 };

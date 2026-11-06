@@ -12,6 +12,7 @@
 }
 
 .evl-body {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -24,7 +25,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 20px 16px 24px;
+  padding: 20px var(--layout-page-gutter) 24px;
   background: var(--bg-band);
   color: var(--text-inverse);
 }
@@ -91,7 +92,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 20px 16px 32px;
+  padding: 20px var(--layout-page-gutter) 32px;
   min-width: 0;
 }
 
@@ -318,6 +319,7 @@
 .evl-results .ui-data-table__cell--action {
   order: 5;
   display: flex;
+  flex-direction: column;
   flex: 0 0 auto;
   width: auto;
   align-items: flex-end;
@@ -378,7 +380,12 @@
 }
 
 .evl-results .ui-data-table__hint {
-  display: none;
+  display: block;
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: right;
 }
 
 /* ---------- Paginación ---------- */
@@ -414,17 +421,24 @@
   font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.02em;
+  color: var(--text-inverse);
 }
 
 .evl-banner__text {
   margin: 0;
   font-size: 15px;
   line-height: 1.5;
-  color: var(--text-inverse-secondary);
+  color: var(--text-inverse);
 }
 
 .evl-banner__cta.ui-button {
   align-self: flex-start;
+  background: var(--bg-surface);
+  color: var(--text-action);
+  text-decoration: none;
+}
+.evl-banner.ui-card {
+  background: var(--bg-accent);
 }
 
 /* ==========================================================================
@@ -433,7 +447,7 @@
 @media (min-width: 768px) {
   .evl-body {
     gap: 32px;
-    padding: 56px 120px 96px;
+    padding: 56px var(--layout-page-gutter) 96px;
   }
 
   .evl-header {
@@ -743,5 +757,147 @@
 
   .evl-banner__cta.ui-button {
     justify-self: end;
+  }
+
+  .evl-page--guest .evl-body {
+    position: relative;
+    gap: 0;
+    padding: 0 0 96px;
+  }
+
+  .evl-page--guest .evl-header {
+    padding: 48px var(--layout-page-gutter) 80px;
+    background: var(--bg-band);
+    color: var(--text-inverse);
+  }
+
+  .evl-page--guest .evl-title {
+    color: var(--text-inverse);
+  }
+
+  .evl-page--guest .evl-subtitle {
+    color: var(--text-inverse-secondary);
+  }
+
+  .evl-page--guest .evl-header__cta.ui-button {
+    border: 1px solid var(--ref-color-gray-300);
+    background: transparent;
+    color: var(--text-inverse);
+  }
+
+  .evl-page--guest .evl-content {
+    gap: 24px;
+    padding: 0 var(--layout-page-gutter) 32px;
+  }
+
+  .evl-page--guest .evl-how {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px 24px;
+    margin: -81px 0 0;
+    padding: 22px 28px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-surface);
+    box-shadow: var(--shadow-raised);
+  }
+
+  .evl-page--guest .evl-how .evl-section-title {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .evl-page--guest .evl-how__steps {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 20px;
+  }
+
+  .evl-page--guest .evl-how__step {
+    align-items: center;
+    gap: 10px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  .evl-page--guest .evl-how__step::before {
+    width: 26px;
+    height: 26px;
+    border: 1.5px solid var(--ref-color-violet-500);
+    background: transparent;
+    color: var(--ref-color-violet-500);
+    font-size: 12px;
+  }
+
+  .evl-page--guest .evl-how__step:first-child::before {
+    border-color: var(--ref-color-violet-500);
+    background: var(--ref-color-violet-500);
+    color: var(--text-inverse);
+  }
+
+  .evl-page--guest .evl-how__demo {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    padding: 5px 13px;
+    border: 1.5px solid var(--text-action);
+    border-radius: 8px;
+    color: var(--text-action);
+    font: var(--type-caption);
+    line-height: 1.35;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .evl-page--guest .evl-how__demo:hover {
+    background: var(--bg-action-subtle);
+  }
+}
+
+@media (min-width: 1200px) {
+  .evl-page--guest .evl-how {
+    box-sizing: border-box;
+    grid-template-columns: auto repeat(4, minmax(0, 1fr)) auto;
+    gap: 24px;
+    margin-top: -42px;
+    min-height: 84px;
+    padding: 22px 28px;
+  }
+
+  .evl-page--guest .evl-how .evl-section-title {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .evl-page--guest .evl-how__steps {
+    display: contents;
+  }
+
+  .evl-page--guest .evl-how__step {
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+  }
+
+  .evl-page--guest .evl-how__step::before {
+    width: 26px;
+    height: 26px;
+  }
+
+  .evl-page--guest .evl-how__demo {
+    grid-column: auto;
+    grid-row: auto;
+    justify-self: auto;
+    padding: 5px 13px;
   }
 }

@@ -175,9 +175,16 @@ const EventsListPage: React.FC = () => {
 
   const data = list.data;
   const pagination = data?.pagination;
+  const stageOrder: Record<EventListPage['items'][number]['stage'], number> = {
+    participation: 0,
+    voting: 1,
+    results: 2,
+    creation: 3,
+  };
+  const orderedItems = data?.items.slice().sort((left, right) => stageOrder[left.stage] - stageOrder[right.stage]);
 
   return (
-    <div className="evl-page">
+    <div className={`evl-page${userId ? '' : ' evl-page--guest'}`}>
       <div className="evl-body">
         <div className="evl-header">
           <div className="evl-header__copy">
@@ -254,6 +261,9 @@ const EventsListPage: React.FC = () => {
                   </li>
                 ))}
               </ol>
+              <Link to="/" className="evl-how__demo">
+                {t('home.how.demo')}
+              </Link>
             </section>
           )}
 
@@ -329,7 +339,7 @@ const EventsListPage: React.FC = () => {
                 variant="public"
                 caption={t('events.list.title')}
                 captionHidden
-                rows={data.items}
+                rows={orderedItems ?? []}
                 userId={userId}
                 myEventsById={myEventsById}
               />

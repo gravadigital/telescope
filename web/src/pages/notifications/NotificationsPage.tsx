@@ -24,6 +24,15 @@ type Phase = 'idle' | 'busy' | 'error';
 
 const SKELETONS = [0, 1, 2, 3, 4];
 
+type EmailPreference = 'votingOpened' | 'resultsPublished' | 'deadlineReminder' | 'participantRegistered';
+
+const DEFAULT_EMAIL_PREFERENCES: Record<EmailPreference, boolean> = {
+  votingOpened: true,
+  resultsPublished: true,
+  deadlineReminder: true,
+  participantRegistered: false,
+};
+
 /** S-12: historial de 90 días, paginado por cursor, con "Marcar todo como leído". */
 const NotificationsPage: React.FC = () => {
   const { t } = useT();
@@ -33,6 +42,7 @@ const NotificationsPage: React.FC = () => {
   const [list, setList] = React.useState<ListState>({ status: 'loading', items: [], cursor: null });
   const [more, setMore] = React.useState<Phase>('idle');
   const [markAll, setMarkAll] = React.useState<Phase>('idle');
+  const [emailPreferences, setEmailPreferences] = React.useState(DEFAULT_EMAIL_PREFERENCES);
   const listRef = React.useRef<HTMLUListElement>(null);
   const focusIndex = React.useRef<number | null>(null);
   const active = React.useRef(true);
@@ -115,90 +125,122 @@ const NotificationsPage: React.FC = () => {
   const loading = list.status === 'loading';
   const empty = list.status === 'ready' && list.items.length === 0;
 
+  const toggleEmailPreference = (preference: EmailPreference) => {
+    setEmailPreferences((current) => ({ ...current, [preference]: !current[preference] }));
+  };
+
   return (
     <div className="nt-page">
-      <div className="nt-page__header">
-        <Link to="/events" className="nt-page__back" onClick={handleBack}>
-          {t('notifications.back')}
-        </Link>
-        <div className="nt-page__intro">
-          <p className="nt-page__eyebrow">
-            {unreadCount > 0
-              ? t('notifications.unreadEyebrow', { count: unreadCount })
-              : t('notifications.upToDateEyebrow')}
-          </p>
-          <h1 className="nt-page__title">{t('notifications.title')}</h1>
-          <p className="nt-page__lead">{t('notifications.intro')}</p>
+      <header className="nt-page__band">
+        <div className="nt-page__band-inner">
+          <Link to="/events" className="nt-page__back" onClick={handleBack}>
+            {t('notifications.back')}
+          </Link>
+          <div className="nt-page__header">
+            <div className="nt-page__intro">
+              <p className="nt-page__eyebrow">
+                {unreadCount > 0
+                  ? t('notifications.unreadEyebrow', { count: unreadCount })
+                  : t('notifications.upToDateEyebrow')}
+              </p>
+              <h1 className="nt-page__title">{t('notifications.title')}</h1>
+              <p className="nt-page__lead">{t('notifications.intro')}</p>
+            </div>
+            {!loading && !empty && (
+              <Button
+                variant="secondary"
+                className="nt-page__mark"
+                disabled={unreadCount === 0}
+                loading={markAll === 'busy'}
+                onClick={handleMarkAll}
+              >
+                {t('notifications.markAll')}
+              </Button>
+            )}
+          </div>
         </div>
-        {!loading && !empty && (
-          <Button
-            variant="secondary"
-            className="nt-page__mark"
-            disabled={unreadCount === 0}
-            loading={markAll === 'busy'}
-            onClick={handleMarkAll}
-          >
-            {t('notifications.markAll')}
-          </Button>
-        )}
-      </div>
+      </header>
 
       <div className="nt-page__body">
-        {markAll === 'error' && <Callout tone="error">{t('notifications.markAllError')}</Callout>}
+        <div className="nt-page__feed">
+          {markAll === 'error' && <Callout tone="error">{t('notifications.markAllError')}</Callout>}
 
-        {loading && (
-          <>
-            <p role="status" className="ui-visually-hidden">
-              {t('notifications.loading')}
-            </p>
-            <ul className="nt-page__list" aria-hidden="true">
-              {SKELETONS.map((key) => (
-                <li key={key} className="nt-page__skeleton" />
+          {loading && (
+            <>
+              <p role="status" className="ui-visually-hidden">
+                {t('notifications.loading')}
+              </p>
+              <ul className="nt-page__list" aria-hidden="true">
+                {SKELETONS.map((key) => (
+                  <li key={key} className="nt-page__skeleton" />
+                ))}
+              </ul>
+            </>
+          )}
+
+          {list.status === 'error' && (
+            <Callout tone="error" action={{ label: t('common.retry'), onClick: () => void loadFirst() }}>
+              {t('notifications.loadError')}
+            </Callout>
+          )}
+
+          {empty && (
+            <EmptyState
+              variant="inline"
+              icon={<BellIcon width={32} height={32} />}
+              title={t('notifications.empty')}
+              headingLevel={2}
+            />
+          )}
+
+          {list.status === 'ready' && list.items.length > 0 && (
+            <ul ref={listRef} className="nt-page__list">
+              {list.items.map((n) => (
+                <NotificationItem key={n.id} notification={n} variant="page" onActivate={handleActivate} />
               ))}
             </ul>
-          </>
-        )}
+          )}
 
-        {list.status === 'error' && (
-          <Callout tone="error" action={{ label: t('common.retry'), onClick: () => void loadFirst() }}>
-            {t('notifications.loadError')}
-          </Callout>
-        )}
+          {more === 'error' && (
+            <Callout tone="error" action={{ label: t('common.retry'), onClick: () => void loadMore() }}>
+              {t('notifications.loadError')}
+            </Callout>
+          )}
 
-        {empty && (
-          <EmptyState
-            variant="inline"
-            icon={<BellIcon width={32} height={32} />}
-            title={t('notifications.empty')}
-            headingLevel={2}
-          />
-        )}
+          {list.status === 'ready' && list.cursor !== null && more !== 'error' && (
+            <Button
+              variant="secondary"
+              className="nt-page__more"
+              loading={more === 'busy'}
+              loadingLabel={t('notifications.loadingMore')}
+              onClick={() => void loadMore()}
+            >
+              {t('notifications.loadMore')}
+            </Button>
+          )}
+        </div>
 
-        {list.status === 'ready' && list.items.length > 0 && (
-          <ul ref={listRef} className="nt-page__list">
-            {list.items.map((n) => (
-              <NotificationItem key={n.id} notification={n} variant="page" onActivate={handleActivate} />
+        <aside className="nt-page__preferences" aria-label={t('notifications.emailPreferences.title')}>
+          <section className="nt-page__preferences-card">
+            <h2>{t('notifications.emailPreferences.title')}</h2>
+            <p>{t('notifications.emailPreferences.intro')}</p>
+            {(Object.keys(DEFAULT_EMAIL_PREFERENCES) as EmailPreference[]).map((preference) => (
+              <label key={preference} className="nt-page__preference">
+                <span>{t(`notifications.emailPreferences.${preference}`)}</span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={emailPreferences[preference]}
+                  onChange={() => toggleEmailPreference(preference)}
+                />
+              </label>
             ))}
-          </ul>
-        )}
-
-        {more === 'error' && (
-          <Callout tone="error" action={{ label: t('common.retry'), onClick: () => void loadMore() }}>
-            {t('notifications.loadError')}
-          </Callout>
-        )}
-
-        {list.status === 'ready' && list.cursor !== null && more !== 'error' && (
-          <Button
-            variant="secondary"
-            className="nt-page__more"
-            loading={more === 'busy'}
-            loadingLabel={t('notifications.loadingMore')}
-            onClick={() => void loadMore()}
-          >
-            {t('notifications.loadMore')}
-          </Button>
-        )}
+          </section>
+          <section className="nt-page__reminders-card">
+            <h2>{t('notifications.reminders.title')}</h2>
+            <p>{t('notifications.reminders.text')}</p>
+          </section>
+        </aside>
       </div>
     </div>
   );

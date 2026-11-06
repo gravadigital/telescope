@@ -14,12 +14,14 @@
   border-top: 1px solid var(--border-inverse);
 }
 .ly-footer__inner {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: var(--space-stack-md);
   max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
-  padding: var(--space-padding-spacious) var(--space-padding-compact);
+  padding: var(--space-padding-spacious) var(--layout-page-gutter);
 }
 .ly-footer__brand {
   display: flex;
@@ -35,6 +37,9 @@
   display: block;
   width: auto;
   height: 36px;
+}
+.ly-footer__logo-mark path:first-child {
+  fill: var(--text-inverse);
 }
 .ly-footer__logo:focus-visible,
 .ly-footer__github:focus-visible,
@@ -101,16 +106,29 @@
     grid-template-columns: 1fr auto auto;
     gap: 64px;
     align-items: center;
-    width: 100%;
     max-width: none;
-    margin: 0;
-    padding: 40px clamp(32px, 8.333vw, 120px);
+    width: 100%;
+    padding: 40px var(--layout-page-gutter);
   }
   .ly-footer__logo-mark {
-    height: 42px;
+    width: 170px;
+    height: 45px;
+  }
+  .ly-footer__github {
+    padding-top: 21px;
+    padding-right: 5px;
+  }
+  .ly-footer__github-icon {
+    width: 29px;
+    height: 22px;
   }
   .ly-footer__contact {
+    gap: 6px;
     align-items: flex-end;
     text-align: right;
+  }
+  .ly-footer__version {
+    padding: 4px 9px;
+    border-color: rgba(255, 255, 255, 0.22);
   }
 }

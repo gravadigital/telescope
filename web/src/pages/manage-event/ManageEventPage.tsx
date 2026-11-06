@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button, Callout, Card, Dialog, EmptyState, ProgressBar, StatTile, StatusPill } from '../../components/ui';
-import { BellIcon, EditIcon, LinkIcon, ShareIcon } from '../../components/ui/icons/Icons';
+import { BellIcon, EditIcon, ShareIcon } from '../../components/ui/icons/Icons';
 import EventHero from '../../components/events/event-hero/EventHero';
 import StageTimeline from '../../components/events/stage-timeline/StageTimeline';
 import Countdown from '../../components/events/countdown/Countdown';
@@ -19,7 +19,6 @@ import NotFoundPage from '../not-found/NotFoundPage';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, getErrorCode } from '../../config/api';
 import {
-  COPY_FEEDBACK_MS,
   MIN_PROPOSALS_TO_VOTE,
   STAGE_ORDER,
   SUCCESS_NOTICE_MS,
@@ -35,7 +34,6 @@ import {
   pendingFiles,
   pendingVotes,
   reminderType,
-  shareUrl,
   stageNameKey,
   stageStatus,
   transitionDialog,
@@ -115,7 +113,6 @@ const ManageEventPage: React.FC = () => {
   const [openDialog, setOpenDialog] = React.useState<ManageDialog | null>(null);
   // Se conserva entre recargas de la gestión: solo se reinicia al recargar la pestaña (D-9).
   const [reminderSent, setReminderSent] = React.useState(false);
-  const [copied, setCopied] = React.useState(false);
   const [downloadError, setDownloadError] = React.useState<string | null>(null);
   const [pausing, setPausing] = React.useState(false);
   const [pauseError, setPauseError] = React.useState<TranslationKey | null>(null);
@@ -129,7 +126,6 @@ const ManageEventPage: React.FC = () => {
 
   const requestRef = React.useRef(0);
   const noticeTimer = React.useRef<number | undefined>(undefined);
-  const copyTimer = React.useRef<number | undefined>(undefined);
 
   // ---------- Avisos ----------
   const showNotice = React.useCallback((key: TranslationKey, params?: Params): void => {
@@ -144,7 +140,6 @@ const ManageEventPage: React.FC = () => {
   React.useEffect(
     () => () => {
       if (noticeTimer.current !== undefined) window.clearTimeout(noticeTimer.current);
-      if (copyTimer.current !== undefined) window.clearTimeout(copyTimer.current);
     },
     []
   );
@@ -255,22 +250,6 @@ const ManageEventPage: React.FC = () => {
   };
 
   // ---------- Acciones ----------
-  const handleCopy = async (): Promise<void> => {
-    if (!event) return;
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error('clipboard');
-      await navigator.clipboard.writeText(shareUrl(window.location.origin, event.id));
-      if (copyTimer.current !== undefined) window.clearTimeout(copyTimer.current);
-      setCopied(true);
-      copyTimer.current = window.setTimeout(() => {
-        copyTimer.current = undefined;
-        setCopied(false);
-      }, COPY_FEEDBACK_MS);
-    } catch {
-      setOpenDialog('share');
-    }
-  };
-
   const handleDownload = async (attachment: Attachment): Promise<void> => {
     setDownloadError(null);
     try {
@@ -432,19 +411,25 @@ const ManageEventPage: React.FC = () => {
       : reminder === 'vote' && rosterReady && statsReady
         ? pendingVotes(rows, votingStatus)
         : [];
+  const showReminder = reminder !== null && pending.length > 0 && !blockError;
+  const reminderButton = showReminder ? (
+    <Button
+      variant="secondary"
+      iconStart={<BellIcon />}
+      disabled={paused || reminderSent}
+      onClick={() => setOpenDialog('reminder')}
+    >
+      {reminderSent
+        ? t('manage.reminder.sent')
+        : t(reminder === 'file' ? 'manage.reminder.file' : 'manage.reminder.vote', { count: pending.length })}
+    </Button>
+  ) : null;
 
   // ---------- Encabezado ----------
   const pill = managePill(event);
   const showEdit = !cancelled && canEditEvent(event.stage);
   const shareAction = ((): React.ReactNode => {
     if (cancelled || event.stage === 'creation') return null;
-    if (event.stage === 'participation') {
-      return (
-        <Button variant="onBand" iconStart={<LinkIcon />} onClick={handleCopy}>
-          {copied ? t('manage.copied') : t('manage.copyInvite')}
-        </Button>
-      );
-    }
     return (
       <Button variant="onBand" iconStart={<ShareIcon />} onClick={() => setOpenDialog('share')}>
         {t('manage.share')}
@@ -464,18 +449,20 @@ const ManageEventPage: React.FC = () => {
     ) : undefined;
 
   const countdown =
-    state === 'participation' && deadline ? (
+    (state === 'participation' || state === 'voting') && deadline ? (
       <Countdown
-        title={t('manage.countdown.registration.title')}
-        expiredText={t('manage.countdown.registration.expired')}
+        title={t(`manage.countdown.${event.stage === 'voting' ? 'voting' : 'registration'}.title` as const)}
+        expiredText={t(`manage.countdown.${event.stage === 'voting' ? 'voting' : 'registration'}.expired` as const)}
         units={{
-          days: t('manage.countdown.registration.days'),
-          hours: t('manage.countdown.registration.hours'),
-          minutes: t('manage.countdown.registration.minutes'),
-          seconds: t('manage.countdown.registration.seconds'),
+          days: t(`manage.countdown.${event.stage === 'voting' ? 'voting' : 'registration'}.days` as const),
+          hours: t(`manage.countdown.${event.stage === 'voting' ? 'voting' : 'registration'}.hours` as const),
+          minutes: t(`manage.countdown.${event.stage === 'voting' ? 'voting' : 'registration'}.minutes` as const),
+          seconds: t(`manage.countdown.${event.stage === 'voting' ? 'voting' : 'registration'}.seconds` as const),
         }}
         target={endOfDay(deadline)}
-        footer={t('manage.countdown.registration.footer', { date: fmt.date(deadline) })}
+        footer={t(`manage.countdown.${event.stage === 'voting' ? 'voting' : 'registration'}.footer` as const, {
+          date: fmt.date(deadline),
+        })}
       />
     ) : undefined;
 
@@ -524,7 +511,7 @@ const ManageEventPage: React.FC = () => {
         : t('manage.metrics.days', { count: deadlineDays });
 
   const metrics: React.ReactNode[] = [];
-  if (state === 'participation' || state === 'voting' || state === 'results') {
+  if (state === 'participation' || state === 'results') {
     metrics.push(
       <StatTile
         key="registered"
@@ -564,15 +551,23 @@ const ManageEventPage: React.FC = () => {
           </Callout>
         </div>
       ) : (
-        <div key="rankings" className="mep-metric">
-          <StatTile
-            label={t('manage.metrics.rankings')}
-            value={progress ? t('manage.metrics.rankingsValue', { sent: progress.sent, total: progress.total }) : ''}
-            loading={!progress}
-            accessibleText={
-              progress ? t('manage.metrics.rankingsA11y', { sent: progress.sent, total: progress.total }) : undefined
-            }
-          />
+        <Card key="rankings" padding="compact" className="mep-rankings-card">
+          <div className="mep-rankings-card__header" aria-busy={!progress || undefined}>
+            <div className="mep-rankings-card__stat">
+              <p className="mep-rankings-card__label">{t('manage.metrics.rankings')}</p>
+              {progress ? (
+                <p className="mep-rankings-card__value">
+                  {t('manage.metrics.rankingsValue', {
+                    sent: fmt.number(progress.sent),
+                    total: fmt.number(progress.total),
+                  })}
+                </p>
+              ) : (
+                <span className="mep-rankings-card__skeleton" aria-hidden="true" />
+              )}
+            </div>
+            {reminderButton}
+          </div>
           {progress && (
             <ProgressBar
               value={progress.sent}
@@ -581,11 +576,12 @@ const ManageEventPage: React.FC = () => {
               valueText={t('manage.metrics.rankingsA11y', { sent: progress.sent, total: progress.total })}
             />
           )}
-        </div>
+          <p className="mep-rankings-card__help">{t('manage.metrics.rankingsHelp')}</p>
+        </Card>
       )
     );
   }
-  if (state === 'participation' || state === 'voting') {
+  if (state === 'participation') {
     metrics.push(<StatTile key="deadline" label={t('manage.metrics.deadline')} value={deadlineValue} />);
   }
 
@@ -648,13 +644,8 @@ const ManageEventPage: React.FC = () => {
                 ? t('manage.nextStep.voting.text', { date: fmt.date(votingDate) })
                 : t('manage.nextStep.voting.textNoDate')
             }
-            consequence={
-              progress && progress.missing > 0
-                ? t('manage.consequence.missingRankings', { missing: progress.missing, total: progress.total })
-                : undefined
-            }
             primaryAction={action(t('manage.nextStep.voting.action'))}
-            primaryVariant={progress?.complete ? 'primary' : 'secondary'}
+            primaryVariant="primary"
           />
         );
       }
@@ -685,20 +676,6 @@ const ManageEventPage: React.FC = () => {
   })();
 
   // ---------- Participantes ----------
-  const showReminder = reminder !== null && pending.length > 0 && !blockError;
-  const reminderButton = showReminder ? (
-    <Button
-      variant="secondary"
-      iconStart={<BellIcon />}
-      disabled={paused || reminderSent}
-      onClick={() => setOpenDialog('reminder')}
-    >
-      {reminderSent
-        ? t('manage.reminder.sent')
-        : t(reminder === 'file' ? 'manage.reminder.file' : 'manage.reminder.vote', { count: pending.length })}
-    </Button>
-  ) : null;
-
   const participantsContent = ((): React.ReactNode => {
     if (state === 'creation') {
       return <EmptyState title={t('manage.empty.title')} headingLevel={3} description={t('manage.empty.creation')} />;
@@ -718,7 +695,7 @@ const ManageEventPage: React.FC = () => {
           headingLevel={3}
           description={state === 'participation' ? t('manage.empty.participation') : undefined}
           action={
-            state === 'participation' ? { label: t('manage.copyInvite'), onClick: handleCopy } : undefined
+            state === 'participation' ? { label: t('manage.share'), onClick: () => setOpenDialog('share') } : undefined
           }
         />
       );
@@ -797,13 +774,21 @@ const ManageEventPage: React.FC = () => {
         <div className="mep-body" data-stage={state}>
           <div className="mep-cols">
             <div className="mep-main-col">
-              {metrics.length > 0 && <div className="mep-metrics mep-item mep-item--metrics">{metrics}</div>}
+              {metrics.length > 0 && (
+                <div
+                  className={`mep-metrics mep-item mep-item--metrics${state === 'voting' ? ' mep-metrics--voting' : ''}`}
+                >
+                  {metrics}
+                </div>
+              )}
               {state === 'creation' && nextStep && (
                 <div className="mep-item mep-item--next" ref={nextStepRef}>
                   {nextStep}
                 </div>
               )}
-              {configBlock && <div className="mep-item mep-item--config">{configBlock}</div>}
+              {configBlock && state === 'results' && (
+                <div className="mep-item mep-item--config">{configBlock}</div>
+              )}
               <div className="mep-main mep-item mep-item--main">
                 {showParticipants && (
                   <section className="mep-participants" aria-labelledby="mep-participants-title">
@@ -816,7 +801,7 @@ const ManageEventPage: React.FC = () => {
                             })
                           : t('manage.participants.title')}
                       </h2>
-                      {reminderButton}
+                      {state === 'participation' && reminderButton}
                     </div>
                     {participantsContent}
                   </section>
@@ -831,6 +816,9 @@ const ManageEventPage: React.FC = () => {
                 <div className="mep-item mep-item--next" ref={nextStepRef}>
                   {nextStep}
                 </div>
+              )}
+              {state === 'voting' && configBlock && (
+                <div className="mep-item mep-item--config mep-item--voting-config">{configBlock}</div>
               )}
               {state === 'creation' && (
                 <>
@@ -907,6 +895,7 @@ const ManageEventPage: React.FC = () => {
           open={openDialog === 'publishResults'}
           eventId={event.id}
           progress={progress}
+          votingDeadline={event.voting_estimated_end_date ?? null}
           unevaluated={rosterReady && stats.data ? unevaluatedProposals(proposals.length, stats.data) : 0}
           onClose={closeDialog}
           onDone={() => finishDialog('manage.success.resultsPublished', undefined, true)}

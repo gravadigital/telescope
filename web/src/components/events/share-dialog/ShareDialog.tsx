@@ -2,6 +2,7 @@ import React from 'react';
 import { Button, Callout, Dialog, TextField } from '../../ui';
 import {
   FacebookIcon,
+  InstagramIcon,
   LinkIcon,
   LinkedInIcon,
   MailIcon,
@@ -10,7 +11,14 @@ import {
   XLogoIcon,
 } from '../../ui/icons/Icons';
 import type { IconProps } from '../../ui/icons/Icons';
-import { COPY_FEEDBACK_MS, shareAudienceKey, shareLinks, shareUrl } from '../../../domain/eventDetail';
+import {
+  COPY_FEEDBACK_MS,
+  INSTAGRAM_OPEN_DELAY_MS,
+  instagramShareLinks,
+  shareAudienceKey,
+  shareLinks,
+  shareUrl,
+} from '../../../domain/eventDetail';
 import type { ShareNetwork } from '../../../domain/eventDetail';
 import { useT } from '../../../i18n';
 import type { EventStage } from '../../../types';
@@ -30,6 +38,7 @@ const NETWORK_ICONS: Record<ShareNetwork, React.FC<IconProps>> = {
   x: XLogoIcon,
   linkedin: LinkedInIcon,
   facebook: FacebookIcon,
+  instagram: InstagramIcon,
   email: MailIcon,
 };
 
@@ -37,9 +46,11 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, eventId, eventName, sta
   const { t } = useT();
   const [copied, setCopied] = React.useState(false);
   const [copyFailed, setCopyFailed] = React.useState(false);
+  const [instagramToast, setInstagramToast] = React.useState(false);
   const copyRef = React.useRef<HTMLButtonElement>(null);
   const inputRef = React.useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const timerRef = React.useRef<number | undefined>(undefined);
+  const openTimerRef = React.useRef<number | undefined>(undefined);
 
   const clearTimer = (): void => {
     if (timerRef.current !== undefined) {
@@ -48,31 +59,77 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, eventId, eventName, sta
     }
   };
 
+  const clearOpenTimer = (): void => {
+    if (openTimerRef.current !== undefined) {
+      window.clearTimeout(openTimerRef.current);
+      openTimerRef.current = undefined;
+    }
+  };
+
   // Al reabrir, el estado de copia vuelve a cero; al desmontar, no queda el timer.
   React.useEffect(() => {
     if (open) {
       setCopied(false);
       setCopyFailed(false);
+      setInstagramToast(false);
     }
-    return clearTimer;
+    return () => {
+      clearTimer();
+      clearOpenTimer();
+    };
   }, [open]);
 
   const url = shareUrl(window.location.origin, eventId);
   const canShareNatively = typeof navigator.share === 'function';
 
-  const handleCopy = async (): Promise<void> => {
+  /**
+   * Respaldo para contextos no seguros (http desde la red local, donde el teléfono abre la
+   * página): ahí no existe `navigator.clipboard`.
+   */
+  const copyWithExecCommand = (text: string): boolean => {
+    if (typeof document.execCommand !== 'function') return false;
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    let ok = false;
+    try {
+      ok = document.execCommand('copy');
+    } catch {
+      ok = false;
+    }
+    document.body.removeChild(area);
+    return ok;
+  };
+
+  const handleCopy = async (): Promise<boolean> => {
     clearTimer();
     try {
-      if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
-      await navigator.clipboard.writeText(url);
+      let ok = false;
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(url);
+          ok = true;
+        } catch {
+          ok = copyWithExecCommand(url);
+        }
+      } else {
+        ok = copyWithExecCommand(url);
+      }
+      if (!ok) throw new Error('clipboard unavailable');
       setCopyFailed(false);
       setCopied(true);
       timerRef.current = window.setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
+      return true;
     } catch {
       setCopied(false);
       setCopyFailed(true);
       inputRef.current?.focus();
       inputRef.current?.select();
+      return false;
     }
   };
 
@@ -85,6 +142,39 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, eventId, eventName, sta
         console.error('Failed to share event:', err);
       }
     }
+  };
+
+  /** Abre Instagram en pestaña nueva; si el navegador bloquea el popup, navega en la actual. */
+  const openInNewTab = (target: string): void => {
+    const opened = window.open(target, '_blank');
+    if (opened) {
+      opened.opener = null;
+    } else {
+      window.location.href = target;
+    }
+  };
+
+  /**
+   * En celular deja que el vínculo abra Instagram de inmediato. En desktop copia el enlace,
+   * muestra el aviso y espera antes de abrir la bandeja web, para que se pueda leer el aviso.
+   */
+  const handleInstagramClick = (event: React.MouseEvent<HTMLAnchorElement>): void => {
+    const { primary } = instagramShareLinks(navigator.userAgent, url);
+
+    if (!primary.startsWith('https://')) {
+      void handleCopy();
+      return;
+    }
+
+    event.preventDefault();
+    void handleCopy().then((copiedSuccessfully) => {
+      if (copiedSuccessfully) setInstagramToast(true);
+      clearOpenTimer();
+      openTimerRef.current = window.setTimeout(() => {
+        openTimerRef.current = undefined;
+        openInNewTab(primary);
+      }, INSTAGRAM_OPEN_DELAY_MS);
+    });
   };
 
   return (
@@ -129,14 +219,20 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, eventId, eventName, sta
             const Icon = NETWORK_ICONS[network];
             const name = t(`share.networks.${network}`);
             const external = network !== 'email';
+            // En celular Instagram abre el "Enviar a…" con el link; en desktop, el web.
+            const destination =
+              network === 'instagram'
+                ? instagramShareLinks(navigator.userAgent, url).primary
+                : href;
             return (
               <li key={network}>
                 <a
                   className="ev-share-dialog__network"
-                  href={href}
+                  href={destination}
                   aria-label={t('share.networkAccessible', { network: name })}
                   target={external ? '_blank' : undefined}
                   rel={external ? 'noopener noreferrer' : undefined}
+                  onClick={network === 'instagram' ? handleInstagramClick : undefined}
                 >
                   <span className="ev-share-dialog__network-icon-frame" aria-hidden="true">
                     <Icon className="ev-share-dialog__network-icon" width={24} height={24} />
@@ -153,6 +249,13 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, eventId, eventName, sta
             <Button variant="secondary" fullWidth iconStart={<ShareIcon />} onClick={handleNativeShare}>
               {t('share.more')}
             </Button>
+          </div>
+        )}
+
+        {instagramToast && (
+          <div className="ev-share-dialog__toast">
+            <strong className="ev-share-dialog__toast-title">{t('share.instagramNotifyTitle')}</strong>
+            <span>{t('share.instagramNotifyBody')}</span>
           </div>
         )}
       </div>
